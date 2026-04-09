@@ -1,0 +1,23 @@
+{
+  "name": "obraya",
+  "version": "0.0.1",
+  "private": true,
+  "description": "ObraYa - Plataforma de ultima milla para materiales de construccion",
+  "workspaces": [
+    "packages/backend",
+    "packages/frontend",
+    "packages/mobile",
+    "packages/shared"
+  ],
+  "scripts": {
+    "dev:backend": "npm run dev --workspace=packages/backend",
+    "dev:frontend": "npm run dev --workspace=packages/frontend",
+    "build:backend": "npm run build --workspace=packages/backend",
+    "build:frontend": "npm run build --workspace=packages/frontend",
+    "lint": "npm run lint --workspaces --if-present",
+    "test": "npm run test --workspaces --if-present"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  }
+}
