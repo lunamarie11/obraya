@@ -1,23 +1,15 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
-
-// MVP: CRUD productos, imagenes, fichas tecnicas, variantes, import CSV masivo
+import { Product } from './entities/product.entity';
+import { ProductVariant } from './entities/product-variant.entity';
+import { ProductsService } from './products.service';
+import { ProductsController } from './products.controller';
+import { StorageService } from './storage.service';
 
 @Module({
-  imports: [
-    // TypeOrmModule.forFeature([Product, ProductVariant, Stock, Price, ProductImage, TechnicalSheet]),
-  ],
-  controllers: [
-    // ProductController,
-    // ImportController,
-  ],
-  providers: [
-    // ProductService,
-    // ImportService,
-    // S3Service (for images and technical sheets),
-  ],
-  exports: [
-    // ProductService,
-  ],
+  imports: [TypeOrmModule.forFeature([Product, ProductVariant])],
+  controllers: [ProductsController],
+  providers: [ProductsService, StorageService],
+  exports: [ProductsService],
 })
 export class ProductsModule {}
