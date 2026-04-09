@@ -20,5 +20,6 @@
     "paths": {
       "@obraya/shared": ["../shared/src"]
     }
-  }
+  },
+  "exclude": ["node_modules"]
 }

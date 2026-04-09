@@ -4,6 +4,54 @@ Cada cambio importante del proyecto se documenta aqui. Las decisiones arquitecto
 
 ---
 
+## [0.3.0] - 2026-04-09
+
+### Decisiones Tomadas
+
+- **App Router de Next.js 14:** Se usa el sistema de rutas con carpetas `(auth)` y `(backoffice)` como route groups para separar layouts sin afectar la URL.
+- **Token en localStorage:** Decisión de MVP. En v2 migrar a httpOnly cookies para protección contra XSS. El middleware actualmente verifica cookie (no localStorage) — en v2 unificar.
+- **React Query para estado server:** Todo dato del servidor se maneja con `useQuery`/`useMutation`. Sin Redux ni Context para datos remotos.
+- **Precios en centavos en el frontend:** `formatARS()` convierte centavos a pesos ARS con `Intl.NumberFormat`. Nunca se hace aritmética en la UI con los valores raw.
+- **22/22 tests pasando:** PricesService (8 tests: descuentos scheduled, por volumen, precedencia) y OrdersService (14 tests: transiciones válidas e inválidas, cancelación, mensajes).
+
+### Agregado
+
+- **Tests unitarios (22 tests, 0 fallos):**
+  - `prices.service.spec.ts`: 8 casos para resolución de descuentos (volumen, programado, precedencia, fuera de fecha)
+  - `orders.service.spec.ts`: 14 casos para flujo de estados (transiciones válidas/inválidas, cancelación con/sin motivo, mensajes en estado final)
+
+- **Infraestructura:**
+  - MinIO agregado al `docker-compose.yml` (puerto 9000 API, 9001 consola web)
+  - `jest.config.js` configurado para el backend
+
+- **Frontend Next.js 14 (App Router):**
+  - Route groups `(auth)` y `(backoffice)` con layouts separados
+  - `globals.css` con Tailwind + clases reutilizables (`.card`, `.btn-primary`, `.badge-*`)
+  - `lib/api.ts`: cliente Axios con interceptor de token y auto-refresh
+  - `lib/auth.ts`: login, register, logout, getStoredUser
+  - Sidebar con navegación activa y color de marca (naranja ObraYa)
+  - Header con avatar de usuario y rol
+  - **Páginas implementadas:**
+    - `/login` — formulario de login con manejo de errores
+    - `/register` — registro de empresa + admin con confirmación
+    - `/dashboard` — KPIs con selector de período (hoy/semana/mes), comparativa vs anterior, top productos, alerta de bajo stock
+    - `/orders` — tabla paginada con filtros por estado y búsqueda, badges de estado con color
+    - `/products` — grid de productos con imágenes, variantes, edición y desactivación
+    - `/stock` — tabla de stock con highlight de bajo stock
+    - `/reports` — descarga directa de CSV de ventas (con rango de fechas) y stock
+  - `middleware.ts` para protección de rutas (redirige a /login si no hay token)
+  - `tailwind.config.ts` y `next.config.js` configurados
+
+### Pendiente
+
+- Páginas de detalle: `/orders/:id` (detalle + chat), `/products/:id` (edición + upload imágenes)
+- Página `/products/new` (formulario de creación)
+- Página `/settings` (usuarios de la empresa, invitaciones)
+- Migrar auth de localStorage a httpOnly cookies
+- Instalar dependencias frontend (`npm install` en packages/frontend)
+
+---
+
 ## [0.2.0] - 2026-04-09
 
 ### Decisiones Tomadas
