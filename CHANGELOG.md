@@ -4,6 +4,62 @@ Cada cambio importante del proyecto se documenta aqui. Las decisiones arquitecto
 
 ---
 
+## [0.2.0] - 2026-04-09
+
+### Decisiones Tomadas
+
+- **Precios en centavos:** `basePrice` se almacena como entero (bigint) en centavos de ARS para evitar errores de punto flotante. $1500 → 150000. Se convierte a decimal solo al exportar.
+- **Descuento programado tiene precedencia sobre volumen:** Si hay un descuento activo por fecha, no se aplica el de volumen. Evita conflictos y es el comportamiento más predecible para el usuario.
+- **Soft delete en Orders nunca:** Los pedidos no se eliminan, solo se cancelan con motivo obligatorio. Requerimiento legal/auditoría.
+- **Transiciones de estado validadas en backend:** La lógica de `VALID_TRANSITIONS` vive en el service, no en el frontend. El frontend no puede saltar estados inválidos aunque lo intente.
+- **BOM en CSV exportados:** Se agrega `\uFEFF` al inicio del CSV para que Excel (Windows) abra correctamente los acentos sin configuración extra.
+- **Dashboard compara contra período anterior:** El endpoint retorna el período actual Y el anterior para mostrar variación porcentual sin un segundo request.
+- **Reportes como descarga directa:** Los endpoints de reportes responden con `Content-Disposition: attachment` para descarga directa desde el browser o Postman, no base64.
+
+### Agregado
+
+- **Módulo Prices:**
+  - Entidad `Price` (tipo B2C/B2B, precio en centavos, precios por volumen JSONB, descuento programado JSONB)
+  - Entidad `PriceHistory` (historial de cambios con motivo y usuario)
+  - `GET  /api/v1/products/:id/prices` — ver precios actuales
+  - `POST /api/v1/products/:id/prices` — crear o actualizar precio (upsert)
+  - `GET  /api/v1/products/:id/prices/resolve?type=B2C&quantity=50` — precio final aplicando descuentos
+  - `GET  /api/v1/products/:id/prices/history` — historial de cambios
+  - Resolución de descuentos: primero programado, luego volumen, luego base
+
+- **Módulo Orders:**
+  - Entidades `Order`, `OrderItem`, `OrderMessage`
+  - Flujo de estados validado: Nuevo→Aceptado→Preparacion→Despachado→Entregado (+ Cancelado desde cualquier estado activo)
+  - `GET  /api/v1/orders` — listar con filtros (estado, fecha, búsqueda)
+  - `GET  /api/v1/orders/:id` — detalle con items y mensajes
+  - `PUT  /api/v1/orders/:id/status` — cambiar estado (valida transición, requiere motivo si cancela)
+  - `POST /api/v1/orders/:id/messages` — enviar mensaje al comprador
+  - `GET  /api/v1/orders/:id/messages` — historial del chat
+  - Mensaje de sistema automático en cada cambio de estado
+
+- **Dashboard:**
+  - `GET /api/v1/dashboard/summary?period=today|week|month`
+  - KPIs: ingresos totales, cantidad de pedidos, ticket medio
+  - Variación porcentual vs período anterior
+  - Top 10 productos por revenue
+  - Pedidos por estado
+  - Alertas de bajo stock (top 5)
+
+- **Reportes:**
+  - `GET /api/v1/reports/sales?from=2026-01-01&to=2026-12-31` → descarga CSV de ventas
+  - `GET /api/v1/reports/stock` → descarga CSV de stock valorizado
+  - CSV con BOM para compatibilidad con Excel
+
+### Pendiente
+
+- Migrations SQL (generar con `npm run migration:generate`)
+- MinIO en docker-compose para imágenes en dev
+- Tests unitarios de OrdersService (flujo de estados) y PricesService (resolución de descuentos)
+- Integración AFIP para validación de CUIT al registrar empresa
+- Notificaciones push/email al cambiar estado de pedido
+
+---
+
 ## [0.1.0] - 2026-04-09
 
 ### Decisiones Tomadas

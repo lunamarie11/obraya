@@ -10,9 +10,12 @@ import { appConfig, databaseConfig, jwtConfig, storageConfig } from './config/ap
 import { UsersModule } from './modules/users/users.module';
 import { ProductsModule } from './modules/products/products.module';
 import { StockModule } from './modules/stock/stock.module';
+import { PricesModule } from './modules/prices/prices.module';
+import { OrdersModule } from './modules/orders/orders.module';
+import { DashboardModule } from './modules/dashboard/dashboard.module';
+import { ReportsModule } from './modules/reports/reports.module';
 
 // Módulos de negocio - Fase 2+
-// import { OrdersModule } from './modules/orders/orders.module';
 // import { PaymentsModule } from './modules/payments/payments.module';
 // import { LogisticsModule } from './modules/logistics/logistics.module';
 // import { NotificationsModule } from './modules/notifications/notifications.module';
@@ -29,6 +32,10 @@ import { StockModule } from './modules/stock/stock.module';
     UsersModule,
     ProductsModule,
     StockModule,
+    PricesModule,
+    OrdersModule,
+    DashboardModule,
+    ReportsModule,
   ],
 })
 export class AppModule {}

@@ -1,23 +1,19 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
-
-// MVP: Recepcion, estados (Nuevo->Aceptado->Preparacion->Despachado->Entregado), chat con comprador
+import { Order } from './entities/order.entity';
+import { OrderItem } from './entities/order-item.entity';
+import { OrderMessage } from './entities/order-message.entity';
+import { OrdersService } from './orders.service';
+import { OrdersController } from './orders.controller';
+import { StockModule } from '../stock/stock.module';
 
 @Module({
   imports: [
-    // TypeOrmModule.forFeature([Order, OrderItem, OrderStatus, OrderChat, OrderTimeline]),
+    TypeOrmModule.forFeature([Order, OrderItem, OrderMessage]),
+    StockModule,
   ],
-  controllers: [
-    // OrderController,
-    // OrderChatController,
-  ],
-  providers: [
-    // OrderService,
-    // OrderChatService,
-    // OrderStateManager,
-  ],
-  exports: [
-    // OrderService,
-  ],
+  controllers: [OrdersController],
+  providers: [OrdersService],
+  exports: [OrdersService],
 })
 export class OrdersModule {}
