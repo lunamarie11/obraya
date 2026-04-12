@@ -1,0 +1,273 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../node_modules/.prisma/client"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ── Users ──────────────────────────────────────────────────────────────────
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  password  String
+  name      String
+  phone     String?
+  cuit      String?
+  role      UserRole @default(BUYER)
+  isPro     Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  addresses Address[]
+  orders    Order[]
+  projects  Project[]
+  reviews   Review[]
+
+  @@map("users")
+}
+
+enum UserRole {
+  BUYER
+  SUPPLIER
+  CONTRACTOR
+  ADMIN
+}
+
+// ── Addresses ──────────────────────────────────────────────────────────────
+model Address {
+  id        String   @id @default(cuid())
+  userId    String
+  label     String
+  street    String
+  city      String
+  province  String
+  zipCode   String
+  isDefault Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  user   User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  orders Order[]
+
+  @@map("addresses")
+}
+
+// ── Categories ─────────────────────────────────────────────────────────────
+model Category {
+  id        String   @id @default(cuid())
+  name      String
+  slug      String   @unique
+  emoji     String?
+  parentId  String?
+  createdAt DateTime @default(now())
+
+  parent   Category?  @relation("CategoryTree", fields: [parentId], references: [id])
+  children Category[] @relation("CategoryTree")
+  products Product[]
+
+  @@map("categories")
+}
+
+// ── Suppliers ──────────────────────────────────────────────────────────────
+model Supplier {
+  id        String   @id @default(cuid())
+  name      String
+  cuit      String   @unique
+  email     String   @unique
+  phone     String?
+  address   String?
+  logoUrl   String?
+  rating    Float    @default(0)
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  products Product[]
+
+  @@map("suppliers")
+}
+
+// ── Products ───────────────────────────────────────────────────────────────
+model Product {
+  id          String   @id @default(cuid())
+  name        String
+  slug        String   @unique
+  description String?
+  brand       String
+  emoji       String?
+  imageUrl    String?
+  price       Float
+  proPrice    Float?
+  unit        String
+  stock       Int      @default(0)
+  isActive    Boolean  @default(true)
+  isPromo     Boolean  @default(false)
+  promoPrice  Float?
+  badge       String?
+  categoryId  String
+  supplierId  String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  category   Category    @relation(fields: [categoryId], references: [id])
+  supplier   Supplier    @relation(fields: [supplierId], references: [id])
+  orderItems OrderItem[]
+  reviews    Review[]
+
+  @@map("products")
+}
+
+// ── Orders ─────────────────────────────────────────────────────────────────
+model Order {
+  id            String      @id @default(cuid())
+  orderNumber   String      @unique
+  userId        String
+  addressId     String?
+  status        OrderStatus @default(PENDING)
+  subtotal      Float
+  shipping      Float       @default(0)
+  total         Float
+  paymentMethod String?
+  notes         String?
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+
+  user     User       @relation(fields: [userId], references: [id])
+  address  Address?   @relation(fields: [addressId], references: [id])
+  items    OrderItem[]
+  tracking Tracking[]
+
+  @@map("orders")
+}
+
+enum OrderStatus {
+  PENDING
+  CONFIRMED
+  PREPARING
+  IN_TRANSIT
+  DELIVERED
+  CANCELLED
+}
+
+model OrderItem {
+  id        String  @id @default(cuid())
+  orderId   String
+  productId String
+  qty       Int
+  price     Float
+  subtotal  Float
+
+  order   Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  product Product @relation(fields: [productId], references: [id])
+
+  @@map("order_items")
+}
+
+// ── Tracking ───────────────────────────────────────────────────────────────
+model Tracking {
+  id        String      @id @default(cuid())
+  orderId   String
+  status    OrderStatus
+  message   String?
+  location  String?
+  createdAt DateTime    @default(now())
+
+  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@map("tracking")
+}
+
+// ── Projects ───────────────────────────────────────────────────────────────
+model Project {
+  id        String        @id @default(cuid())
+  name      String
+  type      String
+  area      String?
+  location  String?
+  budget    Float
+  spent     Float         @default(0)
+  progress  Int           @default(0)
+  status    ProjectStatus @default(ON_TRACK)
+  startDate DateTime
+  endDate   DateTime
+  ownerId   String
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
+
+  owner    User      @relation(fields: [ownerId], references: [id])
+  tasks    Task[]
+  expenses Expense[]
+
+  @@map("projects")
+}
+
+enum ProjectStatus {
+  ON_TRACK
+  AT_RISK
+  DELAYED
+  COMPLETED
+  PAUSED
+}
+
+model Task {
+  id            String     @id @default(cuid())
+  title         String
+  projectId     String
+  status        TaskStatus @default(BACKLOG)
+  priority      Priority   @default(MEDIUM)
+  assignedTo    String?
+  dueDate       DateTime?
+  progress      Int        @default(0)
+  completedDate DateTime?
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@map("tasks")
+}
+
+enum TaskStatus {
+  BACKLOG
+  IN_PROGRESS
+  REVIEW
+  DONE
+}
+
+enum Priority {
+  HIGH
+  MEDIUM
+  LOW
+}
+
+model Expense {
+  id           String   @id @default(cuid())
+  projectId    String
+  concept      String
+  category     String
+  amount       Float
+  registeredBy String?
+  date         DateTime @default(now())
+  createdAt    DateTime @default(now())
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@map("expenses")
+}
+
+// ── Reviews ────────────────────────────────────────────────────────────────
+model Review {
+  id        String   @id @default(cuid())
+  userId    String
+  productId String
+  rating    Int
+  comment   String?
+  createdAt DateTime @default(now())
+
+  user    User    @relation(fields: [userId], references: [id])
+  product Product @relation(fields: [productId], references: [id])
+
+  @@map("reviews")
+}
