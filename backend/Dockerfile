@@ -3,6 +3,7 @@ WORKDIR /app
 COPY package*.json ./
 RUN npm ci
 COPY . .
+ENV DATABASE_URL=postgresql://dummy:dummy@dummy:5432/dummy
 RUN npx prisma generate
 RUN npm run build
 
@@ -11,6 +12,7 @@ WORKDIR /app
 COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/prisma ./prisma
+COPY --from=builder /app/prisma.config.ts ./prisma.config.ts
 COPY package*.json ./
 
 # Script to run migrations then start the app
