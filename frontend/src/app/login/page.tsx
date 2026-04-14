@@ -3,14 +3,20 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { HardHat, ArrowRight, Loader2 } from "lucide-react";
+import { HardHat, ArrowRight, Loader2, Building2, ShoppingCart } from "lucide-react";
 import { authApi } from "@/lib/auth";
+
+const DEMO_USERS = [
+  { label: "Arquitecto", email: "arq@obraya.com", password: "obraya123", icon: Building2, color: "bg-dark-800 hover:bg-dark-900" },
+  { label: "Comercio", email: "comercio@obraya.com", password: "obraya123", icon: ShoppingCart, color: "bg-brand-500 hover:bg-brand-600" },
+];
 
 export default function LoginPage() {
   const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
+  const [demoLoading, setDemoLoading] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   async function handleSubmit(e: React.FormEvent) {
@@ -19,18 +25,34 @@ export default function LoginPage() {
     setLoading(true);
     try {
       const result = await authApi.login({ email, password });
-      // Redirige según el rol del usuario
       if (result.user.role === "ARQUITECTO") {
         router.push("/arquitecto/dashboard");
       } else if (result.user.role === "COMERCIO") {
         router.push("/comercio/dashboard");
       } else {
-        router.push("/select-role");
+        router.push("/");
       }
     } catch (err: any) {
       setError(err?.message || "Email o contraseña incorrectos");
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function handleDemo(demo: typeof DEMO_USERS[0]) {
+    setError(null);
+    setDemoLoading(demo.label);
+    try {
+      const result = await authApi.login({ email: demo.email, password: demo.password });
+      if (result.user.role === "ARQUITECTO") {
+        router.push("/arquitecto/dashboard");
+      } else {
+        router.push("/comercio/dashboard");
+      }
+    } catch (err: any) {
+      setError(err?.message || "Error al ingresar con cuenta demo");
+    } finally {
+      setDemoLoading(null);
     }
   }
 
@@ -46,14 +68,38 @@ export default function LoginPage() {
         </Link>
       </div>
 
-      {/* Form */}
       <div className="flex-1 flex items-center justify-center px-6 py-12">
-        <div className="w-full max-w-md">
-          <div className="bg-white rounded-2xl border border-gray-100 p-8 shadow-sm">
-            <h1 className="text-3xl font-extrabold mb-2">Ingresar</h1>
-            <p className="text-gray-600 mb-8">Accedé a tu cuenta de ObraYa</p>
+        <div className="w-full max-w-md space-y-4">
 
-            <form onSubmit={handleSubmit} className="space-y-5">
+          {/* Demo access */}
+          <div className="bg-brand-50 border border-brand-200 rounded-2xl p-6">
+            <p className="text-xs font-bold uppercase tracking-wider text-brand-700 mb-3">Acceso rápido — cuentas de prueba</p>
+            <div className="grid grid-cols-2 gap-3">
+              {DEMO_USERS.map((demo) => (
+                <button
+                  key={demo.label}
+                  onClick={() => handleDemo(demo)}
+                  disabled={demoLoading !== null}
+                  className={`flex items-center justify-center gap-2 ${demo.color} text-white text-sm font-bold py-3 rounded-xl transition disabled:opacity-60`}
+                >
+                  {demoLoading === demo.label ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <demo.icon className="w-4 h-4" />
+                  )}
+                  {demo.label}
+                </button>
+              ))}
+            </div>
+            <p className="text-xs text-brand-600 mt-3 text-center">Contraseña: <span className="font-mono font-bold">obraya123</span></p>
+          </div>
+
+          {/* Login form */}
+          <div className="bg-white rounded-2xl border border-gray-100 p-8 shadow-sm">
+            <h1 className="text-2xl font-extrabold mb-1">Ingresar con tu cuenta</h1>
+            <p className="text-gray-500 text-sm mb-6">Accedé a tu cuenta de ObraYa</p>
+
+            <form onSubmit={handleSubmit} className="space-y-4">
               <div>
                 <label className="block text-sm font-semibold mb-2 text-dark-900">Email</label>
                 <input
@@ -90,19 +136,10 @@ export default function LoginPage() {
               <button
                 type="submit"
                 disabled={loading}
-                className="w-full bg-brand-500 hover:bg-brand-600 disabled:opacity-60 text-white font-bold py-3 rounded-lg transition flex items-center justify-center gap-2"
+                className="w-full bg-dark-900 hover:bg-dark-800 disabled:opacity-60 text-white font-bold py-3 rounded-lg transition flex items-center justify-center gap-2"
               >
-                {loading ? (
-                  <>
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                    Ingresando...
-                  </>
-                ) : (
-                  <>
-                    Ingresar
-                    <ArrowRight className="w-4 h-4" />
-                  </>
-                )}
+                {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <ArrowRight className="w-4 h-4" />}
+                {loading ? "Ingresando..." : "Ingresar"}
               </button>
             </form>
 
@@ -114,7 +151,7 @@ export default function LoginPage() {
             </div>
           </div>
 
-          <p className="text-center text-xs text-gray-500 mt-6">
+          <p className="text-center text-xs text-gray-500">
             Al continuar aceptás nuestros <a href="#" className="underline">Términos</a> y{" "}
             <a href="#" className="underline">Política de Privacidad</a>.
           </p>

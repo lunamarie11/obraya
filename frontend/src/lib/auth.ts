@@ -42,12 +42,14 @@ function persistAuth(data: AuthResponse) {
   if (typeof window === "undefined") return;
   localStorage.setItem(TOKEN_KEY, data.token);
   localStorage.setItem(USER_KEY, JSON.stringify(data.user));
+  document.cookie = `${TOKEN_KEY}=${data.token}; path=/; max-age=${60 * 60 * 24 * 7}; SameSite=Lax`;
 }
 
 export function clearAuth() {
   if (typeof window === "undefined") return;
   localStorage.removeItem(TOKEN_KEY);
   localStorage.removeItem(USER_KEY);
+  document.cookie = `${TOKEN_KEY}=; path=/; max-age=0`;
 }
 
 export function isAuthenticated(): boolean {
