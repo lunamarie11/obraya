@@ -1,17 +1,18 @@
 import { Body, Controller, Get, Post, Req, UseGuards } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
+import { IsEmail, IsIn, IsString, MinLength } from 'class-validator';
 import { AuthService } from './auth.service';
 
 class RegisterBody {
-  name!: string;
-  email!: string;
-  password!: string;
-  role!: 'ARQUITECTO' | 'COMERCIO';
+  @IsString() name!: string;
+  @IsEmail() email!: string;
+  @IsString() @MinLength(6) password!: string;
+  @IsIn(['ARQUITECTO', 'COMERCIO']) role!: 'ARQUITECTO' | 'COMERCIO';
 }
 
 class LoginBody {
-  email!: string;
-  password!: string;
+  @IsEmail() email!: string;
+  @IsString() password!: string;
 }
 
 @Controller('auth')
