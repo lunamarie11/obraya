@@ -7,7 +7,7 @@ const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000/api";
 const TOKEN_KEY = "obraya_token";
 const USER_KEY = "obraya_user";
 
-export type Role = "ARQUITECTO" | "COMERCIO";
+export type Role = "BUYER" | "DELIVERY" | "ARQUITECTO" | "COMERCIO";
 
 export interface AuthUser {
   id: string;

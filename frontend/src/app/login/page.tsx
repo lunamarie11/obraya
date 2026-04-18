@@ -3,10 +3,12 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { HardHat, ArrowRight, Loader2, Building2, ShoppingCart } from "lucide-react";
+import { HardHat, ArrowRight, Loader2, Building2, ShoppingCart, Package, Truck } from "lucide-react";
 import { authApi } from "@/lib/auth";
 
 const DEMO_USERS = [
+  { label: "Comprador", email: "buyer@obraya.com", password: "obraya123", icon: Package, color: "bg-green-500 hover:bg-green-600" },
+  { label: "Delivery", email: "delivery@obraya.com", password: "obraya123", icon: Truck, color: "bg-blue-500 hover:bg-blue-600" },
   { label: "Arquitecto", email: "arq@obraya.com", password: "obraya123", icon: Building2, color: "bg-dark-800 hover:bg-dark-900" },
   { label: "Comercio", email: "comercio@obraya.com", password: "obraya123", icon: ShoppingCart, color: "bg-brand-500 hover:bg-brand-600" },
 ];
@@ -25,7 +27,11 @@ export default function LoginPage() {
     setLoading(true);
     try {
       const result = await authApi.login({ email, password });
-      if (result.user.role === "ARQUITECTO") {
+      if (result.user.role === "BUYER") {
+        router.push("/buyer/dashboard");
+      } else if (result.user.role === "DELIVERY") {
+        router.push("/delivery/dashboard");
+      } else if (result.user.role === "ARQUITECTO") {
         router.push("/arquitecto/dashboard");
       } else if (result.user.role === "COMERCIO") {
         router.push("/comercio/dashboard");
@@ -44,7 +50,11 @@ export default function LoginPage() {
     setDemoLoading(demo.label);
     try {
       const result = await authApi.login({ email: demo.email, password: demo.password });
-      if (result.user.role === "ARQUITECTO") {
+      if (result.user.role === "BUYER") {
+        router.push("/buyer/dashboard");
+      } else if (result.user.role === "DELIVERY") {
+        router.push("/delivery/dashboard");
+      } else if (result.user.role === "ARQUITECTO") {
         router.push("/arquitecto/dashboard");
       } else {
         router.push("/comercio/dashboard");

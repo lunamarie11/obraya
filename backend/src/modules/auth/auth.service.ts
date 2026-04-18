@@ -8,7 +8,7 @@ import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
 import { PrismaService } from '../../prisma/prisma.service';
 
-type Role = 'ARQUITECTO' | 'COMERCIO';
+type Role = 'BUYER' | 'SUPPLIER' | 'CONTRACTOR' | 'ADMIN' | 'ARQUITECTO' | 'COMERCIO' | 'DELIVERY';
 
 export interface RegisterDto {
   name: string;
@@ -34,7 +34,7 @@ export class AuthService {
       throw new BadRequestException('Todos los campos son obligatorios');
     }
 
-    if (!['ARQUITECTO', 'COMERCIO'].includes(dto.role)) {
+    if (!['BUYER', 'SUPPLIER', 'CONTRACTOR', 'ADMIN', 'ARQUITECTO', 'COMERCIO', 'DELIVERY'].includes(dto.role)) {
       throw new BadRequestException('Rol inválido');
     }
 

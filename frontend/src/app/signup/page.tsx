@@ -3,10 +3,10 @@
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useState, Suspense } from "react";
-import { HardHat, ArrowRight, Loader2, Building2, ShoppingCart, CheckCircle2 } from "lucide-react";
+import { HardHat, ArrowRight, Loader2, Building2, ShoppingCart, CheckCircle2, Package, Truck, User } from "lucide-react";
 import { authApi } from "@/lib/auth";
 
-type Role = "ARQUITECTO" | "COMERCIO";
+type Role = "BUYER" | "DELIVERY" | "ARQUITECTO" | "COMERCIO";
 
 function SignupForm() {
   const router = useRouter();
@@ -15,7 +15,7 @@ function SignupForm() {
 
   const [step, setStep] = useState<1 | 2>(preselectedRole ? 2 : 1);
   const [role, setRole] = useState<Role | null>(
-    preselectedRole === "ARQUITECTO" || preselectedRole === "COMERCIO" ? preselectedRole : null
+    preselectedRole === "BUYER" || preselectedRole === "DELIVERY" || preselectedRole === "ARQUITECTO" || preselectedRole === "COMERCIO" ? preselectedRole : null
   );
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
@@ -30,7 +30,11 @@ function SignupForm() {
     setLoading(true);
     try {
       const result = await authApi.register({ name, email, password, role });
-      if (result.user.role === "ARQUITECTO") {
+      if (result.user.role === "BUYER") {
+        router.push("/buyer/dashboard");
+      } else if (result.user.role === "DELIVERY") {
+        router.push("/delivery/dashboard");
+      } else if (result.user.role === "ARQUITECTO") {
         router.push("/arquitecto/dashboard");
       } else {
         router.push("/comercio/dashboard");
@@ -69,6 +73,38 @@ function SignupForm() {
               <p className="text-gray-600 mb-8">Elegí el rol que mejor se ajuste a tu trabajo.</p>
 
               <div className="space-y-3">
+                <button
+                  onClick={() => { setRole("BUYER"); setStep(2); }}
+                  className="w-full text-left bg-white border-2 border-gray-100 hover:border-green-500 rounded-xl p-5 transition group"
+                >
+                  <div className="flex items-start gap-4">
+                    <div className="w-12 h-12 bg-green-50 text-green-500 rounded-xl flex items-center justify-center flex-shrink-0">
+                      <Package className="w-6 h-6" />
+                    </div>
+                    <div className="flex-1">
+                      <div className="font-bold text-dark-900 mb-1">Soy Comprador</div>
+                      <div className="text-sm text-gray-600">Busco materiales de construcción para mi obra.</div>
+                    </div>
+                    <ArrowRight className="w-5 h-5 text-gray-300 group-hover:text-green-500 mt-3" />
+                  </div>
+                </button>
+
+                <button
+                  onClick={() => { setRole("DELIVERY"); setStep(2); }}
+                  className="w-full text-left bg-white border-2 border-gray-100 hover:border-blue-500 rounded-xl p-5 transition group"
+                >
+                  <div className="flex items-start gap-4">
+                    <div className="w-12 h-12 bg-blue-50 text-blue-500 rounded-xl flex items-center justify-center flex-shrink-0">
+                      <Truck className="w-6 h-6" />
+                    </div>
+                    <div className="flex-1">
+                      <div className="font-bold text-dark-900 mb-1">Soy Delivery</div>
+                      <div className="text-sm text-gray-600">Entrego materiales de construcción.</div>
+                    </div>
+                    <ArrowRight className="w-5 h-5 text-gray-300 group-hover:text-blue-500 mt-3" />
+                  </div>
+                </button>
+
                 <button
                   onClick={() => { setRole("ARQUITECTO"); setStep(2); }}
                   className="w-full text-left bg-white border-2 border-gray-100 hover:border-navy-500 rounded-xl p-5 transition group"
@@ -121,12 +157,22 @@ function SignupForm() {
               </button>
 
               <div className="flex items-center gap-3 mb-6">
-                <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${role === "ARQUITECTO" ? "bg-navy-50 text-navy-500" : "bg-brand-50 text-brand-600"}`}>
-                  {role === "ARQUITECTO" ? <Building2 className="w-5 h-5" /> : <ShoppingCart className="w-5 h-5" />}
+                <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${
+                  role === "BUYER" ? "bg-green-50 text-green-500" :
+                  role === "DELIVERY" ? "bg-blue-50 text-blue-500" :
+                  role === "ARQUITECTO" ? "bg-navy-50 text-navy-500" : "bg-brand-50 text-brand-600"
+                }`}>
+                  {role === "BUYER" ? <Package className="w-5 h-5" /> :
+                   role === "DELIVERY" ? <Truck className="w-5 h-5" /> :
+                   role === "ARQUITECTO" ? <Building2 className="w-5 h-5" /> : <ShoppingCart className="w-5 h-5" />}
                 </div>
                 <div>
                   <div className="text-xs text-gray-500">Registrándote como</div>
-                  <div className="font-bold text-dark-900">{role === "ARQUITECTO" ? "Arquitecto" : "Comercio"}</div>
+                  <div className="font-bold text-dark-900">
+                    {role === "BUYER" ? "Comprador" :
+                     role === "DELIVERY" ? "Delivery" :
+                     role === "ARQUITECTO" ? "Arquitecto" : "Comercio"}
+                  </div>
                 </div>
               </div>
 

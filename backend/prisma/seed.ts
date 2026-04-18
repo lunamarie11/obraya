@@ -25,6 +25,26 @@ async function main() {
   await prisma.user.deleteMany();
 
   // ── Users ────────────────────────────────────────────────────────────────
+  const buyer = await prisma.user.create({
+    data: {
+      email: "buyer@obraya.com",
+      password: PASSWORD_HASH,
+      name: "María González",
+      phone: "+54 11 3456 7890",
+      role: "BUYER",
+    },
+  });
+
+  const delivery = await prisma.user.create({
+    data: {
+      email: "delivery@obraya.com",
+      password: PASSWORD_HASH,
+      name: "Pedro Rodríguez",
+      phone: "+54 11 2345 6789",
+      role: "DELIVERY",
+    },
+  });
+
   const arquitecto = await prisma.user.create({
     data: {
       email: "arq@obraya.com",
@@ -70,6 +90,17 @@ async function main() {
       password: PASSWORD_HASH,
       name: "Pedro Lopez",
       role: "ARQUITECTO",
+    },
+  });
+
+  // ── Delivery Profiles ────────────────────────────────────────────────────
+  await prisma.delivery.create({
+    data: {
+      userId: delivery.id,
+      vehicleType: "moto",
+      licensePlate: "ABC 123",
+      rating: 4.8,
+      totalDeliveries: 45,
     },
   });
 

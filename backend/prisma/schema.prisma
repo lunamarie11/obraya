@@ -24,8 +24,28 @@ model User {
   orders    Order[]
   projects  Project[]
   reviews   Review[]
+  delivery  Delivery?
 
   @@map("users")
+}
+
+// ── Delivery ───────────────────────────────────────────────────────────────
+model Delivery {
+  id            String   @id @default(cuid())
+  userId        String   @unique
+  vehicleType   String   // moto, auto, camioneta
+  licensePlate  String?
+  isActive      Boolean  @default(true)
+  rating        Float    @default(5.0)
+  totalDeliveries Int     @default(0)
+  commissionRate Float   @default(0.1) // 10% commission
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  orders Order[]
+
+  @@map("deliveries")
 }
 
 enum UserRole {
@@ -35,6 +55,7 @@ enum UserRole {
   ADMIN
   ARQUITECTO
   COMERCIO
+  DELIVERY
 }
 
 // ── Addresses ──────────────────────────────────────────────────────────────
@@ -126,10 +147,13 @@ model Order {
   orderNumber   String      @unique
   userId        String
   addressId     String?
+  deliveryId    String?
   status        OrderStatus @default(PENDING)
   subtotal      Float
   shipping      Float       @default(0)
   total         Float
+  tip           Float       @default(0)
+  deliveryCommission Float  @default(0)
   paymentMethod String?
   notes         String?
   createdAt     DateTime    @default(now())
@@ -137,6 +161,7 @@ model Order {
 
   user     User       @relation(fields: [userId], references: [id])
   address  Address?   @relation(fields: [addressId], references: [id])
+  delivery Delivery?  @relation(fields: [deliveryId], references: [id])
   items    OrderItem[]
   tracking Tracking[]
 
