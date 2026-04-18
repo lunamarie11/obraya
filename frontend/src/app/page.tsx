@@ -96,6 +96,37 @@ const stats = [
   { value: "24/7", label: "Soporte disponible" },
 ];
 
+const roleCards = [
+  {
+    title: "Arquitecto",
+    description: "Planificá tus obras con control completo de etapas, presupuesto y equipos.",
+    href: "/signup?role=arquitecto",
+    icon: Building2,
+    color: "from-navy-600 to-navy-800",
+  },
+  {
+    title: "Comercio",
+    description: "Vendé materiales y gestioná tu stock, precios y logística centralizada.",
+    href: "/signup?role=comercio",
+    icon: ShoppingCart,
+    color: "from-brand-500 to-brand-700",
+  },
+  {
+    title: "Buyer",
+    description: "Comprá materiales rápido, compará precios y seguí tu pedido en todo momento.",
+    href: "/signup?role=buyer",
+    icon: Package,
+    color: "from-emerald-500 to-emerald-700",
+  },
+  {
+    title: "Delivery",
+    description: "Aceptá pedidos, gestioná entregas y ganá con cada viaje desde la app.",
+    href: "/signup?role=delivery",
+    icon: Truck,
+    color: "from-sky-500 to-sky-700",
+  },
+];
+
 export default function HomePage() {
   return (
     <div className="min-h-screen bg-white text-dark-900">
@@ -111,7 +142,7 @@ export default function HomePage() {
 
           <div className="hidden md:flex items-center gap-8 text-sm font-medium text-gray-600">
             <a href="#features" className="hover:text-dark-900 transition">Plataforma</a>
-            <a href="#para-quien" className="hover:text-dark-900 transition">Para quién</a>
+            <a href="#roles" className="hover:text-dark-900 transition">Roles</a>
             <a href="#como-funciona" className="hover:text-dark-900 transition">Cómo funciona</a>
             <a href="#testimonios" className="hover:text-dark-900 transition">Clientes</a>
           </div>
@@ -142,13 +173,12 @@ export default function HomePage() {
           </div>
 
           <h1 className="text-5xl md:text-7xl font-extrabold tracking-tight mb-6 leading-[1.05]">
-            La plataforma integral<br />
-            <span className="bg-gradient-to-r from-brand-500 to-brand-700 bg-clip-text text-transparent">de la construcción</span>
+            La plataforma para arquitectos,<br />
+            comercios, buyers y delivery
           </h1>
 
           <p className="text-lg md:text-xl text-gray-600 max-w-2xl mx-auto mb-10 leading-relaxed">
-            Gestioná obras, controlá presupuestos y comprá materiales en un solo lugar.
-            ObraYa conecta arquitectos y comercios para que construir sea más simple.
+            Gestioná obras, presupuestos, compras y logística desde una única app. Cada rol tiene su espacio y sus herramientas.
           </p>
 
           <div className="flex flex-col sm:flex-row gap-3 justify-center mb-14">
@@ -156,14 +186,14 @@ export default function HomePage() {
               href="/signup"
               className="inline-flex items-center justify-center gap-2 bg-brand-500 hover:bg-brand-600 text-white font-bold px-8 py-4 rounded-xl transition-all shadow-lg shadow-brand-500/30 hover:shadow-xl hover:-translate-y-0.5"
             >
-              Empezar gratis
+              Comenzar ahora
               <ArrowRight className="w-5 h-5" />
             </Link>
             <Link
               href="/login"
               className="inline-flex items-center justify-center gap-2 bg-white border-2 border-gray-200 hover:border-dark-900 text-dark-900 font-bold px-8 py-4 rounded-xl transition-all"
             >
-              Ingresar a ObraYa
+              Ya tengo cuenta
             </Link>
           </div>
 
@@ -173,6 +203,72 @@ export default function HomePage() {
               <div key={s.label}>
                 <div className="text-3xl md:text-4xl font-extrabold text-dark-900">{s.value}</div>
                 <div className="text-xs md:text-sm text-gray-500 mt-1">{s.label}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ============ ROLES ============ */}
+      <section id="roles" className="py-24 bg-white">
+        <div className="max-w-7xl mx-auto px-6">
+          <div className="text-center mb-16">
+            <div className="text-xs font-bold uppercase tracking-wider text-brand-600 mb-3">Tu rol, tu app</div>
+            <h2 className="text-4xl md:text-5xl font-extrabold mb-4">Cuatro experiencias específicas para cada equipo</h2>
+            <p className="text-lg text-gray-600 max-w-2xl mx-auto">
+              Elegí tu perfil y accedé directamente a la interfaz con flujos hechos para vos.
+            </p>
+          </div>
+
+          <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-4">
+            {roleCards.map((role) => (
+              <Link
+                key={role.title}
+                href={role.href}
+                className={`group block rounded-3xl p-6 transition-all border border-gray-100 shadow-sm hover:shadow-xl hover:-translate-y-1 ${role.color} bg-gradient-to-br text-white`}
+              >
+                <div className="flex items-center justify-between">
+                  <div className="rounded-2xl bg-white/10 p-3">
+                    <role.icon className="w-6 h-6" />
+                  </div>
+                  <div className="text-xs uppercase tracking-[0.24em] font-bold opacity-80">Nuevo</div>
+                </div>
+                <div className="mt-8">
+                  <h3 className="text-xl font-extrabold mb-3">{role.title}</h3>
+                  <p className="text-sm text-white/80 leading-relaxed">{role.description}</p>
+                </div>
+                <div className="mt-6 inline-flex items-center gap-2 text-sm font-bold text-white/90 group-hover:text-white">
+                  Comenzar ahora
+                  <ArrowRight className="w-4 h-4" />
+                </div>
+              </Link>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ============ FEATURES ============ */}
+      <section id="features" className="py-24 bg-gray-50">
+        <div className="max-w-7xl mx-auto px-6">
+          <div className="text-center mb-16">
+            <div className="text-xs font-bold uppercase tracking-wider text-brand-600 mb-3">Todo en un solo lugar</div>
+            <h2 className="text-4xl md:text-5xl font-extrabold mb-4">Herramientas que funcionan juntas</h2>
+            <p className="text-lg text-gray-600 max-w-2xl mx-auto">
+              Seis módulos pensados para todo el ciclo de una obra: desde la planificación hasta la entrega final.
+            </p>
+          </div>
+
+          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {features.map((f) => (
+              <div
+                key={f.title}
+                className="bg-white border border-gray-100 rounded-2xl p-8 hover:shadow-xl hover:-translate-y-1 transition-all"
+              >
+                <div className="w-12 h-12 bg-brand-50 text-brand-600 rounded-xl flex items-center justify-center mb-5">
+                  <f.icon className="w-6 h-6" />
+                </div>
+                <h3 className="text-lg font-bold mb-2">{f.title}</h3>
+                <p className="text-sm text-gray-600 leading-relaxed">{f.description}</p>
               </div>
             ))}
           </div>
@@ -211,60 +307,90 @@ export default function HomePage() {
       <section id="para-quien" className="py-24 bg-white">
         <div className="max-w-7xl mx-auto px-6">
           <div className="text-center mb-16">
-            <div className="text-xs font-bold uppercase tracking-wider text-brand-600 mb-3">Pensado para vos</div>
-            <h2 className="text-4xl md:text-5xl font-extrabold mb-4">Dos roles, una sola plataforma</h2>
+            <div className="text-xs font-bold uppercase tracking-wider text-brand-600 mb-3">Pensado para equipos</div>
+            <h2 className="text-4xl md:text-5xl font-extrabold mb-4">Un producto para los cuatro roles clave</h2>
             <p className="text-lg text-gray-600 max-w-2xl mx-auto">
-              Elegí el perfil que mejor se ajusta a tu trabajo y accedé a las herramientas específicas que necesitás.
+              ObraYa entrega una experiencia dedicada según tu función: arquitecto, comercio, buyer o delivery.
             </p>
           </div>
 
-          <div className="grid md:grid-cols-2 gap-6">
-            {/* Arquitecto */}
-            <div className="relative bg-gradient-to-br from-navy-500 to-[#1A252F] rounded-3xl p-10 text-white overflow-hidden">
-              <div className="absolute top-0 right-0 w-64 h-64 bg-white/5 rounded-full -translate-y-20 translate-x-20" />
-              <Building2 className="w-12 h-12 mb-6 relative" />
-              <h3 className="text-3xl font-extrabold mb-3 relative">Para Arquitectos</h3>
-              <p className="text-white/80 mb-6 relative">
-                Gestioná cada obra con precisión, controlá los costos y tené a todo el equipo alineado.
-              </p>
-              <ul className="space-y-3 mb-8 relative">
-                {["Dashboard de obras en vivo", "Kanban de tareas por etapa", "Control de presupuesto y gastos", "Calculadora llave en mano", "Gestión de contratistas"].map((item) => (
-                  <li key={item} className="flex items-center gap-3 text-sm">
-                    <CheckCircle2 className="w-5 h-5 text-brand-300 flex-shrink-0" />
+          <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-4">
+            <div className="rounded-3xl border border-gray-100 p-8 hover:shadow-xl transition-all">
+              <div className="w-12 h-12 rounded-2xl bg-navy-50 text-navy-700 flex items-center justify-center mb-5">
+                <Building2 className="w-6 h-6" />
+              </div>
+              <h3 className="text-xl font-bold mb-3">Arquitecto</h3>
+              <p className="text-gray-600 mb-6">Controlá obras, tareas y presupuesto con un dashboard especializado.</p>
+              <ul className="space-y-3 text-sm text-gray-600 mb-6">
+                {["Gestión de obras", "Tareas por etapa", "Presupuesto inteligente", "Seguimiento en vivo"].map((item) => (
+                  <li key={item} className="flex items-center gap-2">
+                    <CheckCircle2 className="w-4 h-4 text-brand-500" />
                     {item}
                   </li>
                 ))}
               </ul>
-              <Link
-                href="/signup?role=arquitecto"
-                className="inline-flex items-center gap-2 bg-white text-dark-900 font-bold px-6 py-3 rounded-xl hover:bg-gray-100 transition relative"
-              >
+              <Link href="/signup?role=arquitecto" className="inline-flex items-center gap-2 text-sm font-semibold text-brand-600 hover:text-brand-700">
                 Empezar como Arquitecto
                 <ArrowRight className="w-4 h-4" />
               </Link>
             </div>
 
-            {/* Comercio */}
-            <div className="relative bg-gradient-to-br from-brand-500 to-brand-700 rounded-3xl p-10 text-white overflow-hidden">
-              <div className="absolute top-0 right-0 w-64 h-64 bg-white/10 rounded-full -translate-y-20 translate-x-20" />
-              <ShoppingCart className="w-12 h-12 mb-6 relative" />
-              <h3 className="text-3xl font-extrabold mb-3 relative">Para Comercios</h3>
-              <p className="text-white/90 mb-6 relative">
-                Vendé más, gestioná tu logística con GPS y llegá a cientos de arquitectos activos.
-              </p>
-              <ul className="space-y-3 mb-8 relative">
-                {["Dashboard de ventas y KPIs", "Catálogo de productos online", "Gestión de pedidos en vivo", "Logística con seguimiento GPS", "Reportes y métricas de venta"].map((item) => (
-                  <li key={item} className="flex items-center gap-3 text-sm">
-                    <CheckCircle2 className="w-5 h-5 text-white flex-shrink-0" />
+            <div className="rounded-3xl border border-gray-100 p-8 hover:shadow-xl transition-all">
+              <div className="w-12 h-12 rounded-2xl bg-brand-50 text-brand-700 flex items-center justify-center mb-5">
+                <ShoppingCart className="w-6 h-6" />
+              </div>
+              <h3 className="text-xl font-bold mb-3">Comercio</h3>
+              <p className="text-gray-600 mb-6">Vendé materiales con pedidos online, inventario y métricas en un solo tablero.</p>
+              <ul className="space-y-3 text-sm text-gray-600 mb-6">
+                {["Catálogo digital", "Pedidos en vivo", "Gestión de stock", "Reportes de venta"].map((item) => (
+                  <li key={item} className="flex items-center gap-2">
+                    <CheckCircle2 className="w-4 h-4 text-brand-500" />
                     {item}
                   </li>
                 ))}
               </ul>
-              <Link
-                href="/signup?role=comercio"
-                className="inline-flex items-center gap-2 bg-white text-dark-900 font-bold px-6 py-3 rounded-xl hover:bg-gray-100 transition relative"
-              >
+              <Link href="/signup?role=comercio" className="inline-flex items-center gap-2 text-sm font-semibold text-brand-600 hover:text-brand-700">
                 Empezar como Comercio
+                <ArrowRight className="w-4 h-4" />
+              </Link>
+            </div>
+
+            <div className="rounded-3xl border border-gray-100 p-8 hover:shadow-xl transition-all">
+              <div className="w-12 h-12 rounded-2xl bg-emerald-50 text-emerald-700 flex items-center justify-center mb-5">
+                <Package className="w-6 h-6" />
+              </div>
+              <h3 className="text-xl font-bold mb-3">Buyer</h3>
+              <p className="text-gray-600 mb-6">Comprá materiales rápido, compará comercios y seguí tus pedidos en tiempo real.</p>
+              <ul className="space-y-3 text-sm text-gray-600 mb-6">
+                {["Búsqueda de materiales", "Comparación de precios", "Seguimiento de pedidos", "Historial de compras"].map((item) => (
+                  <li key={item} className="flex items-center gap-2">
+                    <CheckCircle2 className="w-4 h-4 text-brand-500" />
+                    {item}
+                  </li>
+                ))}
+              </ul>
+              <Link href="/signup?role=buyer" className="inline-flex items-center gap-2 text-sm font-semibold text-brand-600 hover:text-brand-700">
+                Empezar como Buyer
+                <ArrowRight className="w-4 h-4" />
+              </Link>
+            </div>
+
+            <div className="rounded-3xl border border-gray-100 p-8 hover:shadow-xl transition-all">
+              <div className="w-12 h-12 rounded-2xl bg-sky-50 text-sky-700 flex items-center justify-center mb-5">
+                <Truck className="w-6 h-6" />
+              </div>
+              <h3 className="text-xl font-bold mb-3">Delivery</h3>
+              <p className="text-gray-600 mb-6">Aceptá pedidos, manejá rutas y ganá con cada entrega desde tu panel.</p>
+              <ul className="space-y-3 text-sm text-gray-600 mb-6">
+                {["Órdenes disponibles", "Aceptación rápida", "Seguimiento de entregas", "Dashboard de ganancias"].map((item) => (
+                  <li key={item} className="flex items-center gap-2">
+                    <CheckCircle2 className="w-4 h-4 text-brand-500" />
+                    {item}
+                  </li>
+                ))}
+              </ul>
+              <Link href="/signup?role=delivery" className="inline-flex items-center gap-2 text-sm font-semibold text-brand-600 hover:text-brand-700">
+                Empezar como Delivery
                 <ArrowRight className="w-4 h-4" />
               </Link>
             </div>
