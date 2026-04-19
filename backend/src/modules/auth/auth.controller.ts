@@ -1,6 +1,7 @@
 import { Body, Controller, Get, Post, Req, UseGuards } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import { IsEmail, IsIn, IsString, MinLength } from 'class-validator';
+import { Throttle } from '@nestjs/throttler';
 import { AuthService } from './auth.service';
 
 class RegisterBody {
@@ -19,11 +20,13 @@ class LoginBody {
 export class AuthController {
   constructor(private auth: AuthService) {}
 
+  @Throttle({ default: 5 })
   @Post('register')
   register(@Body() dto: RegisterBody) {
     return this.auth.register(dto);
   }
 
+  @Throttle({ default: 5 })
   @Post('login')
   login(@Body() dto: LoginBody) {
     return this.auth.login(dto);

@@ -14,10 +14,12 @@ import { CommonModule } from './common/common.module';
 import { AdminModule } from './modules/admin/admin.module';
 import { HealthModule } from './health/health.module';
 import { SecurityBridgeMiddleware } from './common/security-bridge.middleware';
+import { ThrottlingModule } from './config/throttling.module';
 
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
+    ThrottlingModule,
     CommonModule,
     PrismaModule,
     ProductsModule,

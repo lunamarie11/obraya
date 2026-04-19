@@ -4,6 +4,7 @@ import { AppModule } from './app.module';
 import { LoggingInterceptor } from './common/interceptors/logging.interceptor';
 import { LoggerService } from './common/logging/logger.service';
 import { MetricsService } from './common/monitoring/metrics.service';
+import { CorsConfig } from './config/cors.config';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
@@ -23,7 +24,8 @@ async function bootstrap() {
     forbidNonWhitelisted: true,
   }));
 
-  app.enableCors({ origin: process.env.FRONTEND_URL || 'http://localhost:3002' });
+  // Enable CORS with dynamic configuration
+  app.enableCors(CorsConfig());
 
   const port = process.env.PORT ?? 3003;
   await app.listen(port);
