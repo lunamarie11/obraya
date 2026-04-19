@@ -7,8 +7,7 @@ import { useRouter } from "next/navigation";
 
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
-  const [isAdmin, setIsAdmin] = useState<boolean>(false);
-  const [loading, setLoading] = useState(true);
+  const [isAdmin, setIsAdmin] = useState<boolean | null>(null);
   const router = useRouter();
 
   useEffect(() => {
@@ -18,13 +17,14 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     if (isAdminUser) {
       setIsAdmin(true);
     } else {
+      // Redirect non-admin users
+      setIsAdmin(false);
       router.push("/login");
-      return;
     }
-    setLoading(false);
-  }, [router]);
+  }, []); // Empty dependency array - only run once on mount
 
-  if (loading) {
+  // Show loading while checking permissions
+  if (isAdmin === null) {
     return (
       <div className="min-h-screen bg-slate-50 flex items-center justify-center">
         <div className="text-center">
@@ -35,7 +35,10 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     );
   }
 
-  if (!isAdmin) return null;
+  // Return null while redirecting non-admin users
+  if (!isAdmin) {
+    return null;
+  }
 
   return (
     <div className="flex">

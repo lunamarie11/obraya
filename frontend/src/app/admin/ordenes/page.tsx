@@ -1,29 +1,24 @@
 "use client";
 
-import { useState } from "react";
-import { Search, Filter, ChevronRight } from "lucide-react";
-import { formatCurrency, formatDate } from "@/lib/utils";
+import { useEffect, useState } from "react";
+import { Search, ChevronRight } from "lucide-react";
+import { formatCurrency } from "@/lib/utils";
+import { adminApi } from "@/lib/api";
 
-interface Orden {
+interface AdminOrder {
   id: string;
-  number: string;
-  buyer: string;
-  comercio: string;
+  orderNumber: string;
   total: number;
   status: "PENDING" | "CONFIRMED" | "PREPARING" | "IN_TRANSIT" | "DELIVERED" | "CANCELLED";
   paymentMethod: string;
   createdAt: string;
-  items: number;
+  itemCount: number;
+  customer: {
+    id: string;
+    name: string;
+    email: string;
+  };
 }
-
-const ORDENES: Orden[] = [
-  { id: "1", number: "OBY-2026-12345", buyer: "María González", comercio: "Ferretería Central", total: 15000, status: "DELIVERED", paymentMethod: "Efectivo", createdAt: "2026-04-18", items: 3 },
-  { id: "2", number: "OBY-2026-12344", buyer: "Juan Pérez", comercio: "Distribuidor Premium", total: 28500, status: "IN_TRANSIT", paymentMethod: "Tarjeta", createdAt: "2026-04-18", items: 5 },
-  { id: "3", number: "OBY-2026-12343", buyer: "Ana Compradora", comercio: "MegaStock Industrial", total: 42000, status: "CONFIRMED", paymentMethod: "Mercado Pago", createdAt: "2026-04-17", items: 8 },
-  { id: "4", number: "OBY-2026-12342", buyer: "Carlos Diseño", comercio: "Materiales Norte", total: 9500, status: "PREPARING", paymentMethod: "Efectivo", createdAt: "2026-04-17", items: 2 },
-  { id: "5", number: "OBY-2026-12341", buyer: "Laura Construcción", comercio: "Ferretería Central", total: 35000, status: "PENDING", paymentMethod: "Tarjeta", createdAt: "2026-04-16", items: 6 },
-  { id: "6", number: "OBY-2026-12340", buyer: "Roberto Obras", comercio: "Distribuidor Premium", total: 56000, status: "DELIVERED", paymentMethod: "Mercado Pago", createdAt: "2026-04-15", items: 10 },
-];
 
 const STATUS_CONFIG = {
   PENDING: { label: "Pendiente", color: "bg-amber-100 text-amber-800", bgFull: "bg-amber-50" },
@@ -36,32 +31,45 @@ const STATUS_CONFIG = {
 
 export default function AdminOrdenesList() {
   const [search, setSearch] = useState("");
-  const [statusFilter, setStatusFilter] = useState<"all" | Orden["status"]>("all");
+  const [statusFilter, setStatusFilter] = useState<"all" | AdminOrder["status"]>("all");
+  const [orders, setOrders] = useState<AdminOrder[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const filtered = ORDENES.filter((orden) => {
-    const matchesSearch = orden.number.includes(search) || orden.buyer.toLowerCase().includes(search.toLowerCase()) || orden.comercio.toLowerCase().includes(search.toLowerCase());
-    const matchesStatus = statusFilter === "all" || orden.status === statusFilter;
+  useEffect(() => {
+    adminApi.getAllOrders({ limit: 100, offset: 0 })
+      .then((data) => setOrders(data.orders || []))
+      .catch((error) => {
+        console.error("Error fetching orders:", error);
+        setOrders([]);
+      })
+      .finally(() => setLoading(false));
+  }, []);
+
+  const filtered = orders.filter((order) => {
+    const matchesSearch =
+      order.orderNumber.includes(search) ||
+      order.customer.name.toLowerCase().includes(search.toLowerCase()) ||
+      order.customer.email.toLowerCase().includes(search.toLowerCase());
+    const matchesStatus = statusFilter === "all" || order.status === statusFilter;
     return matchesSearch && matchesStatus;
   });
 
-  const totalOrderValue = filtered.reduce((sum, o) => sum + o.total, 0);
+  const totalOrderValue = filtered.reduce((sum, order) => sum + order.total, 0);
   const avgOrderValue = filtered.length > 0 ? totalOrderValue / filtered.length : 0;
 
   return (
     <div className="min-h-screen bg-slate-50 p-8">
       <div className="max-w-7xl mx-auto space-y-6">
-        {/* Header */}
         <div className="space-y-4">
           <div>
             <h1 className="text-3xl font-bold text-slate-900">Órdenes</h1>
             <p className="mt-1 text-sm text-slate-500">Monitorea todas las órdenes de la plataforma en tiempo real.</p>
           </div>
 
-          {/* Stats */}
           <div className="grid gap-4 sm:grid-cols-3">
             <div className="rounded-2xl bg-white p-4 shadow-sm border border-gray-200">
               <p className="text-sm text-slate-500">Órdenes Totales</p>
-              <p className="mt-2 text-2xl font-bold text-slate-900">{ORDENES.length}</p>
+              <p className="mt-2 text-2xl font-bold text-slate-900">{orders.length}</p>
             </div>
             <div className="rounded-2xl bg-white p-4 shadow-sm border border-gray-200">
               <p className="text-sm text-slate-500">Valor Total</p>
@@ -74,7 +82,6 @@ export default function AdminOrdenesList() {
           </div>
         </div>
 
-        {/* Search & Filter */}
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div className="relative flex-1 max-w-sm">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
@@ -100,46 +107,50 @@ export default function AdminOrdenesList() {
           </div>
         </div>
 
-        {/* Orders List */}
         <div className="space-y-3">
-          {filtered.map((orden) => {
-            const statusConfig = STATUS_CONFIG[orden.status];
+          {filtered.map((order) => {
+            const statusConfig = STATUS_CONFIG[order.status];
             return (
-              <div key={orden.id} className={`rounded-2xl border-l-4 p-4 ${statusConfig.bgFull} border-l-amber-500 cursor-pointer hover:shadow-md transition`}>
+              <div key={order.id} className={`rounded-2xl border-l-4 p-4 ${statusConfig.bgFull} border-l-amber-500 cursor-pointer hover:shadow-md transition`}>
                 <div className="flex items-start justify-between gap-4">
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-3 mb-2">
-                      <p className="font-semibold text-slate-900">{orden.number}</p>
+                      <p className="font-semibold text-slate-900">{order.orderNumber}</p>
                       <span className={`inline-block rounded-full px-2 py-1 text-xs font-semibold ${statusConfig.color}`}>{statusConfig.label}</span>
                     </div>
                     <div className="grid gap-2 text-sm text-slate-600 sm:grid-cols-2 lg:grid-cols-4">
                       <div>
                         <p className="text-xs text-slate-500 uppercase font-semibold">Comprador</p>
-                        <p className="text-slate-900 font-medium">{orden.buyer}</p>
+                        <p className="text-slate-900 font-medium">{order.customer.name}</p>
                       </div>
                       <div>
-                        <p className="text-xs text-slate-500 uppercase font-semibold">Comercio</p>
-                        <p className="text-slate-900 font-medium">{orden.comercio}</p>
+                        <p className="text-xs text-slate-500 uppercase font-semibold">Email</p>
+                        <p className="text-slate-900 font-medium">{order.customer.email}</p>
                       </div>
                       <div>
                         <p className="text-xs text-slate-500 uppercase font-semibold">Pago</p>
-                        <p className="text-slate-900 font-medium">{orden.paymentMethod}</p>
+                        <p className="text-slate-900 font-medium">{order.paymentMethod}</p>
                       </div>
                       <div>
                         <p className="text-xs text-slate-500 uppercase font-semibold">Creada</p>
-                        <p className="text-slate-900 font-medium">{orden.createdAt}</p>
+                        <p className="text-slate-900 font-medium">{new Date(order.createdAt).toLocaleDateString()}</p>
                       </div>
                     </div>
                   </div>
                   <div className="flex flex-col items-end gap-2 shrink-0">
-                    <p className="text-lg font-bold text-slate-900">{formatCurrency(orden.total)}</p>
-                    <p className="text-xs text-slate-500">{orden.items} artículos</p>
+                    <p className="text-lg font-bold text-slate-900">{formatCurrency(order.total)}</p>
+                    <p className="text-xs text-slate-500">{order.itemCount} artículos</p>
                     <ChevronRight className="w-5 h-5 text-slate-400" />
                   </div>
                 </div>
               </div>
             );
           })}
+          {filtered.length === 0 && (
+            <div className="rounded-3xl bg-white p-8 text-center text-slate-500 border border-gray-200">
+              No se encontraron órdenes.
+            </div>
+          )}
         </div>
       </div>
     </div>

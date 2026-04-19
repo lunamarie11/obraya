@@ -1,7 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Search, MoreVertical, Mail, Phone } from "lucide-react";
+import { adminApi } from "@/lib/api";
 
 interface Usuario {
   id: string;
@@ -9,24 +10,15 @@ interface Usuario {
   email: string;
   phone?: string;
   role: "BUYER" | "DELIVERY" | "ARQUITECTO" | "COMERCIO";
-  joinDate: string;
-  lastActive: string;
-  status: "active" | "inactive";
+  createdAt: string;
+  isPro: boolean;
+  totalOrders: number;
 }
-
-const USUARIOS: Usuario[] = [
-  { id: "1", name: "María González", email: "maria@example.com", phone: "+54 11 1234 5678", role: "BUYER", joinDate: "2026-01-15", lastActive: "2026-04-18", status: "active" },
-  { id: "2", name: "Juan Pérez", email: "juan@ferreteria.com", phone: "+54 11 9876 5432", role: "COMERCIO", joinDate: "2025-11-20", lastActive: "2026-04-18", status: "active" },
-  { id: "3", name: "Pedro Repartidor", email: "pedro@delivery.com", phone: "+54 11 5555 4444", role: "DELIVERY", joinDate: "2026-02-01", lastActive: "2026-04-17", status: "active" },
-  { id: "4", name: "Carlos Arquitecto", email: "carlos@diseño.com", phone: "+54 11 3333 2222", role: "ARQUITECTO", joinDate: "2025-12-10", lastActive: "2026-04-10", status: "inactive" },
-  { id: "5", name: "Ana Compradora", email: "ana@obras.com", phone: "+54 11 7777 8888", role: "BUYER", joinDate: "2026-03-05", lastActive: "2026-04-18", status: "active" },
-  { id: "6", name: "Roberto Comerciante", email: "roberto@mayorista.com", phone: "+54 11 2222 3333", role: "COMERCIO", joinDate: "2025-10-15", lastActive: "2026-04-18", status: "active" },
-];
 
 const ROLE_COLORS = {
   BUYER: "bg-emerald-100 text-emerald-800",
   DELIVERY: "bg-sky-100 text-sky-800",
-  ARQUITECTO: "bg-navy-100 text-navy-800",
+  ARQUITECTO: "bg-slate-100 text-slate-800",
   COMERCIO: "bg-amber-100 text-amber-800",
 };
 
@@ -40,18 +32,43 @@ const ROLE_LABELS = {
 export default function AdminUsuariosList() {
   const [search, setSearch] = useState("");
   const [roleFilter, setRoleFilter] = useState<"all" | "BUYER" | "DELIVERY" | "ARQUITECTO" | "COMERCIO">("all");
+  const [usuarios, setUsuarios] = useState<Usuario[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const filtered = USUARIOS.filter((usuario) => {
+  useEffect(() => {
+    adminApi.getAllUsers({ limit: 100, offset: 0 })
+      .then((data) => {
+        setUsuarios(data.users || []);
+      })
+      .catch((err) => {
+        console.error("Error fetching users:", err);
+        setUsuarios([]);
+      })
+      .finally(() => setLoading(false));
+  }, []);
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-slate-50 p-8 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-amber-500 mx-auto"></div>
+          <p className="mt-4 text-slate-600">Cargando usuarios...</p>
+        </div>
+      </div>
+    );
+  }
+
+  const filtered = usuarios.filter((usuario) => {
     const matchesSearch = usuario.name.toLowerCase().includes(search.toLowerCase()) || usuario.email.toLowerCase().includes(search.toLowerCase());
     const matchesRole = roleFilter === "all" || usuario.role === roleFilter;
     return matchesSearch && matchesRole;
   });
 
   const roleCounts = {
-    BUYER: USUARIOS.filter((u) => u.role === "BUYER").length,
-    DELIVERY: USUARIOS.filter((u) => u.role === "DELIVERY").length,
-    ARQUITECTO: USUARIOS.filter((u) => u.role === "ARQUITECTO").length,
-    COMERCIO: USUARIOS.filter((u) => u.role === "COMERCIO").length,
+    BUYER: usuarios.filter((u) => u.role === "BUYER").length,
+    DELIVERY: usuarios.filter((u) => u.role === "DELIVERY").length,
+    ARQUITECTO: usuarios.filter((u) => u.role === "ARQUITECTO").length,
+    COMERCIO: usuarios.filter((u) => u.role === "COMERCIO").length,
   };
 
   return (
@@ -115,7 +132,7 @@ export default function AdminUsuariosList() {
                 <th className="px-6 py-4 text-left font-semibold text-slate-900">Contacto</th>
                 <th className="px-6 py-4 text-left font-semibold text-slate-900">Rol</th>
                 <th className="px-6 py-4 text-left font-semibold text-slate-900">Miembro desde</th>
-                <th className="px-6 py-4 text-left font-semibold text-slate-900">Último activo</th>
+                <th className="px-6 py-4 text-left font-semibold text-slate-900">Pedidos</th>
                 <th className="px-6 py-4 text-center font-semibold text-slate-900"></th>
               </tr>
             </thead>
@@ -144,8 +161,8 @@ export default function AdminUsuariosList() {
                       {ROLE_LABELS[usuario.role]}
                     </span>
                   </td>
-                  <td className="px-6 py-4 text-sm text-slate-600">{usuario.joinDate}</td>
-                  <td className="px-6 py-4 text-sm text-slate-600">{usuario.lastActive}</td>
+                  <td className="px-6 py-4 text-sm text-slate-600">{new Date(usuario.createdAt).toLocaleDateString()}</td>
+                  <td className="px-6 py-4 text-sm text-slate-600">{usuario.totalOrders || 0}</td>
                   <td className="px-6 py-4 text-center">
                     <button className="p-2 hover:bg-slate-100 rounded-lg transition">
                       <MoreVertical className="w-4 h-4 text-slate-500" />
@@ -155,6 +172,11 @@ export default function AdminUsuariosList() {
               ))}
             </tbody>
           </table>
+          {filtered.length === 0 && (
+            <div className="p-8 text-center text-slate-500">
+              No se encontraron usuarios.
+            </div>
+          )}
         </div>
       </div>
     </div>

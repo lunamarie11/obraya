@@ -11,6 +11,7 @@ import { DashboardModule } from './modules/dashboard/dashboard.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { DeliveryModule } from './modules/delivery/delivery.module';
 import { CommonModule } from './common/common.module';
+import { AdminModule } from './modules/admin/admin.module';
 import { SecurityBridgeMiddleware } from './common/security-bridge.middleware';
 
 @Module({
@@ -27,6 +28,7 @@ import { SecurityBridgeMiddleware } from './common/security-bridge.middleware';
     DashboardModule,
     AuthModule,
     DeliveryModule,
+    AdminModule,
   ],
 })
 export class AppModule implements NestModule {

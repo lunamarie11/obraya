@@ -3,12 +3,20 @@
 // All API calls go through this module.
 // ───────────────────────────────────────────────────────────────────────────
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000/api";
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3003/api";
 
 // ── Base fetch wrapper ─────────────────────────────────────────────────────
+import { getToken } from "./auth";
+
 async function apiFetch<T>(path: string, options?: RequestInit): Promise<T> {
+  const token = getToken();
+  const headers: any = { "Content-Type": "application/json", ...options?.headers };
+  if (token) {
+    headers["Authorization"] = `Bearer ${token}`;
+  }
+  
   const res = await fetch(`${API_URL}${path}`, {
-    headers: { "Content-Type": "application/json", ...options?.headers },
+    headers,
     ...options,
   });
 
@@ -117,4 +125,21 @@ export const dashboardApi = {
     apiFetch<any>(`/dashboard/comercio${qs({ period })}`),
   getCategoryStats: () =>
     apiFetch<any[]>("/dashboard/categories"),
+};
+// ── Admin API ──────────────────────────────────────────────────────────────
+export const adminApi = {
+  getDashboardStats: () =>
+    apiFetch<any>("/admin/dashboard/stats"),
+  getAllUsers: (filters?: { role?: string; search?: string; limit?: number; offset?: number }) =>
+    apiFetch<any>(`/admin/users${qs({role: filters?.role, search: filters?.search, limit: filters?.limit?.toString(), offset: filters?.offset?.toString()})}`),
+  getAllComercios: (filters?: { search?: string; limit?: number; offset?: number }) =>
+    apiFetch<any>(`/admin/comercios${qs({search: filters?.search, limit: filters?.limit?.toString(), offset: filters?.offset?.toString()})}`),
+  getAllOrders: (filters?: { status?: string; userId?: string; search?: string; limit?: number; offset?: number }) =>
+    apiFetch<any>(`/admin/orders${qs({status: filters?.status, userId: filters?.userId, search: filters?.search, limit: filters?.limit?.toString(), offset: filters?.offset?.toString()})}`),
+  getAllDeliveries: (filters?: { status?: string; limit?: number; offset?: number }) =>
+    apiFetch<any>(`/admin/deliveries${qs({status: filters?.status, limit: filters?.limit?.toString(), offset: filters?.offset?.toString()})}`),
+  updateUserRole: (userId: string, role: string) =>
+    apiFetch<any>(`/admin/users/${userId}/role`, { method: "PATCH", body: JSON.stringify({ role }) }),
+  updateOrderStatus: (orderId: string, status: string) =>
+    apiFetch<any>(`/admin/orders/${orderId}/status`, { method: "PATCH", body: JSON.stringify({ status }) }),
 };

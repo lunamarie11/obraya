@@ -25,6 +25,15 @@ async function main() {
   await prisma.user.deleteMany();
 
   // ── Users ────────────────────────────────────────────────────────────────
+  const admin = await prisma.user.create({
+    data: {
+      email: "admin@obraya.com",
+      password: PASSWORD_HASH,
+      name: "Super Admin",
+      role: "ADMIN",
+    },
+  });
+
   const buyer = await prisma.user.create({
     data: {
       email: "buyer@obraya.com",
@@ -380,7 +389,7 @@ async function main() {
   });
 
   console.log("Seed completed!");
-  console.log(`  Users: 5`);
+  console.log(`  Users: 8`);
   console.log(`  Projects: 4`);
   console.log(`  Tasks: ${taskData.length}`);
   console.log(`  Expenses: ${expenseData.length}`);
@@ -390,6 +399,7 @@ async function main() {
   console.log(`  Orders: 1`);
   console.log("");
   console.log("Test credentials:");
+  console.log("  Admin      → admin@obraya.com / obraya123");
   console.log("  Arquitecto → arq@obraya.com / obraya123");
   console.log("  Comercio   → comercio@obraya.com / obraya123");
 }

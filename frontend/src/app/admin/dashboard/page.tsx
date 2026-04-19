@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { ordersApi } from "@/lib/api";
+import { adminApi } from "@/lib/api";
 import { formatCurrency } from "@/lib/utils";
 import {
   TrendingUp, Users, Store, Package, Truck, DollarSign,
@@ -20,30 +20,19 @@ export default function AdminDashboard() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    ordersApi.getAll()
-      .then((orders) => {
-        const pendingCount = orders?.filter((o) => o.status === "PENDING")?.length ?? 0;
-        const totalRev = orders?.reduce((sum, o) => sum + o.total, 0) ?? 0;
-        const activeDeliveries = orders?.filter((o) => o.status === "IN_TRANSIT")?.length ?? 0;
-
+    adminApi.getDashboardStats()
+      .then((data) => {
         setStats({
-          totalUsers: 156,
-          totalComercio: 15,
-          totalOrders: orders?.length ?? 48,
-          pendingOrders: pendingCount,
-          totalRevenue: totalRev,
-          activeDeliveries,
+          totalUsers: data.users || 0,
+          totalComercio: data.comercios || 0,
+          totalOrders: data.orders || 0,
+          pendingOrders: data.pendingOrders || 0,
+          totalRevenue: data.revenue || 0,
+          activeDeliveries: data.deliveries || 0,
         });
       })
-      .catch(() => {
-        setStats({
-          totalUsers: 156,
-          totalComercio: 15,
-          totalOrders: 48,
-          pendingOrders: 12,
-          totalRevenue: 285000,
-          activeDeliveries: 8,
-        });
+      .catch((err) => {
+        console.error("Error fetching admin stats:", err);
       })
       .finally(() => setLoading(false));
   }, []);

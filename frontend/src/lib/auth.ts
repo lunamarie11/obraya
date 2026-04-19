@@ -3,7 +3,7 @@
 // Falls back to mock success for demo mode when backend is unreachable.
 // ───────────────────────────────────────────────────────────────────────────
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000/api";
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3003/api";
 const TOKEN_KEY = "obraya_token";
 const USER_KEY = "obraya_user";
 
