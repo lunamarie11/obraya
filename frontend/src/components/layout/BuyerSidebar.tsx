@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import {
   Home, ShoppingCart, Package, Truck, Heart, Settings,
@@ -8,6 +9,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { clearAuth, getCurrentUser } from "@/lib/auth";
+import RoleSwitcher from "@/components/layout/RoleSwitcher";
 
 const navItems = [
   { href: "/buyer/dashboard", label: "Inicio", icon: Home },
@@ -20,7 +22,12 @@ const navItems = [
 export default function BuyerSidebar() {
   const pathname = usePathname();
   const router = useRouter();
-  const user = typeof window !== "undefined" ? getCurrentUser() : null;
+  const [user, setUser] = useState<ReturnType<typeof getCurrentUser> | null>(null);
+
+  useEffect(() => {
+    setUser(getCurrentUser());
+  }, []);
+
   const initials = user?.name?.split(" ").map((n) => n[0]).join("").slice(0, 2).toUpperCase() ?? "BU";
 
   function handleLogout() {
@@ -82,6 +89,8 @@ export default function BuyerSidebar() {
           );
         })}
       </nav>
+
+      <RoleSwitcher />
 
       {/* Bottom section */}
       <div className="px-3 pb-4 space-y-1 border-t border-gray-200 pt-3">

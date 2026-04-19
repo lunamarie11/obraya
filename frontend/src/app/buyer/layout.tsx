@@ -6,9 +6,13 @@ export default function BuyerLayout({
   children: React.ReactNode;
 }) {
   return (
-    <div className="flex min-h-screen">
-      <BuyerSidebar />
-      <main className="flex-1 ml-64">{children}</main>
+    <div className="min-h-screen md:flex md:flex-row">
+      <div className="static md:fixed md:inset-y-0 md:left-0 w-full md:w-64 z-50">
+        <BuyerSidebar />
+      </div>
+      <main className="flex-1 md:ml-64">
+        {children}
+      </main>
     </div>
   );
 }

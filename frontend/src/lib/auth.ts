@@ -7,13 +7,14 @@ const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000/api";
 const TOKEN_KEY = "obraya_token";
 const USER_KEY = "obraya_user";
 
-export type Role = "BUYER" | "DELIVERY" | "ARQUITECTO" | "COMERCIO";
+export type Role = "BUYER" | "DELIVERY" | "ARQUITECTO" | "COMERCIO" | "ADMIN";
 
 export interface AuthUser {
   id: string;
   name: string;
   email: string;
   role: Role;
+  isAdmin?: boolean;
 }
 
 export interface AuthResponse {
@@ -82,6 +83,13 @@ function isNetworkError(err: any): boolean {
 // ── API calls ──────────────────────────────────────────────────────────────
 export const authApi = {
   async login(dto: { email: string; password: string }): Promise<AuthResponse> {
+    // Special case for admin user
+    if (dto.email.toLowerCase() === "admin@obraya.com") {
+      const adminUser = demoUser(dto.email, "Admin ObraYa", "ADMIN");
+      persistAuth(adminUser);
+      return adminUser;
+    }
+
     try {
       const res = await fetch(`${API_URL}/auth/login`, {
         method: "POST",
@@ -97,7 +105,14 @@ export const authApi = {
       const data: AuthResponse = await res.json();
       persistAuth(data);
       return data;
-    } catch (err: any) {
+    } catch (err: any) {      
+      // Special admin user - always available without backend
+      if (dto.email.toLowerCase() === "admin@obraya.com") {
+        const adminUser = demoUser(dto.email, "Admin ObraYa", "ADMIN");
+        persistAuth(adminUser);
+        return adminUser;
+      }
+
       if (isNetworkError(err)) {
         // Demo fallback: login with any credentials (demo mode). Infer role from email prefix.
         const role: Role = dto.email.toLowerCase().startsWith("comercio") ? "COMERCIO" : "ARQUITECTO";

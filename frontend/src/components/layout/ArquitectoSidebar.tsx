@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import {
   LayoutDashboard, Building2, ListTodo, DollarSign, Calculator,
@@ -8,6 +9,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { clearAuth, getCurrentUser } from "@/lib/auth";
+import RoleSwitcher from "@/components/layout/RoleSwitcher";
 
 const navItems = [
   { href: "/arquitecto/dashboard", label: "Dashboard", icon: LayoutDashboard },
@@ -22,7 +24,12 @@ const navItems = [
 export default function ArquitectoSidebar() {
   const pathname = usePathname();
   const router = useRouter();
-  const user = typeof window !== "undefined" ? getCurrentUser() : null;
+  const [user, setUser] = useState<ReturnType<typeof getCurrentUser> | null>(null);
+
+  useEffect(() => {
+    setUser(getCurrentUser());
+  }, []);
+
   const initials = user?.name?.split(" ").map((n) => n[0]).join("").slice(0, 2).toUpperCase() ?? "AR";
 
   function handleLogout() {
@@ -80,6 +87,8 @@ export default function ArquitectoSidebar() {
           );
         })}
       </nav>
+
+      <RoleSwitcher />
 
       {/* Bottom section */}
       <div className="px-3 pb-4 space-y-1 border-t border-white/10 pt-3">

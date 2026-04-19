@@ -11,6 +11,7 @@ const DEMO_USERS = [
   { label: "Delivery", email: "delivery@obraya.com", password: "obraya123", icon: Truck, color: "bg-blue-500 hover:bg-blue-600" },
   { label: "Arquitecto", email: "arq@obraya.com", password: "obraya123", icon: Building2, color: "bg-dark-800 hover:bg-dark-900" },
   { label: "Comercio", email: "comercio@obraya.com", password: "obraya123", icon: ShoppingCart, color: "bg-brand-500 hover:bg-brand-600" },
+  { label: "Admin", email: "admin@obraya.com", password: "obraya123", icon: HardHat, color: "bg-amber-500 hover:bg-amber-600" },
 ];
 
 export default function LoginPage() {
@@ -35,6 +36,8 @@ export default function LoginPage() {
         router.push("/arquitecto/dashboard");
       } else if (result.user.role === "COMERCIO") {
         router.push("/comercio/dashboard");
+      } else if (result.user.role === "ADMIN") {
+        router.push("/admin/dashboard");
       } else {
         router.push("/");
       }
@@ -56,8 +59,12 @@ export default function LoginPage() {
         router.push("/delivery/dashboard");
       } else if (result.user.role === "ARQUITECTO") {
         router.push("/arquitecto/dashboard");
-      } else {
+      } else if (result.user.role === "COMERCIO") {
         router.push("/comercio/dashboard");
+      } else if (result.user.role === "ADMIN") {
+        router.push("/admin/dashboard");
+      } else {
+        router.push("/");
       }
     } catch (err: any) {
       setError(err?.message || "Error al ingresar con cuenta demo");

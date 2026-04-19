@@ -7,7 +7,7 @@ class RegisterBody {
   @IsString() name!: string;
   @IsEmail() email!: string;
   @IsString() @MinLength(6) password!: string;
-  @IsIn(['ARQUITECTO', 'COMERCIO']) role!: 'ARQUITECTO' | 'COMERCIO';
+  @IsIn(['ARQUITECTO', 'COMERCIO', 'ADMIN']) role!: 'ARQUITECTO' | 'COMERCIO' | 'ADMIN';
 }
 
 class LoginBody {

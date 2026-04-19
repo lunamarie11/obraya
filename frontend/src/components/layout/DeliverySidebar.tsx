@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import {
   Truck, Package, DollarSign, Settings, Bell, User, LogOut,
@@ -8,6 +9,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { clearAuth, getCurrentUser } from "@/lib/auth";
+import RoleSwitcher from "@/components/layout/RoleSwitcher";
 
 const navItems = [
   { href: "/delivery/dashboard", label: "Dashboard", icon: Truck },
@@ -20,7 +22,12 @@ const navItems = [
 export default function DeliverySidebar() {
   const pathname = usePathname();
   const router = useRouter();
-  const user = typeof window !== "undefined" ? getCurrentUser() : null;
+  const [user, setUser] = useState<ReturnType<typeof getCurrentUser> | null>(null);
+
+  useEffect(() => {
+    setUser(getCurrentUser());
+  }, []);
+
   const initials = user?.name?.split(" ").map((n) => n[0]).join("").slice(0, 2).toUpperCase() ?? "DE";
 
   function handleLogout() {
@@ -78,6 +85,8 @@ export default function DeliverySidebar() {
           );
         })}
       </nav>
+
+      <RoleSwitcher />
 
       {/* Bottom section */}
       <div className="px-3 pb-4 space-y-1 border-t border-white/10 pt-3">

@@ -11,6 +11,7 @@ export class OrdersService {
     return this.prisma.order.findMany({
       where: userId ? { userId } : undefined,
       include: {
+        user: { select: { id: true, name: true, email: true } },
         items: { include: { product: { select: { name: true, emoji: true, brand: true } } } },
         address: true,
       },

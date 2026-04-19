@@ -7,6 +7,7 @@ import {
   Settings, HardHat, Bell, ArrowLeft, Store,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import RoleSwitcher from "@/components/layout/RoleSwitcher";
 
 const navItems = [
   { href: "/comercio/dashboard", label: "Dashboard", icon: LayoutDashboard },
@@ -71,6 +72,8 @@ export default function ComercioSidebar() {
           );
         })}
       </nav>
+
+      <RoleSwitcher />
 
       {/* Bottom section */}
       <div className="px-3 pb-4 space-y-1">
