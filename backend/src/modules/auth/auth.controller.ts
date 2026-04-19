@@ -20,13 +20,13 @@ class LoginBody {
 export class AuthController {
   constructor(private auth: AuthService) {}
 
-  @Throttle({ default: 5 })
+  @Throttle({ auth: { limit: 5, ttl: 900 } })
   @Post('register')
   register(@Body() dto: RegisterBody) {
     return this.auth.register(dto);
   }
 
-  @Throttle({ default: 5 })
+  @Throttle({ auth: { limit: 5, ttl: 900 } })
   @Post('login')
   login(@Body() dto: LoginBody) {
     return this.auth.login(dto);

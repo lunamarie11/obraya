@@ -14,6 +14,7 @@ import { CommonModule } from './common/common.module';
 import { AdminModule } from './modules/admin/admin.module';
 import { HealthModule } from './health/health.module';
 import { SecurityBridgeMiddleware } from './common/security-bridge.middleware';
+import { SanitizeMiddleware } from './common/sanitize.middleware';
 import { ThrottlingModule } from './config/throttling.module';
 
 @Module({
@@ -38,7 +39,7 @@ import { ThrottlingModule } from './config/throttling.module';
 export class AppModule implements NestModule {
   configure(consumer: MiddlewareConsumer) {
     consumer
-      .apply(SecurityBridgeMiddleware)
+      .apply(SecurityBridgeMiddleware, SanitizeMiddleware)
       .forRoutes('*'); // Aplicar a todas las rutas
   }
 }
