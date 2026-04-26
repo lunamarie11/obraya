@@ -1,0 +1,115 @@
+version: "3.9"
+
+# ── Uso: ────────────────────────────────────────────────────────────────────
+# 1. Copiar .env.example como .env y completar con valores reales de prod
+# 2. Colocar certificados SSL en ./nginx/certs/ (fullchain.pem + privkey.pem)
+#    O usar el servicio certbot incluido para Let's Encrypt
+# 3. docker compose -f docker-compose.prod.yml up -d
+# ────────────────────────────────────────────────────────────────────────────
+
+services:
+  # ── PostgreSQL ───────────────────────────────────────────────────────────
+  postgres:
+    image: postgres:16-alpine
+    container_name: obraya_postgres_prod
+    restart: always
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    # Puerto NO expuesto al host en producción; solo accesible dentro de la red
+    expose:
+      - "5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - internal
+
+  # ── Backend (NestJS) ─────────────────────────────────────────────────────
+  backend:
+    image: ${DOCKER_REGISTRY}/obraya-backend:${IMAGE_TAG:-latest}
+    container_name: obraya_backend_prod
+    restart: always
+    expose:
+      - "3000"
+    environment:
+      DATABASE_URL: ${DATABASE_URL}
+      JWT_SECRET: ${JWT_SECRET}
+      FRONTEND_URL: ${FRONTEND_URL}
+      PORT: 3000
+      NODE_ENV: production
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      ALLOWED_ORIGINS: ${ALLOWED_ORIGINS}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:3000/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    networks:
+      - internal
+
+  # ── Frontend (Next.js) ───────────────────────────────────────────────────
+  frontend:
+    image: ${DOCKER_REGISTRY}/obraya-frontend:${IMAGE_TAG:-latest}
+    container_name: obraya_frontend_prod
+    restart: always
+    expose:
+      - "3000"
+    environment:
+      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL}
+    depends_on:
+      - backend
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:3000 || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    networks:
+      - internal
+
+  # ── Nginx (reverse proxy + SSL) ──────────────────────────────────────────
+  nginx:
+    image: nginx:1.25-alpine
+    container_name: obraya_nginx_prod
+    restart: always
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/conf.d:/etc/nginx/conf.d:ro
+      - ./nginx/certs:/etc/nginx/certs:ro
+      - certbot_webroot:/var/www/certbot:ro
+    depends_on:
+      - frontend
+      - backend
+    networks:
+      - internal
+
+  # ── Certbot (Let's Encrypt) ──────────────────────────────────────────────
+  certbot:
+    image: certbot/certbot:latest
+    container_name: obraya_certbot
+    volumes:
+      - ./nginx/certs:/etc/letsencrypt
+      - certbot_webroot:/var/www/certbot
+    # Ejecutar manualmente: docker compose -f docker-compose.prod.yml run certbot certonly ...
+    entrypoint: "/bin/sh -c 'trap exit TERM; while :; do certbot renew; sleep 12h & wait $${!}; done'"
+    networks:
+      - internal
+
+volumes:
+  postgres_data:
+  certbot_webroot:
+
+networks:
+  internal:
+    driver: bridge

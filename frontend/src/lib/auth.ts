@@ -1,9 +1,6 @@
 // ── ObraYa Auth Client ─────────────────────────────────────────────────────
-// Handles login, signup, token storage (localStorage) and auth headers.
-// Falls back to mock success for demo mode when backend is unreachable.
-// ───────────────────────────────────────────────────────────────────────────
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3003/api";
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000/api";
 const TOKEN_KEY = "obraya_token";
 const USER_KEY = "obraya_user";
 
@@ -14,7 +11,6 @@ export interface AuthUser {
   name: string;
   email: string;
   role: Role;
-  isAdmin?: boolean;
 }
 
 export interface AuthResponse {
@@ -43,7 +39,8 @@ function persistAuth(data: AuthResponse) {
   if (typeof window === "undefined") return;
   localStorage.setItem(TOKEN_KEY, data.token);
   localStorage.setItem(USER_KEY, JSON.stringify(data.user));
-  document.cookie = `${TOKEN_KEY}=${data.token}; path=/; max-age=${60 * 60 * 24 * 7}; SameSite=Lax`;
+  // httpOnly no es posible desde JS; usamos SameSite=Strict para reducir riesgo CSRF
+  document.cookie = `${TOKEN_KEY}=${data.token}; path=/; max-age=${60 * 60 * 24 * 7}; SameSite=Strict`;
 }
 
 export function clearAuth() {
@@ -57,97 +54,40 @@ export function isAuthenticated(): boolean {
   return Boolean(getToken());
 }
 
-// ── Demo-mode helpers (fallback when backend is down) ──────────────────────
-function demoUser(email: string, name: string, role: Role): AuthResponse {
-  return {
-    token: `demo-token-${Date.now()}`,
-    user: {
-      id: `demo-${role.toLowerCase()}-${Date.now()}`,
-      email,
-      name,
-      role,
-    },
-  };
-}
-
-function isNetworkError(err: any): boolean {
-  const msg = String(err?.message || err || "");
-  return (
-    msg.includes("Failed to fetch") ||
-    msg.includes("NetworkError") ||
-    msg.includes("ECONNREFUSED") ||
-    msg.includes("Load failed")
-  );
-}
-
 // ── API calls ──────────────────────────────────────────────────────────────
 export const authApi = {
   async login(dto: { email: string; password: string }): Promise<AuthResponse> {
-    // Special case for admin user
-    if (dto.email.toLowerCase() === "admin@obraya.com") {
-      const adminUser = demoUser(dto.email, "Admin ObraYa", "ADMIN");
-      persistAuth(adminUser);
-      return adminUser;
+    const res = await fetch(`${API_URL}/auth/login`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(dto),
+    });
+
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ message: "Error de autenticación" }));
+      throw new Error(err.message || "Email o contraseña incorrectos");
     }
 
-    try {
-      const res = await fetch(`${API_URL}/auth/login`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(dto),
-      });
-
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({ message: "Error de autenticación" }));
-        throw new Error(err.message || "Email o contraseña incorrectos");
-      }
-
-      const data: AuthResponse = await res.json();
-      persistAuth(data);
-      return data;
-    } catch (err: any) {      
-      // Special admin user - always available without backend
-      if (dto.email.toLowerCase() === "admin@obraya.com") {
-        const adminUser = demoUser(dto.email, "Admin ObraYa", "ADMIN");
-        persistAuth(adminUser);
-        return adminUser;
-      }
-
-      if (isNetworkError(err)) {
-        // Demo fallback: login with any credentials (demo mode). Infer role from email prefix.
-        const role: Role = dto.email.toLowerCase().startsWith("comercio") ? "COMERCIO" : "ARQUITECTO";
-        const fallback = demoUser(dto.email, "Usuario Demo", role);
-        persistAuth(fallback);
-        return fallback;
-      }
-      throw err;
-    }
+    const data: AuthResponse = await res.json();
+    persistAuth(data);
+    return data;
   },
 
   async register(dto: { name: string; email: string; password: string; role: Role }): Promise<AuthResponse> {
-    try {
-      const res = await fetch(`${API_URL}/auth/register`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(dto),
-      });
+    const res = await fetch(`${API_URL}/auth/register`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(dto),
+    });
 
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({ message: "Error al registrar" }));
-        throw new Error(err.message || "No pudimos crear tu cuenta");
-      }
-
-      const data: AuthResponse = await res.json();
-      persistAuth(data);
-      return data;
-    } catch (err: any) {
-      if (isNetworkError(err)) {
-        const fallback = demoUser(dto.email, dto.name, dto.role);
-        persistAuth(fallback);
-        return fallback;
-      }
-      throw err;
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ message: "Error al registrar" }));
+      throw new Error(err.message || "No pudimos crear tu cuenta");
     }
+
+    const data: AuthResponse = await res.json();
+    persistAuth(data);
+    return data;
   },
 
   async me(): Promise<AuthUser | null> {
@@ -157,10 +97,13 @@ export const authApi = {
       const res = await fetch(`${API_URL}/auth/me`, {
         headers: { Authorization: `Bearer ${token}` },
       });
-      if (!res.ok) return getCurrentUser(); // fallback to cached
+      if (!res.ok) {
+        clearAuth();
+        return null;
+      }
       return await res.json();
     } catch {
-      return getCurrentUser();
+      return null;
     }
   },
 

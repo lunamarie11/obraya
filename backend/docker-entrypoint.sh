@@ -2,7 +2,7 @@
 set -e
 
 echo "Running Prisma migrations..."
-npx prisma migrate deploy 2>/dev/null || npx prisma db push --accept-data-loss
+npx prisma migrate deploy
 
 echo "Starting ObraYa API..."
 exec node dist/src/main.js
