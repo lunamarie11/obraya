@@ -21,7 +21,7 @@ function orderToDisplayStatus(status: string): DisplayStatus {
   }
 }
 
-const STATUS_CONFIG: Record<DisplayStatus, { label: string; color: string; bg: string; dot: string; mapColor: string }> = {
+const STATUS_CONFIG: Record<DisplayStatus, { label: string; color: string; dot: string; mapColor: string }> = {
   en_deposito: { label: "En depósito",  color: "bg-gray-100 text-gray-600",       dot: "bg-gray-400",     mapColor: "#9CA3AF" },
   en_camino:   { label: "En camino",    color: "bg-info-50 text-info-500",         dot: "bg-info-500",     mapColor: "#2980B9" },
   entregado:   { label: "Entregado",    color: "bg-success-50 text-success-500",   dot: "bg-success-500",  mapColor: "#27AE60" },
@@ -71,7 +71,7 @@ function LiveMap({ orders, selectedId, onSelect, pulse }: {
           return (
             <g key={o.id} className="cursor-pointer" onClick={() => onSelect(o.id)}>
               <circle cx={x} cy={y} r={isSelected ? 3.5 : 2.5} fill={color} opacity={pulse ? 0.15 : 0.08} />
-              <circle cx={x} cy={y} r={isSelected ? 2}   r2={1.5} fill={color} opacity={0.4} />
+              <circle cx={x} cy={y} r={isSelected ? 2 : 1.5} fill={color} opacity={0.4} />
               <circle cx={x} cy={y} r={isSelected ? 1.2 : 0.8}    fill={color} />
               {isSelected && (
                 <text x={x + 2.5} y={y - 2} fill="white" fontSize={2.5} fontWeight="bold" fontFamily="system-ui">
