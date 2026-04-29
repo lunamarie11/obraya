@@ -126,6 +126,20 @@ export const dashboardApi = {
   getCategoryStats: () =>
     apiFetch<any[]>("/dashboard/categories"),
 };
+// ── Delivery API ───────────────────────────────────────────────────────────
+export const deliveryApi = {
+  getProfile: () =>
+    apiFetch<any>("/delivery/profile"),
+  getAvailableOrders: () =>
+    apiFetch<any[]>("/delivery/orders/available"),
+  acceptOrder: (orderId: string) =>
+    apiFetch<any>(`/delivery/orders/${orderId}/accept`, { method: "POST" }),
+  completeOrder: (orderId: string, tip?: number) =>
+    apiFetch<any>(`/delivery/orders/${orderId}/complete`, { method: "POST", body: JSON.stringify({ tip: tip ?? 0 }) }),
+  getEarnings: () =>
+    apiFetch<any>("/delivery/earnings"),
+};
+
 // ── Admin API ──────────────────────────────────────────────────────────────
 export const adminApi = {
   getDashboardStats: () =>

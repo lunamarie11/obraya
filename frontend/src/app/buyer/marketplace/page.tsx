@@ -1,54 +1,21 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { Search, ShoppingCart, X, Plus, Minus, Truck, CreditCard, ShieldCheck } from "lucide-react";
 import { cn, formatCurrency } from "@/lib/utils";
-import { ordersApi } from "@/lib/api";
+import { ordersApi, productsApi } from "@/lib/api";
 import { getCurrentUser } from "@/lib/auth";
 
-interface Product {
-  id: number;
+interface CartItem {
+  id: string;
   name: string;
   brand: string;
   emoji: string;
-  category: string;
-  vendor: string;
-  badge?: string;
-  badgeType?: "promo" | "default";
   price: number;
-  oldPrice?: number;
   unit: string;
-  stock: "ok" | "low";
-  stockText: string;
-}
-
-interface CartItem extends Product {
+  stock: number;
   qty: number;
 }
-
-const PRODUCTS: Product[] = [
-  { id: 1, name: "Cemento Portland Normal", brand: "Loma Negra", emoji: "🪨", category: "cemento", vendor: "Fabricante", badge: "Más vendido", price: 6800, unit: "bolsa 50 kg", stock: "ok", stockText: "✓ Stock disponible" },
-  { id: 2, name: "Varilla Nervada Ø12mm", brand: "Acindar", emoji: "🔩", category: "hierro", vendor: "Distribuidor", badge: "Promo", badgeType: "promo", price: 4200, oldPrice: 4900, unit: "barra 12m", stock: "ok", stockText: "✓ Stock disponible" },
-  { id: 3, name: "Porcellanato 60×60 Gris", brand: "San Lorenzo", emoji: "🟦", category: "ceramica", vendor: "Ferretería", badge: "Destacado", price: 3800, unit: "caja 1.44m²", stock: "ok", stockText: "✓ Stock disponible" },
-  { id: 4, name: "Pintura Látex Interior Blanco", brand: "Sherwin-Williams", emoji: "🎨", category: "pintura", vendor: "Distribuidor", badge: "Promo", badgeType: "promo", price: 12500, oldPrice: 14200, unit: "bidón 20L", stock: "low", stockText: "⚠ Últimas 8 unidades" },
-  { id: 5, name: "Cal Hidráulica Premium", brand: "Calera Avellaneda", emoji: "⚪", category: "cemento", vendor: "Fabricante", price: 2800, unit: "bolsa 25 kg", stock: "ok", stockText: "✓ Stock disponible" },
-  { id: 6, name: "Caño PVC 4\" Sanitario", brand: "Fiplasma", emoji: "🔧", category: "plomeria", vendor: "Ferretería", price: 1850, unit: "tramo 3m", stock: "ok", stockText: "✓ Stock disponible" },
-  { id: 7, name: "Cable Unipolar 2.5mm IRAM", brand: "Prysmian", emoji: "⚡", category: "electricidad", vendor: "Distribuidor", badge: "Destacado", price: 980, unit: "rollo 100m", stock: "ok", stockText: "✓ Stock disponible" },
-  { id: 8, name: "Malla Electrosoldada 15×15cm", brand: "Acindar", emoji: "🔩", category: "hierro", vendor: "Fabricante", badge: "Promo", badgeType: "promo", price: 8900, oldPrice: 10200, unit: "hoja 6×2.35m", stock: "ok", stockText: "✓ Stock disponible" },
-  { id: 9, name: "Tablero 12 Circuitos", brand: "Schneider Electric", emoji: "⚡", category: "electricidad", vendor: "Ferretería", price: 18500, unit: "unidad", stock: "ok", stockText: "✓ Stock disponible" },
-  { id: 10, name: "Parquet Flotante Roble", brand: "Bambu Floors", emoji: "🪵", category: "madera", vendor: "Distribuidor", price: 5200, unit: "caja 2.5m²", stock: "low", stockText: "⚠ Pocas unidades" },
-];
-
-const CATEGORIES = [
-  { id: "todos", label: "Todos", emoji: "🔍" },
-  { id: "cemento", label: "Cemento y Cal", emoji: "⚪" },
-  { id: "hierro", label: "Hierro y Acero", emoji: "🔩" },
-  { id: "ceramica", label: "Cerámicas", emoji: "🟦" },
-  { id: "pintura", label: "Pinturas", emoji: "🎨" },
-  { id: "plomeria", label: "Plomería", emoji: "🔧" },
-  { id: "electricidad", label: "Electricidad", emoji: "⚡" },
-  { id: "madera", label: "Madera", emoji: "🪵" },
-];
 
 const VENDORS = [
   { name: "Ferreterías urbanas", type: "Ferretería", description: "Entrega rápida en zonas urbanas con stock inmediato.", icon: "🔧" },
@@ -63,9 +30,11 @@ const PAYMENT_METHODS = [
 ];
 
 export default function BuyerMarketplace() {
+  const [products, setProducts] = useState<any[]>([]);
+  const [productsLoading, setProductsLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [activeCat, setActiveCat] = useState("todos");
-  const [cart, setCart] = useState<Record<number, CartItem>>({});
+  const [cart, setCart] = useState<Record<string, CartItem>>({});
   const [cartOpen, setCartOpen] = useState(false);
   const [checkoutOpen, setCheckoutOpen] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState("EFECTIVO");
@@ -73,17 +42,31 @@ export default function BuyerMarketplace() {
   const [message, setMessage] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
+  useEffect(() => {
+    productsApi.getAll()
+      .then((data) => setProducts(data.filter((p: any) => p.isActive !== false && p.stock > 0)))
+      .catch(() => {})
+      .finally(() => setProductsLoading(false));
+  }, []);
+
+  const categories = useMemo(() => {
+    const seen = new Set<string>();
+    const cats: { id: string; label: string }[] = [{ id: "todos", label: "Todos" }];
+    for (const p of products) {
+      const name = p.category?.name;
+      if (name && !seen.has(name)) { seen.add(name); cats.push({ id: name, label: name }); }
+    }
+    return cats;
+  }, [products]);
+
   const filtered = useMemo(() => {
-    return PRODUCTS.filter((product) => {
-      const matchesCat = activeCat === "todos" || product.category === activeCat;
-      const matchesSearch =
-        !search ||
-        product.name.toLowerCase().includes(search.toLowerCase()) ||
-        product.brand.toLowerCase().includes(search.toLowerCase()) ||
-        product.vendor.toLowerCase().includes(search.toLowerCase());
+    return products.filter((product) => {
+      const matchesCat = activeCat === "todos" || product.category?.name === activeCat;
+      const q = search.toLowerCase();
+      const matchesSearch = !q || product.name?.toLowerCase().includes(q) || product.brand?.toLowerCase().includes(q);
       return matchesCat && matchesSearch;
     });
-  }, [search, activeCat]);
+  }, [products, search, activeCat]);
 
   const cartItems = Object.values(cart);
   const cartCount = cartItems.reduce((sum, item) => sum + item.qty, 0);
@@ -91,17 +74,21 @@ export default function BuyerMarketplace() {
   const shipping = subtotal >= 50000 ? 0 : 3500;
   const total = subtotal + shipping;
 
-  function addToCart(product: Product) {
+  function addToCart(product: any) {
     setCart((prev) => {
       const existing = prev[product.id];
       return {
         ...prev,
-        [product.id]: { ...product, qty: (existing?.qty ?? 0) + 1 },
+        [product.id]: {
+          id: product.id, name: product.name, brand: product.brand,
+          emoji: product.emoji ?? "📦", price: product.price, unit: product.unit, stock: product.stock,
+          qty: (existing?.qty ?? 0) + 1,
+        },
       };
     });
   }
 
-  function changeQty(id: number, delta: number) {
+  function changeQty(id: string, delta: number) {
     setCart((prev) => {
       const item = prev[id];
       if (!item) return prev;
@@ -116,30 +103,17 @@ export default function BuyerMarketplace() {
 
   async function createOrder() {
     const user = getCurrentUser();
-    if (!user) {
-      setMessage("Inicia sesión para enviar tu pedido.");
-      return;
-    }
-    if (cartItems.length === 0) {
-      setMessage("Agrega productos al carrito antes de confirmar.");
-      return;
-    }
-
+    if (!user) { setMessage("Inicia sesión para enviar tu pedido."); return; }
+    if (cartItems.length === 0) { setMessage("Agrega productos al carrito antes de confirmar."); return; }
     setLoading(true);
     setMessage(null);
-
     try {
       await ordersApi.create({
         userId: user.id,
-        items: cartItems.map((item) => ({
-          productId: String(item.id),
-          qty: item.qty,
-          price: item.price,
-        })),
+        items: cartItems.map((item) => ({ productId: item.id, qty: item.qty, price: item.price })),
         paymentMethod,
         notes,
       });
-
       setCart({});
       setCheckoutOpen(false);
       setMessage("Tu pedido se envió correctamente y ya aparece en el módulo Delivery.");
@@ -214,7 +188,7 @@ export default function BuyerMarketplace() {
               </span>
             </div>
             <div className="flex flex-wrap gap-2">
-              {CATEGORIES.map((category) => (
+              {categories.map((category) => (
                 <button
                   key={category.id}
                   onClick={() => setActiveCat(category.id)}
@@ -225,7 +199,6 @@ export default function BuyerMarketplace() {
                       : "border-gray-200 bg-white text-slate-600 hover:border-brand-400 hover:text-slate-900"
                   )}
                 >
-                  <span>{category.emoji}</span>
                   {category.label}
                 </button>
               ))}
@@ -252,35 +225,31 @@ export default function BuyerMarketplace() {
           <div>
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-lg font-bold text-slate-900">Resultados</h2>
-              <p className="text-sm text-slate-500">{filtered.length} productos</p>
+              <p className="text-sm text-slate-500">{productsLoading ? "Cargando..." : `${filtered.length} productos`}</p>
             </div>
             <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 xl:grid-cols-4">
               {filtered.map((product) => {
                 const inCart = cart[product.id]?.qty ?? 0;
+                const isLow = product.stock > 0 && product.stock < 20;
                 return (
                   <div key={product.id} className="rounded-3xl border border-gray-200 bg-white shadow-sm overflow-hidden transition hover:shadow-md">
-                    <div className="h-36 bg-slate-100 flex items-center justify-center text-5xl">{product.emoji}</div>
+                    <div className="h-36 bg-slate-100 flex items-center justify-center text-5xl">{product.emoji ?? "📦"}</div>
                     <div className="p-4 flex flex-col gap-3">
                       <div className="flex items-start justify-between gap-2">
                         <div>
                           <p className="text-sm font-semibold text-slate-900">{product.name}</p>
-                          <p className="text-xs text-slate-500">{product.vendor} · {product.brand}</p>
+                          <p className="text-xs text-slate-500">{product.brand}</p>
                         </div>
-                        {product.badge && (
-                          <span className={cn(
-                            "rounded-full px-2 py-1 text-[11px] font-semibold",
-                            product.badgeType === "promo"
-                              ? "bg-amber-100 text-amber-700"
-                              : "bg-slate-100 text-slate-700"
-                          )}>
-                            {product.badge}
-                          </span>
+                        {product.isPromo && (
+                          <span className="rounded-full px-2 py-1 text-[11px] font-semibold bg-amber-100 text-amber-700">Promo</span>
                         )}
                       </div>
                       <div className="space-y-1">
                         <p className="text-sm text-slate-500">{product.unit}</p>
                         <p className="font-bold text-slate-900">{formatCurrency(product.price)}</p>
-                        <p className={cn("text-xs font-semibold", product.stock === "ok" ? "text-emerald-600" : "text-amber-600")}>{product.stockText}</p>
+                        <p className={cn("text-xs font-semibold", isLow ? "text-amber-600" : "text-emerald-600")}>
+                          {isLow ? `⚠ Últimas ${product.stock} unidades` : "✓ Stock disponible"}
+                        </p>
                       </div>
                       <button
                         onClick={() => addToCart(product)}
@@ -364,7 +333,7 @@ export default function BuyerMarketplace() {
                           <div className="flex h-14 w-14 items-center justify-center rounded-3xl bg-white text-3xl">{item.emoji}</div>
                           <div className="min-w-0 flex-1">
                             <p className="font-semibold text-slate-900">{item.name}</p>
-                            <p className="text-sm text-slate-500">{item.vendor} · {item.brand}</p>
+                            <p className="text-sm text-slate-500">{item.brand}</p>
                             <div className="mt-3 flex flex-wrap items-center gap-2 text-sm">
                               <span className="rounded-full bg-white px-3 py-1 text-slate-600">{item.qty} unidad{item.qty === 1 ? "" : "es"}</span>
                               <span className="rounded-full bg-white px-3 py-1 text-slate-600">{item.unit}</span>
