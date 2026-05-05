@@ -2,23 +2,40 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useEffect, useState } from "react";
 import {
   LayoutDashboard, ShoppingCart, Boxes, Package, Truck,
-  Settings, HardHat, Bell, ArrowLeft, Store,
+  Settings, Bell, ArrowLeft, Store, AlertTriangle,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { getCurrentUser } from "@/lib/auth";
+import { usersApi } from "@/lib/api";
 import RoleSwitcher from "@/components/layout/RoleSwitcher";
 
 const navItems = [
-  { href: "/comercio/dashboard", label: "Dashboard", icon: LayoutDashboard },
+  { href: "/comercio/dashboard",   label: "Dashboard",   icon: LayoutDashboard },
   { href: "/comercio/marketplace", label: "Marketplace", icon: ShoppingCart },
-  { href: "/comercio/productos", label: "Productos", icon: Boxes, badge: "3" },
-  { href: "/comercio/pedidos", label: "Mis Pedidos", icon: Package },
-  { href: "/comercio/logistica", label: "Logística", icon: Truck, badge: "2" },
+  { href: "/comercio/productos",   label: "Productos",   icon: Boxes },
+  { href: "/comercio/pedidos",     label: "Mis Pedidos", icon: Package },
+  { href: "/comercio/logistica",   label: "Logística",   icon: Truck },
 ];
+
+function initials(name: string) {
+  return name.split(" ").map((w) => w[0]).slice(0, 2).join("").toUpperCase();
+}
 
 export default function ComercioSidebar() {
   const pathname = usePathname();
+  const session = getCurrentUser();
+  const [profile, setProfile] = useState<any>(null);
+
+  useEffect(() => {
+    if (!session?.id) return;
+    usersApi.getOne(session.id).then(setProfile).catch(() => {});
+  }, [session?.id]);
+
+  const user = profile ?? session;
+  const profileIncomplete = profile && !profile.cuit;
 
   return (
     <aside className="fixed left-0 top-0 h-screen w-64 bg-dark-900 text-white flex flex-col z-50">
@@ -33,7 +50,7 @@ export default function ComercioSidebar() {
         </div>
       </div>
 
-      {/* Back to role selector */}
+      {/* Back */}
       <div className="px-4 mb-2">
         <Link
           href="/"
@@ -43,8 +60,18 @@ export default function ComercioSidebar() {
         </Link>
       </div>
 
+      {/* Perfil incompleto banner */}
+      {profileIncomplete && (
+        <Link href="/comercio/perfil" className="mx-3 mb-3">
+          <div className="bg-warning-500/15 border border-warning-500/30 rounded-lg px-3 py-2 flex items-center gap-2 hover:bg-warning-500/20 transition-colors">
+            <AlertTriangle className="w-3.5 h-3.5 text-warning-400 shrink-0" />
+            <span className="text-[11px] text-warning-300 font-semibold">Completá tu perfil →</span>
+          </div>
+        </Link>
+      )}
+
       {/* Navigation */}
-      <nav className="flex-1 px-3">
+      <nav className="flex-1 px-3 overflow-y-auto">
         <div className="text-[10px] font-bold text-gray-500 uppercase tracking-wider px-3 mb-2">
           Gestión Comercial
         </div>
@@ -63,11 +90,6 @@ export default function ComercioSidebar() {
             >
               <item.icon className="w-5 h-5" />
               {item.label}
-              {"badge" in item && item.badge && (
-                <span className="ml-auto bg-brand-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full">
-                  {item.badge}
-                </span>
-              )}
             </Link>
           );
         })}
@@ -75,7 +97,7 @@ export default function ComercioSidebar() {
 
       <RoleSwitcher />
 
-      {/* Bottom section */}
+      {/* Bottom */}
       <div className="px-3 pb-4 space-y-1">
         <Link
           href="#"
@@ -83,26 +105,33 @@ export default function ComercioSidebar() {
         >
           <Bell className="w-5 h-5" />
           Notificaciones
-          <span className="ml-auto bg-danger-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full">
-            5
-          </span>
         </Link>
         <Link
-          href="#"
-          className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-gray-400 hover:text-white hover:bg-white/5 transition-all"
+          href="/comercio/perfil"
+          className={cn(
+            "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all",
+            pathname.startsWith("/comercio/perfil")
+              ? "bg-brand-500/15 text-brand-400"
+              : "text-gray-400 hover:text-white hover:bg-white/5"
+          )}
         >
           <Settings className="w-5 h-5" />
-          Configuración
+          Mi empresa
+          {profileIncomplete && (
+            <span className="ml-auto w-2 h-2 rounded-full bg-warning-400" />
+          )}
         </Link>
 
-        {/* User */}
+        {/* User card */}
         <div className="mt-4 flex items-center gap-3 px-3 py-3 rounded-lg bg-white/5">
-          <div className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold text-white bg-brand-500">
-            LN
+          <div className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold text-white bg-brand-500 shrink-0">
+            {user?.name ? initials(user.name) : "?"}
           </div>
           <div className="flex-1 min-w-0">
-            <div className="text-sm font-semibold truncate">Loma Negra S.A.</div>
-            <div className="text-[11px] text-gray-500">Comercio</div>
+            <div className="text-sm font-semibold truncate">{user?.name ?? "Mi empresa"}</div>
+            <div className="text-[11px] text-gray-500">
+              {user?.cuit ? `CUIT ${user.cuit.replace(/(\d{2})(\d{8})(\d)/, "$1-$2-$3")}` : "CUIT no cargado"}
+            </div>
           </div>
         </div>
       </div>
