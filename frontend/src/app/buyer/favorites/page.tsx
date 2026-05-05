@@ -1,41 +1,24 @@
+"use client";
+
+import { Heart } from "lucide-react";
+
 export default function BuyerFavorites() {
   return (
-    <div className="p-8">
-      <h1 className="text-3xl font-bold mb-6">Favoritos</h1>
-      <p className="text-gray-600">Tus productos favoritos para compras rápidas.</p>
-
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mt-8">
-        <div className="bg-white p-6 rounded-lg shadow-sm border">
-          <div className="flex justify-between items-start mb-4">
-            <div>
-              <h3 className="font-semibold">Cemento Portland</h3>
-              <p className="text-sm text-gray-600">Bolsa de 50kg</p>
-            </div>
-            <button className="text-red-500 hover:text-red-700">
-              ❤️
-            </button>
-          </div>
-          <p className="text-lg font-bold text-green-600 mb-4">$2,500</p>
-          <button className="w-full bg-green-500 hover:bg-green-600 text-white py-2 rounded-lg">
-            Agregar al carrito
-          </button>
+    <div className="min-h-screen bg-slate-50 flex items-center justify-center p-8">
+      <div className="text-center max-w-sm">
+        <div className="w-16 h-16 rounded-2xl bg-rose-100 flex items-center justify-center mx-auto mb-5">
+          <Heart className="w-8 h-8 text-rose-400" />
         </div>
-
-        <div className="bg-white p-6 rounded-lg shadow-sm border">
-          <div className="flex justify-between items-start mb-4">
-            <div>
-              <h3 className="font-semibold">Arena Fina</h3>
-              <p className="text-sm text-gray-600">Metro cúbico</p>
-            </div>
-            <button className="text-red-500 hover:text-red-700">
-              ❤️
-            </button>
-          </div>
-          <p className="text-lg font-bold text-green-600 mb-4">$8,000</p>
-          <button className="w-full bg-green-500 hover:bg-green-600 text-white py-2 rounded-lg">
-            Agregar al carrito
-          </button>
-        </div>
+        <h1 className="text-2xl font-extrabold text-slate-900">Favoritos</h1>
+        <p className="mt-3 text-sm text-slate-500">
+          Guardá productos para comprarlos más rápido. Esta función estará disponible en la próxima versión.
+        </p>
+        <a
+          href="/buyer/marketplace"
+          className="mt-6 inline-block rounded-2xl bg-brand-600 text-white text-sm font-semibold px-6 py-3 hover:bg-brand-700 transition-colors"
+        >
+          Ir al Marketplace
+        </a>
       </div>
     </div>
   );
