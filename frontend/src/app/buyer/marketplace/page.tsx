@@ -1,9 +1,9 @@
 "use client";
 
 import { useState, useMemo, useEffect } from "react";
-import { Search, ShoppingCart, X, Plus, Minus, Truck, CreditCard, ShieldCheck } from "lucide-react";
+import { Search, ShoppingCart, X, Plus, Minus, Truck, CreditCard, ShieldCheck, MapPin, CheckCircle2 } from "lucide-react";
 import { cn, formatCurrency } from "@/lib/utils";
-import { ordersApi, productsApi } from "@/lib/api";
+import { ordersApi, productsApi, usersApi } from "@/lib/api";
 import { getCurrentUser } from "@/lib/auth";
 
 interface CartItem {
@@ -41,6 +41,27 @@ export default function BuyerMarketplace() {
   const [notes, setNotes] = useState("");
   const [message, setMessage] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [addresses, setAddresses] = useState<any[]>([]);
+  const [selectedAddressId, setSelectedAddressId] = useState<string>("");
+  const [addressesLoading, setAddressesLoading] = useState(false);
+  const [showNewAddress, setShowNewAddress] = useState(false);
+  const [newAddr, setNewAddr] = useState({ label: "Casa", street: "", city: "", province: "", zipCode: "" });
+  const [savingAddr, setSavingAddr] = useState(false);
+
+  useEffect(() => {
+    if (!checkoutOpen) return;
+    const user = getCurrentUser();
+    if (!user) return;
+    setAddressesLoading(true);
+    usersApi.getAddresses(user.id)
+      .then((data) => {
+        setAddresses(data);
+        const def = data.find((a: any) => a.isDefault) ?? data[0];
+        if (def) setSelectedAddressId(def.id);
+      })
+      .catch(() => {})
+      .finally(() => setAddressesLoading(false));
+  }, [checkoutOpen]);
 
   useEffect(() => {
     productsApi.getAll()
@@ -101,10 +122,27 @@ export default function BuyerMarketplace() {
     });
   }
 
+  async function saveNewAddress() {
+    const user = getCurrentUser();
+    if (!user) return;
+    if (!newAddr.street.trim() || !newAddr.city.trim()) return;
+    setSavingAddr(true);
+    try {
+      const created = await usersApi.addAddress(user.id, newAddr);
+      setAddresses((prev) => [...prev, created]);
+      setSelectedAddressId(created.id);
+      setShowNewAddress(false);
+      setNewAddr({ label: "Casa", street: "", city: "", province: "", zipCode: "" });
+    } catch {
+      // silently ignore
+    } finally { setSavingAddr(false); }
+  }
+
   async function createOrder() {
     const user = getCurrentUser();
     if (!user) { setMessage("Inicia sesión para enviar tu pedido."); return; }
     if (cartItems.length === 0) { setMessage("Agrega productos al carrito antes de confirmar."); return; }
+    if (!selectedAddressId) { setMessage("Seleccioná una dirección de entrega."); return; }
     setLoading(true);
     setMessage(null);
     try {
@@ -113,6 +151,7 @@ export default function BuyerMarketplace() {
         items: cartItems.map((item) => ({ productId: item.id, qty: item.qty, price: item.price })),
         paymentMethod,
         notes,
+        addressId: selectedAddressId,
       });
       setCart({});
       setCheckoutOpen(false);
@@ -396,6 +435,90 @@ export default function BuyerMarketplace() {
               </button>
             </div>
             <div className="space-y-6 p-6">
+
+              {/* Address selection */}
+              <div>
+                <div className="flex items-center justify-between mb-3">
+                  <p className="text-sm font-semibold text-slate-900 flex items-center gap-2">
+                    <MapPin className="w-4 h-4 text-brand-500" /> Dirección de entrega
+                  </p>
+                  <button
+                    onClick={() => setShowNewAddress((v) => !v)}
+                    className="text-xs font-semibold text-brand-600 hover:underline"
+                  >
+                    {showNewAddress ? "Cancelar" : "+ Nueva dirección"}
+                  </button>
+                </div>
+
+                {addressesLoading ? (
+                  <p className="text-sm text-slate-400 py-3 text-center">Cargando direcciones…</p>
+                ) : addresses.length > 0 && !showNewAddress ? (
+                  <div className="grid gap-2">
+                    {addresses.map((addr) => (
+                      <button
+                        key={addr.id}
+                        onClick={() => setSelectedAddressId(addr.id)}
+                        className={cn(
+                          "w-full rounded-2xl border p-3 text-left text-sm transition",
+                          selectedAddressId === addr.id
+                            ? "border-brand-500 bg-brand-50"
+                            : "border-gray-200 bg-white hover:border-brand-300"
+                        )}
+                      >
+                        <div className="flex items-center gap-2">
+                          {selectedAddressId === addr.id && <CheckCircle2 className="w-4 h-4 text-brand-500 shrink-0" />}
+                          <div>
+                            <span className="font-semibold text-slate-800">{addr.label}</span>
+                            <span className="text-slate-500 ml-2">{addr.street}, {addr.city}</span>
+                          </div>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                ) : null}
+
+                {(showNewAddress || (addresses.length === 0 && !addressesLoading)) && (
+                  <div className="rounded-2xl border border-gray-200 bg-slate-50 p-4 space-y-3">
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <label className="text-xs font-semibold text-gray-500 uppercase mb-1 block">Etiqueta</label>
+                        <input value={newAddr.label} onChange={(e) => setNewAddr((p) => ({ ...p, label: e.target.value }))}
+                          placeholder="Casa, Obra..." className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-brand-400 bg-white" />
+                      </div>
+                      <div>
+                        <label className="text-xs font-semibold text-gray-500 uppercase mb-1 block">Ciudad *</label>
+                        <input value={newAddr.city} onChange={(e) => setNewAddr((p) => ({ ...p, city: e.target.value }))}
+                          placeholder="Buenos Aires" className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-brand-400 bg-white" />
+                      </div>
+                    </div>
+                    <div>
+                      <label className="text-xs font-semibold text-gray-500 uppercase mb-1 block">Calle y número *</label>
+                      <input value={newAddr.street} onChange={(e) => setNewAddr((p) => ({ ...p, street: e.target.value }))}
+                        placeholder="Av. Corrientes 1234" className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-brand-400 bg-white" />
+                    </div>
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <label className="text-xs font-semibold text-gray-500 uppercase mb-1 block">Provincia</label>
+                        <input value={newAddr.province} onChange={(e) => setNewAddr((p) => ({ ...p, province: e.target.value }))}
+                          placeholder="Buenos Aires" className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-brand-400 bg-white" />
+                      </div>
+                      <div>
+                        <label className="text-xs font-semibold text-gray-500 uppercase mb-1 block">CP</label>
+                        <input value={newAddr.zipCode} onChange={(e) => setNewAddr((p) => ({ ...p, zipCode: e.target.value }))}
+                          placeholder="C1043" className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-brand-400 bg-white" />
+                      </div>
+                    </div>
+                    <button
+                      onClick={saveNewAddress}
+                      disabled={savingAddr || !newAddr.street.trim() || !newAddr.city.trim()}
+                      className="w-full rounded-xl bg-brand-600 disabled:opacity-50 text-white text-sm font-semibold py-2.5 hover:bg-brand-700 transition-colors"
+                    >
+                      {savingAddr ? "Guardando…" : "Guardar dirección"}
+                    </button>
+                  </div>
+                )}
+              </div>
+
               <div className="grid gap-3 sm:grid-cols-3">
                 {PAYMENT_METHODS.map((method) => (
                   <button
