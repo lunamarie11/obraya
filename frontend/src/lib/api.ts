@@ -71,6 +71,8 @@ export const usersApi = {
     apiFetch<any[]>(`/users/${id}/addresses`),
   addAddress: (id: string, data: any) =>
     apiFetch<any>(`/users/${id}/addresses`, { method: "POST", body: JSON.stringify(data) }),
+  saveFcmToken: (id: string, token: string) =>
+    apiFetch<any>(`/users/${id}/fcm-token`, { method: "POST", body: JSON.stringify({ token }) }),
 };
 
 // ── Projects API ───────────────────────────────────────────────────────────

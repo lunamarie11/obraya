@@ -17,6 +17,7 @@ model User {
   cuit      String?
   role      UserRole @default(BUYER)
   isPro     Boolean  @default(false)
+  fcmToken  String?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -154,8 +155,12 @@ model Order {
   total         Float
   tip           Float       @default(0)
   deliveryCommission Float  @default(0)
-  paymentMethod String?
-  notes         String?
+  paymentMethod    String?
+  mpPreferenceId   String?
+  mpPaymentId      String?
+  paymentUrl       String?
+  paymentStatus    String?
+  notes            String?
   createdAt     DateTime    @default(now())
   updatedAt     DateTime    @updatedAt
 

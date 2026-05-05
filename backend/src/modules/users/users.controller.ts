@@ -30,4 +30,12 @@ export class UsersController {
   ) {
     return this.usersService.addAddress(id, body);
   }
+
+  @Post(':id/fcm-token')
+  saveFcmToken(
+    @Param('id') id: string,
+    @Body() body: { token: string },
+  ) {
+    return this.usersService.saveFcmToken(id, body.token);
+  }
 }

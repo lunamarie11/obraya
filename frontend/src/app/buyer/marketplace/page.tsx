@@ -1,10 +1,11 @@
 "use client";
 
 import { useState, useMemo, useEffect } from "react";
-import { Search, ShoppingCart, X, Plus, Minus, Truck, CreditCard, ShieldCheck, MapPin, CheckCircle2 } from "lucide-react";
+import { Search, ShoppingCart, X, Truck, ShieldCheck, MapPin, CheckCircle2, SlidersHorizontal, ExternalLink, Bell } from "lucide-react";
 import { cn, formatCurrency } from "@/lib/utils";
 import { ordersApi, productsApi, usersApi } from "@/lib/api";
 import { getCurrentUser } from "@/lib/auth";
+import { requestFcmToken, onForegroundMessage } from "@/lib/firebase";
 
 interface CartItem {
   id: string;
@@ -47,6 +48,14 @@ export default function BuyerMarketplace() {
   const [showNewAddress, setShowNewAddress] = useState(false);
   const [newAddr, setNewAddr] = useState({ label: "Casa", street: "", city: "", province: "", zipCode: "" });
   const [savingAddr, setSavingAddr] = useState(false);
+  const [paymentUrl, setPaymentUrl] = useState<string | null>(null);
+  // Búsqueda avanzada
+  const [sortBy, setSortBy] = useState<"relevance" | "price_asc" | "price_desc" | "name">("relevance");
+  const [priceMin, setPriceMin] = useState("");
+  const [priceMax, setPriceMax] = useState("");
+  const [showFilters, setShowFilters] = useState(false);
+  const [inStockOnly, setInStockOnly] = useState(false);
+  const [notification, setNotification] = useState<{ title: string; body: string } | null>(null);
 
   useEffect(() => {
     if (!checkoutOpen) return;
@@ -70,6 +79,22 @@ export default function BuyerMarketplace() {
       .finally(() => setProductsLoading(false));
   }, []);
 
+  // Registrar FCM token al cargar la página
+  useEffect(() => {
+    const user = getCurrentUser();
+    if (!user) return;
+    requestFcmToken().then((token) => {
+      if (token) usersApi.saveFcmToken(user.id, token).catch(() => {});
+    });
+    onForegroundMessage((payload) => {
+      const { title, body } = payload.notification ?? {};
+      if (title) {
+        setNotification({ title, body: body ?? "" });
+        setTimeout(() => setNotification(null), 5000);
+      }
+    });
+  }, []);
+
   const categories = useMemo(() => {
     const seen = new Set<string>();
     const cats: { id: string; label: string }[] = [{ id: "todos", label: "Todos" }];
@@ -81,13 +106,25 @@ export default function BuyerMarketplace() {
   }, [products]);
 
   const filtered = useMemo(() => {
-    return products.filter((product) => {
+    const min = priceMin ? parseFloat(priceMin) : null;
+    const max = priceMax ? parseFloat(priceMax) : null;
+
+    let result = products.filter((product) => {
       const matchesCat = activeCat === "todos" || product.category?.name === activeCat;
       const q = search.toLowerCase();
       const matchesSearch = !q || product.name?.toLowerCase().includes(q) || product.brand?.toLowerCase().includes(q);
-      return matchesCat && matchesSearch;
+      const matchesMin = min === null || product.price >= min;
+      const matchesMax = max === null || product.price <= max;
+      const matchesStock = !inStockOnly || product.stock > 0;
+      return matchesCat && matchesSearch && matchesMin && matchesMax && matchesStock;
     });
-  }, [products, search, activeCat]);
+
+    if (sortBy === "price_asc") result = [...result].sort((a, b) => a.price - b.price);
+    else if (sortBy === "price_desc") result = [...result].sort((a, b) => b.price - a.price);
+    else if (sortBy === "name") result = [...result].sort((a, b) => a.name.localeCompare(b.name));
+
+    return result;
+  }, [products, search, activeCat, sortBy, priceMin, priceMax, inStockOnly]);
 
   const cartItems = Object.values(cart);
   const cartCount = cartItems.reduce((sum, item) => sum + item.qty, 0);
@@ -146,7 +183,7 @@ export default function BuyerMarketplace() {
     setLoading(true);
     setMessage(null);
     try {
-      await ordersApi.create({
+      const result = await ordersApi.create({
         userId: user.id,
         items: cartItems.map((item) => ({ productId: item.id, qty: item.qty, price: item.price })),
         paymentMethod,
@@ -154,8 +191,13 @@ export default function BuyerMarketplace() {
         addressId: selectedAddressId,
       });
       setCart({});
-      setCheckoutOpen(false);
-      setMessage("Tu pedido se envió correctamente y ya aparece en el módulo Delivery.");
+      if (paymentMethod === "MERCADO_PAGO" && result?.paymentUrl) {
+        setPaymentUrl(result.paymentUrl);
+        setCheckoutOpen(false);
+      } else {
+        setCheckoutOpen(false);
+        setMessage("Tu pedido se envió correctamente y ya aparece en el módulo Delivery.");
+      }
     } catch (error: any) {
       setMessage(error?.message || "No se pudo procesar el pedido.");
     } finally {
@@ -165,6 +207,45 @@ export default function BuyerMarketplace() {
 
   return (
     <div className="min-h-screen bg-slate-50">
+      {/* Toast de notificación en primer plano */}
+      {notification && (
+        <div className="fixed top-4 right-4 z-[100] bg-slate-900 text-white rounded-2xl shadow-2xl px-5 py-4 max-w-sm flex items-start gap-3 animate-fade-in">
+          <Bell className="w-5 h-5 text-brand-400 shrink-0 mt-0.5" />
+          <div>
+            <p className="font-bold text-sm">{notification.title}</p>
+            <p className="text-xs text-slate-300 mt-0.5">{notification.body}</p>
+          </div>
+          <button onClick={() => setNotification(null)} className="text-slate-400 hover:text-white ml-2">×</button>
+        </div>
+      )}
+
+      {/* Banner de pago MercadoPago */}
+      {paymentUrl && (
+        <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl shadow-2xl p-8 max-w-md w-full text-center space-y-5">
+            <div className="text-5xl">💳</div>
+            <h2 className="text-xl font-extrabold text-slate-900">¡Pedido creado!</h2>
+            <p className="text-sm text-slate-500">
+              Hacé click en el botón para completar el pago con Mercado Pago. Una vez acreditado, tu pedido se confirma automáticamente.
+            </p>
+            <a
+              href={paymentUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center justify-center gap-2 w-full rounded-2xl bg-[#009ee3] text-white font-bold py-3.5 hover:bg-[#007ec4] transition-colors"
+            >
+              <ExternalLink className="w-4 h-4" /> Pagar con Mercado Pago
+            </a>
+            <button
+              onClick={() => setPaymentUrl(null)}
+              className="text-sm text-slate-400 hover:text-slate-600"
+            >
+              Pagar después (el pedido quedó guardado)
+            </button>
+          </div>
+        </div>
+      )}
+
       <div className="sticky top-0 z-30 bg-white border-b border-gray-200">
         <div className="max-w-7xl mx-auto px-6 py-4 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
           <div>
@@ -262,10 +343,59 @@ export default function BuyerMarketplace() {
           </div>
 
           <div>
-            <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center justify-between mb-3 gap-3">
               <h2 className="text-lg font-bold text-slate-900">Resultados</h2>
-              <p className="text-sm text-slate-500">{productsLoading ? "Cargando..." : `${filtered.length} productos`}</p>
+              <div className="flex items-center gap-2">
+                <p className="text-sm text-slate-500">{productsLoading ? "Cargando..." : `${filtered.length} productos`}</p>
+                <button
+                  onClick={() => setShowFilters((v) => !v)}
+                  className={cn(
+                    "flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-semibold transition",
+                    showFilters ? "border-brand-500 bg-brand-50 text-brand-600" : "border-gray-200 bg-white text-slate-600 hover:border-brand-400"
+                  )}
+                >
+                  <SlidersHorizontal className="w-3.5 h-3.5" /> Filtros
+                </button>
+              </div>
             </div>
+
+            {showFilters && (
+              <div className="rounded-2xl border border-gray-200 bg-white p-4 mb-4 flex flex-wrap gap-4 items-end">
+                <div>
+                  <label className="text-xs font-semibold text-slate-500 uppercase block mb-1">Precio mínimo</label>
+                  <input type="number" value={priceMin} onChange={(e) => setPriceMin(e.target.value)}
+                    placeholder="$0" min="0"
+                    className="w-28 border border-gray-200 rounded-xl px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-brand-400" />
+                </div>
+                <div>
+                  <label className="text-xs font-semibold text-slate-500 uppercase block mb-1">Precio máximo</label>
+                  <input type="number" value={priceMax} onChange={(e) => setPriceMax(e.target.value)}
+                    placeholder="Sin límite" min="0"
+                    className="w-28 border border-gray-200 rounded-xl px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-brand-400" />
+                </div>
+                <div>
+                  <label className="text-xs font-semibold text-slate-500 uppercase block mb-1">Ordenar por</label>
+                  <select value={sortBy} onChange={(e) => setSortBy(e.target.value as any)}
+                    className="border border-gray-200 rounded-xl px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-brand-400 bg-white">
+                    <option value="relevance">Relevancia</option>
+                    <option value="price_asc">Precio: menor a mayor</option>
+                    <option value="price_desc">Precio: mayor a menor</option>
+                    <option value="name">Nombre A–Z</option>
+                  </select>
+                </div>
+                <div className="flex items-center gap-2 pb-0.5">
+                  <input type="checkbox" id="stock-filter" checked={inStockOnly} onChange={(e) => setInStockOnly(e.target.checked)}
+                    className="w-4 h-4 accent-brand-500" />
+                  <label htmlFor="stock-filter" className="text-sm font-medium text-slate-700 cursor-pointer">Solo con stock</label>
+                </div>
+                <button
+                  onClick={() => { setPriceMin(""); setPriceMax(""); setSortBy("relevance"); setInStockOnly(false); }}
+                  className="text-xs text-slate-400 hover:text-slate-600 pb-0.5 underline"
+                >
+                  Limpiar filtros
+                </button>
+              </div>
+            )}
             <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 xl:grid-cols-4">
               {filtered.map((product) => {
                 const inCart = cart[product.id]?.qty ?? 0;

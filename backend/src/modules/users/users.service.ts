@@ -49,4 +49,12 @@ export class UsersService {
     }
     return this.prisma.address.create({ data: { ...data, userId } });
   }
+
+  async saveFcmToken(userId: string, token: string) {
+    return this.prisma.user.update({
+      where: { id: userId },
+      data: { fcmToken: token },
+      select: { id: true },
+    });
+  }
 }

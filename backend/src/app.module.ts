@@ -13,6 +13,8 @@ import { DeliveryModule } from './modules/delivery/delivery.module';
 import { CommonModule } from './common/common.module';
 import { AdminModule } from './modules/admin/admin.module';
 import { HealthModule } from './health/health.module';
+import { PaymentsModule } from './modules/payments/payments.module';
+import { NotificationsModule } from './modules/notifications/notifications.module';
 import { SecurityBridgeMiddleware } from './common/security-bridge.middleware';
 import { SanitizeMiddleware } from './common/sanitize.middleware';
 import { ThrottlingModule } from './config/throttling.module';
@@ -34,6 +36,8 @@ import { ThrottlingModule } from './config/throttling.module';
     DeliveryModule,
     AdminModule,
     HealthModule,
+    PaymentsModule,
+    NotificationsModule,
   ],
 })
 export class AppModule implements NestModule {
