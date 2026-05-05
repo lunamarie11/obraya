@@ -9,17 +9,20 @@ export class SanitizeMiddleware implements NestMiddleware {
   use(req: Request, res: Response, next: NextFunction) {
     // Sanitizar body
     if (req.body && typeof req.body === 'object') {
-      req.body = this.sanitizer.sanitizeObject(req.body);
+      const sanitizedBody = this.sanitizer.sanitizeObject(req.body);
+      Object.assign(req.body, sanitizedBody);
     }
 
     // Sanitizar query params
     if (req.query && typeof req.query === 'object') {
-      req.query = this.sanitizer.sanitizeObject(req.query);
+      const sanitizedQuery = this.sanitizer.sanitizeObject(req.query);
+      Object.assign(req.query, sanitizedQuery);
     }
 
     // Sanitizar params
     if (req.params && typeof req.params === 'object') {
-      req.params = this.sanitizer.sanitizeObject(req.params);
+      const sanitizedParams = this.sanitizer.sanitizeObject(req.params);
+      Object.assign(req.params, sanitizedParams);
     }
 
     next();
