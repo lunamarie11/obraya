@@ -87,6 +87,11 @@ export class UsersService {
     return this.companyRepo.findOne({ where: { id } });
   }
 
+  async updateCompany(id: string, dto: Partial<Pick<Company, 'phone' | 'address' | 'city' | 'province' | 'bankingData' | 'coverageZones'>>): Promise<Company> {
+    await this.companyRepo.update(id, dto);
+    return this.companyRepo.findOne({ where: { id } }) as Promise<Company>;
+  }
+
   async getCompanyUsers(companyId: string): Promise<CompanyUser[]> {
     return this.companyUserRepo.find({
       where: { companyId },

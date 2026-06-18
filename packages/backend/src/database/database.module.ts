@@ -16,7 +16,8 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
         password: config.get('database.password'),
         entities: [__dirname + '/../**/*.entity{.ts,.js}'],
         migrations: [__dirname + '/migrations/*{.ts,.js}'],
-        synchronize: false, // Siempre false — usar migrations (ver CLAUDE.md)
+        // En dev sincroniza automáticamente. En prod usar migrations siempre.
+        synchronize: config.get('app.nodeEnv') === 'development',
         logging: config.get('app.nodeEnv') === 'development',
         ssl: config.get('app.nodeEnv') === 'production' ? { rejectUnauthorized: false } : false,
       }),

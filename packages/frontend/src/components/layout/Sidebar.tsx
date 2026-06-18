@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { useEffect, useState } from 'react';
 import {
   LayoutDashboard,
   Package,
@@ -10,22 +11,34 @@ import {
   BarChart2,
   Settings,
   LogOut,
-  Tag,
+  Truck,
+  History,
 } from 'lucide-react';
 import { clsx } from 'clsx';
-import { logout } from '@/lib/auth';
+import { logout, getStoredUser } from '@/lib/auth';
 
-const NAV = [
-  { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
-  { href: '/orders',    label: 'Pedidos',   icon: ShoppingCart },
-  { href: '/products',  label: 'Productos', icon: Package },
-  { href: '/stock',     label: 'Stock',     icon: Warehouse },
-  { href: '/reports',   label: 'Reportes',  icon: BarChart2 },
-  { href: '/settings',  label: 'Configuración', icon: Settings },
+const MAIN_NAV = [
+  { href: '/dashboard', label: 'Dashboard',      icon: LayoutDashboard },
+  { href: '/orders',    label: 'Pedidos',         icon: ShoppingCart },
+  { href: '/products',  label: 'Productos',       icon: Package },
+  { href: '/stock',     label: 'Stock',           icon: Warehouse },
+  { href: '/reports',   label: 'Reportes',        icon: BarChart2 },
+  { href: '/settings',  label: 'Configuración',   icon: Settings },
+];
+
+const DELIVERY_NAV = [
+  { href: '/delivery', label: 'Mis Entregas', icon: Truck },
+  { href: '/delivery/history', label: 'Historial', icon: History },
 ];
 
 export function Sidebar() {
   const pathname = usePathname();
+  const [nav, setNav] = useState(MAIN_NAV as typeof MAIN_NAV | typeof DELIVERY_NAV);
+
+  useEffect(() => {
+    const user = getStoredUser();
+    if (user?.role === 'Logistica') setNav(DELIVERY_NAV);
+  }, []);
 
   return (
     <aside className="w-60 min-h-screen bg-slate-800 flex flex-col">
@@ -39,7 +52,7 @@ export function Sidebar() {
 
       {/* Nav */}
       <nav className="flex-1 px-3 py-4 space-y-0.5">
-        {NAV.map(({ href, label, icon: Icon }) => {
+        {nav.map(({ href, label, icon: Icon }) => {
           const active = pathname.startsWith(href);
           return (
             <Link

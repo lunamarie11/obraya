@@ -10,6 +10,7 @@ import {
 import { Company } from './company.entity';
 
 export enum UserRole {
+  SUPER_ADMIN = 'SuperAdmin',
   ADMIN = 'Admin',
   VENDEDOR = 'Vendedor',
   LOGISTICA = 'Logistica',

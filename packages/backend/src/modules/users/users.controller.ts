@@ -2,6 +2,7 @@ import {
   Controller,
   Get,
   Post,
+  Put,
   Body,
   Param,
   UseGuards,
@@ -27,9 +28,19 @@ export class UsersController {
   @Get(':id')
   @ApiOperation({ summary: 'Detalle de empresa' })
   async getCompany(@Param('id') id: string, @CurrentUser() user: any) {
-    // Un usuario solo puede ver su propia empresa (salvo superadmin ObraYa en v2)
-    const company = await this.usersService.findCompanyById(id);
-    return company;
+    return this.usersService.findCompanyById(id);
+  }
+
+  @Put(':id')
+  @ApiOperation({ summary: 'Actualizar datos de la empresa' })
+  @Roles(UserRole.ADMIN)
+  async updateCompany(
+    @Param('id') id: string,
+    @Body() dto: any,
+    @CurrentUser() currentUser: any,
+  ) {
+    const { phone, address, city, province, bankingData, coverageZones } = dto;
+    return this.usersService.updateCompany(id, { phone, address, city, province, bankingData, coverageZones });
   }
 
   @Get(':id/users')

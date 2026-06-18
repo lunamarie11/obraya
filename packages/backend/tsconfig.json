@@ -12,6 +12,7 @@
     "baseUrl": "./",
     "incremental": true,
     "skipLibCheck": true,
+    "types": [],
     "strictNullChecks": true,
     "noImplicitAny": true,
     "strictBindCallApply": true,
@@ -21,5 +22,5 @@
       "@obraya/shared": ["../shared/src"]
     }
   },
-  "exclude": ["node_modules"]
+  "exclude": ["node_modules", "src/**/*.spec.ts", "src/**/tests/**"]
 }
