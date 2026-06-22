@@ -15,6 +15,7 @@
     "migration:run": "typeorm migration:run -d dist/database/data-source.js",
     "migration:revert": "typeorm migration:revert -d dist/database/data-source.js",
     "seed:test-users": "rm -rf dist && npx tsc --project . --outDir dist && node dist/scripts/seed-users.js"
+    ,"seed:mock-data": "rm -rf dist && npx tsc --project . --outDir dist && node dist/scripts/seed-mock-data.js"
   },
   "dependencies": {
     "@nestjs/common": "^11.0.0",

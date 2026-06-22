@@ -1,9 +1,10 @@
-import { Controller, Post, Body, HttpCode, HttpStatus } from '@nestjs/common';
+import { Controller, Post, Body, HttpCode, HttpStatus, ForbiddenException, UnauthorizedException } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
 import { AuthService } from './auth.service';
 import { UsersService } from './users.service';
 import { LoginDto } from './dto/login.dto';
 import { RegisterCompanyDto } from './dto/register-company.dto';
+import { ConfigService } from '@nestjs/config';
 
 @ApiTags('auth')
 @Controller('auth')
@@ -11,6 +12,7 @@ export class AuthController {
   constructor(
     private readonly authService: AuthService,
     private readonly usersService: UsersService,
+    private readonly config: ConfigService,
   ) {}
 
   @Post('register')
@@ -42,5 +44,29 @@ export class AuthController {
   @ApiOperation({ summary: 'Refrescar access token con refresh token' })
   async refresh(@Body('refreshToken') refreshToken: string) {
     return this.authService.refreshToken(refreshToken);
+  }
+
+  @Post('demo')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Login demo (dev/staging only) usando solo email' })
+  async demo(@Body('email') email: string, @Body('demoSecret') demoSecret?: string) {
+    const enabled = this.config.get<string>('ENABLE_DEMO') === 'true';
+    const nodeEnv = this.config.get<string>('NODE_ENV') || process.env.NODE_ENV;
+    if (!enabled || nodeEnv === 'production') {
+      throw new ForbiddenException('Demo login no disponible');
+    }
+
+    // If a DEMO_SECRET is configured, require it in the request
+    const configuredSecret = this.config.get<string>('DEMO_SECRET');
+    if (configuredSecret && configuredSecret.length > 0) {
+      if (!demoSecret || demoSecret !== configuredSecret) {
+        throw new ForbiddenException('Demo secret inválido');
+      }
+    }
+
+    const user = await this.usersService.findUserByEmail(email);
+    if (!user || !user.isActive) throw new UnauthorizedException('Usuario inválido o inactivo');
+
+    return this.authService.login(user);
   }
 }
