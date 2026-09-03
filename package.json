@@ -12,8 +12,10 @@
   "scripts": {
     "dev:backend": "npm run dev --workspace=packages/backend",
     "dev:frontend": "npm run dev --workspace=packages/frontend",
+    "dev:mobile": "npm run start --workspace=packages/mobile",
     "build:backend": "npm run build --workspace=packages/backend",
     "build:frontend": "npm run build --workspace=packages/frontend",
+    "typecheck:mobile": "npm run typecheck --workspace=packages/mobile",
     "lint": "npm run lint --workspaces --if-present",
     "test": "npm run test --workspaces --if-present"
   },

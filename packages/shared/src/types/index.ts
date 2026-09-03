@@ -79,14 +79,53 @@ export interface Product {
   updatedAt: Date;
 }
 
+export type OrderStatus = 'Nuevo' | 'Aceptado' | 'Preparacion' | 'Despachado' | 'Entregado' | 'Cancelado';
+
+// Datos públicos de una empresa/fabricante, sin autenticación (ver ADR-003).
+// Solo campos que ya existen en la entidad Company del backend.
+export interface PublicCompany {
+  id: string;
+  razonSocial: string;
+  logoUrl?: string;
+  city?: string;
+  province?: string;
+  coverageZones?: string[];
+}
+
+// Producto tal como lo expone el catálogo público (ver ADR-003).
+export interface PublicProduct {
+  id: string;
+  companyId: string;
+  companyName?: string;
+  name: string;
+  category?: string;
+  images?: string[];
+  price?: {
+    basePrice: number;
+    finalPrice: number;
+    discountPercent: number;
+  };
+}
+
 export interface OrderItem {
   id: string;
   orderId: string;
   productId: string;
   variantId?: string;
+  productName?: string;
+  productSku?: string;
   quantity: number;
   unitPrice: number;
   subtotal: number;
+  discountPercent?: number;
+  notes?: string;
+}
+
+export interface OrderDeliveryAddress {
+  street: string;
+  city: string;
+  province: string;
+  postalCode: string;
   notes?: string;
 }
 
@@ -94,12 +133,17 @@ export interface Order {
   id: string;
   companyId: string;
   buyerId: string;
+  buyerName?: string;
+  buyerEmail?: string;
+  buyerPhone?: string;
   orderNumber: string;
-  status: 'Nuevo' | 'Aceptado' | 'Preparacion' | 'Despachado' | 'Entregado' | 'Cancelado';
+  status: OrderStatus;
+  rejectionReason?: string;
   items: OrderItem[];
   totalAmount: number;
   currency: string;
   notes?: string;
+  deliveryAddress?: OrderDeliveryAddress;
   createdAt: Date;
   updatedAt: Date;
   scheduledDeliveryDate?: Date;
