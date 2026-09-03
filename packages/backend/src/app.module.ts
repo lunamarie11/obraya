@@ -16,6 +16,8 @@ import { DashboardModule } from './modules/dashboard/dashboard.module';
 import { ReportsModule } from './modules/reports/reports.module';
 import { AdminModule } from './modules/admin/admin.module';
 import { MonitoringModule } from './modules/monitoring/monitoring.module';
+import { MarketplaceModule } from './modules/marketplace/marketplace.module';
+import { BuyersModule } from './modules/buyers/buyers.module';
 
 // Módulos de negocio - Fase 2+
 // import { PaymentsModule } from './modules/payments/payments.module';
@@ -40,6 +42,8 @@ import { MonitoringModule } from './modules/monitoring/monitoring.module';
     ReportsModule,
     AdminModule,
     MonitoringModule,
+    MarketplaceModule,
+    BuyersModule,
   ],
 })
 export class AppModule {}

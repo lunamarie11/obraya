@@ -8,6 +8,7 @@ import { Repository, DataSource, Between, ILike } from 'typeorm';
 import { Order, OrderStatus, VALID_TRANSITIONS } from './entities/order.entity';
 import { OrderItem } from './entities/order-item.entity';
 import { OrderMessage, MessageSender } from './entities/order-message.entity';
+import { CreateOrderDto } from './dto/create-order.dto';
 import { UpdateOrderStatusDto } from './dto/update-order-status.dto';
 import { SendMessageDto } from './dto/send-message.dto';
 import { OrderQueryDto } from './dto/order-query.dto';
@@ -68,6 +69,70 @@ export class OrdersService {
   async findOne(id: string, companyId: string): Promise<Order> {
     const order = await this.orderRepo.findOne({
       where: { id, companyId },
+      relations: ['items', 'messages'],
+      order: { messages: { createdAt: 'ASC' } },
+    });
+    if (!order) throw new NotFoundException('Pedido no encontrado');
+    return order;
+  }
+
+  async create(companyId: string, buyerId: string, dto: CreateOrderDto): Promise<Order> {
+    if (!dto.items?.length) {
+      throw new BadRequestException('El pedido debe contener al menos un item');
+    }
+
+    const items: OrderItem[] = dto.items.map((item) => {
+      const unitPrice = item.unitPrice ?? 0;
+      return this.itemRepo.create({
+        productId: item.productId,
+        variantId: item.variantId,
+        productName: item.productName,
+        productSku: item.productSku,
+        quantity: item.quantity,
+        unitPrice,
+        subtotal: Math.round(unitPrice * item.quantity),
+        discountPercent: item.discountPercent ?? 0,
+        notes: item.notes,
+      });
+    });
+
+    const totalAmount = items.reduce((sum, item) => sum + Number(item.subtotal), 0);
+
+    const order = this.orderRepo.create({
+      companyId,
+      buyerId,
+      buyerName: dto.buyerName,
+      buyerEmail: dto.buyerEmail,
+      buyerPhone: dto.buyerPhone,
+      orderNumber: this.generateOrderNumber(),
+      status: OrderStatus.NUEVO,
+      items,
+      totalAmount,
+      currency: 'ARS',
+      notes: dto.notes,
+      deliveryAddress: dto.deliveryAddress,
+    });
+
+    return this.orderRepo.save(order);
+  }
+
+  // Ver ADR-006: el comprador crea el pedido para el fabricante indicado en
+  // dto.companyId (el carrito ya viene agrupado por companyId desde el frontend).
+  async createForBuyer(buyerId: string, dto: CreateOrderDto): Promise<Order> {
+    return this.create(dto.companyId, buyerId, dto);
+  }
+
+  async findAllForBuyer(buyerId: string): Promise<Order[]> {
+    return this.orderRepo.find({
+      where: { buyerId },
+      relations: ['items'],
+      order: { createdAt: 'DESC' },
+    });
+  }
+
+  async findOneForBuyer(id: string, buyerId: string): Promise<Order> {
+    const order = await this.orderRepo.findOne({
+      where: { id, buyerId },
       relations: ['items', 'messages'],
       order: { messages: { createdAt: 'ASC' } },
     });

@@ -90,10 +90,20 @@ export class PricesService {
     });
   }
 
-  async resolve(productId: string, type: PriceType, quantity = 1): Promise<ResolvedPrice | null> {
-    const price = await this.priceRepo.findOne({
-      where: { productId, type, isActive: true },
-    });
+  async resolve(productId: string, type: PriceType, quantity = 1, variantId?: string): Promise<ResolvedPrice | null> {
+    // Priorizar precio asociado a la variante si se provee
+    let price: Price | null = null;
+    if (variantId) {
+      price = await this.priceRepo.findOne({
+        where: { productId, type, variantId, isActive: true },
+      });
+    }
+
+    if (!price) {
+      price = await this.priceRepo.findOne({
+        where: { productId, type, isActive: true },
+      });
+    }
 
     if (!price) return null;
 

@@ -44,8 +44,9 @@ export class PricesController {
     @Param('productId', ParseUUIDPipe) productId: string,
     @Query('type') type: PriceType,
     @Query('quantity') quantity = 1,
+    @Query('variantId') variantId?: string,
   ) {
-    return this.pricesService.resolve(productId, type, Number(quantity));
+    return this.pricesService.resolve(productId, type, Number(quantity), variantId);
   }
 
   @Get('history')

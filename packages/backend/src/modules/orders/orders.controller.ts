@@ -11,6 +11,7 @@ import {
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { OrdersService } from './orders.service';
+import { CreateOrderDto } from './dto/create-order.dto';
 import { UpdateOrderStatusDto } from './dto/update-order-status.dto';
 import { SendMessageDto } from './dto/send-message.dto';
 import { OrderQueryDto } from './dto/order-query.dto';
@@ -78,5 +79,11 @@ export class OrdersController {
   async getMessages(@Param('id', ParseUUIDPipe) id: string, @CurrentUser() user: any) {
     const order = await this.ordersService.findOne(id, user.companyId);
     return order.messages;
+  }
+
+  @Post()
+  @ApiOperation({ summary: 'Crear un nuevo pedido' })
+  async create(@Body() dto: CreateOrderDto, @CurrentUser() user: any) {
+    return this.ordersService.create(user.companyId, user.id, dto);
   }
 }
