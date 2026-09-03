@@ -66,11 +66,17 @@ export default function StockPage() {
 
   return (
     <div>
-      <Header title="Stock" />
+      <Header title="Stock" actions={
+        <label className={clsx('btn-secondary text-sm flex items-center gap-2 cursor-pointer', csvUploading && 'opacity-60 pointer-events-none')}>
+          {csvUploading ? <Loader2 size={14} className="animate-spin" /> : <Upload size={14} />}
+          {csvUploading ? 'Importando...' : 'Importar CSV'}
+          <input ref={csvRef} type="file" accept=".csv" className="hidden" onChange={handleCsvUpload} />
+        </label>
+      } />
       <div className="p-6 space-y-4">
 
         {lowStock.length > 0 && (
-          <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 flex items-start gap-3">
+          <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 flex items-start gap-3">
             <AlertTriangle size={18} className="text-amber-500 flex-shrink-0 mt-0.5" />
             <p className="text-sm text-amber-700">
               <span className="font-semibold">{lowStock.length} producto{lowStock.length > 1 ? 's' : ''}</span>{' '}
@@ -79,24 +85,16 @@ export default function StockPage() {
           </div>
         )}
 
-        <div className="flex justify-end">
-          <label className={clsx('btn-secondary text-sm flex items-center gap-2 cursor-pointer', csvUploading && 'opacity-60 pointer-events-none')}>
-            {csvUploading ? <Loader2 size={14} className="animate-spin" /> : <Upload size={14} />}
-            {csvUploading ? 'Importando...' : 'Importar CSV'}
-            <input ref={csvRef} type="file" accept=".csv" className="hidden" onChange={handleCsvUpload} />
-          </label>
-        </div>
-
         <div className="card overflow-hidden">
           <table className="w-full text-sm">
             <thead className="bg-slate-50 border-b border-slate-200">
               <tr>
-                <th className="text-left px-4 py-3 font-medium text-slate-600">Producto</th>
-                <th className="text-left px-4 py-3 font-medium text-slate-600">Depósito</th>
-                <th className="text-right px-4 py-3 font-medium text-slate-600">Disponible</th>
-                <th className="text-right px-4 py-3 font-medium text-slate-600">Reservado</th>
-                <th className="text-right px-4 py-3 font-medium text-slate-600">Total</th>
-                <th className="text-right px-4 py-3 font-medium text-slate-600">Mínimo</th>
+                <th className="text-left px-4 py-3 font-medium text-slate-500 text-xs uppercase tracking-wide">Producto</th>
+                <th className="text-left px-4 py-3 font-medium text-slate-500 text-xs uppercase tracking-wide">Depósito</th>
+                <th className="text-right px-4 py-3 font-medium text-slate-500 text-xs uppercase tracking-wide">Disponible</th>
+                <th className="text-right px-4 py-3 font-medium text-slate-500 text-xs uppercase tracking-wide">Reservado</th>
+                <th className="text-right px-4 py-3 font-medium text-slate-500 text-xs uppercase tracking-wide">Total</th>
+                <th className="text-right px-4 py-3 font-medium text-slate-500 text-xs uppercase tracking-wide">Mínimo</th>
                 <th className="px-4 py-3" />
               </tr>
             </thead>
@@ -105,7 +103,7 @@ export default function StockPage() {
                 ? Array.from({ length: 6 }).map((_, i) => (
                     <tr key={i}>
                       {Array.from({ length: 7 }).map((_, j) => (
-                        <td key={j} className="px-4 py-3"><div className="h-4 bg-slate-100 rounded animate-pulse" /></td>
+                        <td key={j} className="px-4 py-3"><div className="h-4 bg-slate-200 rounded animate-pulse" /></td>
                       ))}
                     </tr>
                   ))
@@ -115,10 +113,10 @@ export default function StockPage() {
                     const isEditing = editingId === s.productId;
 
                     return (
-                      <tr key={s.id} className={clsx('hover:bg-slate-50', isLow && 'bg-amber-50/40')}>
+                      <tr key={s.id} className={clsx('transition-colors', isLow ? 'bg-amber-50 hover:bg-amber-100/50' : 'hover:bg-orange-50/50')}>
                         <td className="px-4 py-3">
-                          <p className="font-medium text-slate-700">{s.product?.name}</p>
-                          {s.product?.sku && <p className="text-xs text-slate-400 font-mono">{s.product.sku}</p>}
+                          <p className="font-semibold text-slate-900">{s.product?.name}</p>
+                          {s.product?.sku && <p className="text-xs text-slate-500 font-mono">{s.product.sku}</p>}
                         </td>
                         <td className="px-4 py-3">
                           {isEditing ? (
@@ -132,7 +130,7 @@ export default function StockPage() {
                             <span className="text-slate-500">{s.warehouseName ?? '—'}</span>
                           )}
                         </td>
-                        <td className={clsx('px-4 py-3 text-right font-semibold', isLow ? 'text-red-600' : 'text-green-700')}>
+                        <td className={clsx('px-4 py-3 text-right font-bold', isLow ? 'text-red-600' : 'text-green-600')}>
                           {available}
                         </td>
                         <td className="px-4 py-3 text-right text-slate-500">{s.reservedQuantity}</td>
@@ -145,7 +143,7 @@ export default function StockPage() {
                               onChange={(e) => setEditQty(e.target.value)}
                             />
                           ) : (
-                            <span className="font-medium text-slate-800">{s.quantity}</span>
+                            <span className="font-semibold text-slate-900">{s.quantity}</span>
                           )}
                         </td>
                         <td className="px-4 py-3 text-right">
@@ -157,7 +155,7 @@ export default function StockPage() {
                               onChange={(e) => setEditMin(e.target.value)}
                             />
                           ) : (
-                            <span className="text-slate-400">{s.minimumAlert}</span>
+                            <span className="text-slate-500">{s.minimumAlert}</span>
                           )}
                         </td>
                         <td className="px-4 py-3">
@@ -172,11 +170,11 @@ export default function StockPage() {
                                     warehouseName: editWh || undefined,
                                   })}
                                   disabled={updateStock.isPending}
-                                  className="p-1.5 rounded bg-green-50 hover:bg-green-100 text-green-600 transition-colors"
+                                  className="p-1.5 rounded-lg bg-green-50 hover:bg-green-100 text-green-600 border border-green-200 transition-colors"
                                 >
                                   {updateStock.isPending ? <Loader2 size={13} className="animate-spin" /> : <Check size={13} />}
                                 </button>
-                                <button onClick={() => setEditingId(null)} className="p-1.5 rounded bg-slate-100 hover:bg-slate-200 text-slate-500">
+                                <button onClick={() => setEditingId(null)} className="p-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-500 transition-colors">
                                   <X size={13} />
                                 </button>
                               </>
@@ -184,14 +182,14 @@ export default function StockPage() {
                               <>
                                 <button
                                   onClick={() => startEdit(s)}
-                                  className="p-1.5 rounded bg-slate-100 hover:bg-slate-200 text-slate-500 transition-colors"
+                                  className="p-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-500 transition-colors"
                                   title="Editar stock"
                                 >
                                   <Pencil size={13} />
                                 </button>
                                 <button
                                   onClick={() => setHistoryId(historyId === s.productId ? null : s.productId)}
-                                  className={clsx('p-1.5 rounded transition-colors', historyId === s.productId ? 'bg-orange-100 text-orange-500' : 'bg-slate-100 hover:bg-slate-200 text-slate-500')}
+                                  className={clsx('p-1.5 rounded-lg transition-colors', historyId === s.productId ? 'bg-orange-100 text-orange-600' : 'bg-slate-100 hover:bg-slate-200 text-slate-500')}
                                   title="Ver movimientos"
                                 >
                                   <History size={13} />
@@ -215,49 +213,48 @@ export default function StockPage() {
           )}
         </div>
 
-        {/* Historial de movimientos inline */}
         {historyId && (
           <div className="card overflow-hidden">
-            <div className="px-4 py-3 border-b border-slate-100 flex items-center justify-between">
-              <h3 className="font-medium text-slate-700 text-sm flex items-center gap-2">
+            <div className="px-4 py-3 border-b border-slate-200 flex items-center justify-between">
+              <h3 className="font-semibold text-slate-700 text-sm flex items-center gap-2">
                 <History size={14} className="text-slate-400" />
                 Movimientos de stock
               </h3>
-              <button onClick={() => setHistoryId(null)} className="text-slate-400 hover:text-slate-600">
+              <button onClick={() => setHistoryId(null)} className="text-slate-400 hover:text-slate-700 transition-colors">
                 <X size={15} />
               </button>
             </div>
             {movFetching ? (
-              <div className="p-4 text-center text-slate-400 text-sm">Cargando...</div>
+              <div className="p-4 text-center text-slate-500 text-sm">Cargando...</div>
             ) : movements.length === 0 ? (
-              <div className="p-4 text-center text-slate-400 text-sm">Sin movimientos registrados.</div>
+              <div className="p-4 text-center text-slate-500 text-sm">Sin movimientos registrados.</div>
             ) : (
               <table className="w-full text-sm">
-                <thead className="bg-slate-50 border-b border-slate-100">
+                <thead className="bg-slate-50 border-b border-slate-200">
                   <tr>
-                    <th className="text-left px-4 py-2 text-xs font-medium text-slate-500">Tipo</th>
-                    <th className="text-right px-4 py-2 text-xs font-medium text-slate-500">Cantidad</th>
-                    <th className="text-left px-4 py-2 text-xs font-medium text-slate-500">Notas</th>
-                    <th className="text-right px-4 py-2 text-xs font-medium text-slate-500">Fecha</th>
+                    <th className="text-left px-4 py-2 text-xs font-medium text-slate-500 uppercase tracking-wide">Tipo</th>
+                    <th className="text-right px-4 py-2 text-xs font-medium text-slate-500 uppercase tracking-wide">Cantidad</th>
+                    <th className="text-left px-4 py-2 text-xs font-medium text-slate-500 uppercase tracking-wide">Notas</th>
+                    <th className="text-right px-4 py-2 text-xs font-medium text-slate-500 uppercase tracking-wide">Fecha</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-50">
+                <tbody className="divide-y divide-slate-100">
                   {movements.map((m: any) => (
-                    <tr key={m.id}>
+                    <tr key={m.id} className="hover:bg-slate-50">
                       <td className="px-4 py-2">
                         <span className={clsx(
-                          'inline-flex px-2 py-0.5 rounded-full text-xs font-medium',
-                          m.type === 'entrada' ? 'bg-green-100 text-green-700' :
-                          m.type === 'salida' ? 'bg-red-100 text-red-700' : 'bg-slate-100 text-slate-600',
+                          'inline-flex px-2 py-0.5 rounded-full text-xs font-semibold border',
+                          m.type === 'entrada' ? 'bg-green-50 text-green-600 border-green-200' :
+                          m.type === 'salida' ? 'bg-red-50 text-red-600 border-red-200' : 'bg-slate-100 text-slate-600 border-slate-200',
                         )}>
                           {m.type}
                         </span>
                       </td>
-                      <td className={clsx('px-4 py-2 text-right font-medium', m.quantity > 0 ? 'text-green-600' : 'text-red-500')}>
+                      <td className={clsx('px-4 py-2 text-right font-bold', m.quantity > 0 ? 'text-green-600' : 'text-red-600')}>
                         {m.quantity > 0 ? '+' : ''}{m.quantity}
                       </td>
-                      <td className="px-4 py-2 text-slate-400 text-xs">{m.notes ?? '—'}</td>
-                      <td className="px-4 py-2 text-right text-slate-400 text-xs">
+                      <td className="px-4 py-2 text-slate-500 text-xs">{m.notes ?? '—'}</td>
+                      <td className="px-4 py-2 text-right text-slate-500 text-xs">
                         {format(new Date(m.createdAt), "d MMM yyyy HH:mm", { locale: es })}
                       </td>
                     </tr>

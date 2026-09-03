@@ -26,7 +26,8 @@ const ROLE_LABELS: Record<string, string> = {
 };
 
 export default function CompanyDetailPage() {
-  const { id } = useParams<{ id: string }>();
+  const params = useParams() as { id: string };
+  const { id } = params;
   const router = useRouter();
   const queryClient = useQueryClient();
 
@@ -54,11 +55,11 @@ export default function CompanyDetailPage() {
 
   return (
     <div>
-      <header className="h-14 bg-slate-900 border-b border-slate-800 flex items-center gap-3 px-6 sticky top-0 z-10">
-        <Link href="/superadmin/companies" className="text-slate-400 hover:text-white transition-colors">
+      <header className="h-14 bg-white border-b border-slate-200 flex items-center gap-3 px-6 sticky top-0 z-10">
+        <Link href="/superadmin/companies" className="text-slate-500 hover:text-slate-900 transition-colors">
           <ArrowLeft size={18} />
         </Link>
-        <h1 className="text-base font-semibold text-white">{company.razonSocial}</h1>
+        <h1 className="text-base font-semibold text-slate-900">{company.razonSocial}</h1>
         <span className={clsx('ml-2 inline-flex px-2 py-0.5 rounded-full text-xs font-medium', STATUS_COLORS[company.status])}>
           {STATUS_LABELS[company.status]}
         </span>
@@ -68,10 +69,10 @@ export default function CompanyDetailPage() {
 
         {/* Acciones */}
         {company.status !== 'active' && (
-          <div className="bg-green-500/10 border border-green-500/20 rounded-xl p-4 flex items-center justify-between">
+          <div className="bg-green-50 border border-green-200 rounded-xl p-4 flex items-center justify-between">
             <div>
-              <p className="text-sm font-medium text-green-400">Aprobar empresa</p>
-              <p className="text-xs text-slate-400 mt-0.5">
+              <p className="text-sm font-medium text-green-600">Aprobar empresa</p>
+              <p className="text-xs text-slate-500 mt-0.5">
                 La empresa podrá operar en la plataforma y recibir pedidos.
               </p>
             </div>
@@ -87,10 +88,10 @@ export default function CompanyDetailPage() {
         )}
 
         {company.status === 'active' && (
-          <div className="bg-red-500/10 border border-red-500/20 rounded-xl p-4 flex items-center justify-between">
+          <div className="bg-red-50 border border-red-200 rounded-xl p-4 flex items-center justify-between">
             <div>
-              <p className="text-sm font-medium text-red-400">Suspender empresa</p>
-              <p className="text-xs text-slate-400 mt-0.5">
+              <p className="text-sm font-medium text-red-600">Suspender empresa</p>
+              <p className="text-xs text-slate-500 mt-0.5">
                 La empresa no podrá operar hasta ser reactivada.
               </p>
             </div>
@@ -107,8 +108,8 @@ export default function CompanyDetailPage() {
 
         {/* Info general */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div className="bg-slate-800 border border-slate-700 rounded-xl p-5">
-            <h2 className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-4">Datos de la empresa</h2>
+          <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-sm">
+            <h2 className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-4">Datos de la empresa</h2>
             <dl className="space-y-3">
               {[
                 { label: 'Razón social', value: company.razonSocial },
@@ -120,41 +121,41 @@ export default function CompanyDetailPage() {
               ].map(({ label, value }) => (
                 <div key={label} className="flex justify-between gap-4">
                   <dt className="text-xs text-slate-500">{label}</dt>
-                  <dd className="text-xs text-white font-medium text-right">{value}</dd>
+                  <dd className="text-xs text-slate-900 font-medium text-right">{value}</dd>
                 </div>
               ))}
             </dl>
           </div>
 
-          <div className="bg-slate-800 border border-slate-700 rounded-xl p-5">
-            <h2 className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-4">Métricas</h2>
+          <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-sm">
+            <h2 className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-4">Métricas</h2>
             <div className="grid grid-cols-2 gap-3">
-              <div className="bg-slate-900 rounded-lg p-3">
+              <div className="bg-slate-50 border border-slate-200 rounded-lg p-3">
                 <div className="flex items-center gap-1.5 mb-1">
-                  <Users size={13} className="text-blue-400" />
-                  <span className="text-xs text-slate-400">Usuarios</span>
+                  <Users size={13} className="text-blue-600" />
+                  <span className="text-xs text-slate-500">Usuarios</span>
                 </div>
-                <p className="text-xl font-bold text-white">{company.users?.length ?? 0}</p>
+                <p className="text-xl font-bold text-slate-900">{company.users?.length ?? 0}</p>
               </div>
-              <div className="bg-slate-900 rounded-lg p-3">
+              <div className="bg-slate-50 border border-slate-200 rounded-lg p-3">
                 <div className="flex items-center gap-1.5 mb-1">
-                  <ShoppingCart size={13} className="text-orange-400" />
-                  <span className="text-xs text-slate-400">Pedidos</span>
+                  <ShoppingCart size={13} className="text-orange-500" />
+                  <span className="text-xs text-slate-500">Pedidos</span>
                 </div>
-                <p className="text-xl font-bold text-white">{company.orderCount ?? 0}</p>
+                <p className="text-xl font-bold text-slate-900">{company.orderCount ?? 0}</p>
               </div>
             </div>
             <dl className="space-y-3 mt-4">
               <div className="flex justify-between gap-4">
                 <dt className="text-xs text-slate-500">Registrada</dt>
-                <dd className="text-xs text-white">
+                <dd className="text-xs text-slate-900">
                   {format(new Date(company.createdAt), "d MMM yyyy", { locale: es })}
                 </dd>
               </div>
               {company.approvedAt && (
                 <div className="flex justify-between gap-4">
                   <dt className="text-xs text-slate-500">Aprobada</dt>
-                  <dd className="text-xs text-white">
+                  <dd className="text-xs text-slate-900">
                     {format(new Date(company.approvedAt), "d MMM yyyy", { locale: es })}
                     {company.approvedBy && <span className="text-slate-500"> por {company.approvedBy}</span>}
                   </dd>
@@ -166,29 +167,29 @@ export default function CompanyDetailPage() {
 
         {/* Usuarios */}
         {company.users?.length > 0 && (
-          <div className="bg-slate-800 border border-slate-700 rounded-xl overflow-hidden">
-            <div className="px-5 py-4 border-b border-slate-700">
-              <h2 className="text-xs font-semibold text-slate-400 uppercase tracking-wide flex items-center gap-2">
+          <div className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-sm">
+            <div className="px-5 py-4 border-b border-slate-200">
+              <h2 className="text-xs font-semibold text-slate-600 uppercase tracking-wide flex items-center gap-2">
                 <Users size={13} />
                 Usuarios ({company.users.length})
               </h2>
             </div>
             <table className="w-full text-sm">
-              <tbody className="divide-y divide-slate-700">
+              <tbody className="divide-y divide-slate-100">
                 {company.users.map((user: any) => (
-                  <tr key={user.id} className="px-5">
+                  <tr key={user.id} className="px-5 hover:bg-orange-50/50">
                     <td className="px-5 py-3">
-                      <p className="text-white font-medium">{user.firstName} {user.lastName}</p>
+                      <p className="text-slate-900 font-medium">{user.firstName} {user.lastName}</p>
                       <p className="text-xs text-slate-500">{user.email}</p>
                     </td>
                     <td className="px-5 py-3">
-                      <span className="text-xs bg-slate-700 text-slate-300 px-2 py-0.5 rounded-full">
+                      <span className="text-xs bg-slate-100 text-slate-700 px-2 py-0.5 rounded-full">
                         {ROLE_LABELS[user.role] ?? user.role}
                       </span>
                     </td>
                     <td className="px-5 py-3 text-xs text-slate-500">
                       {user.isActive ? (
-                        <span className="text-green-400">Activo</span>
+                        <span className="text-green-600">Activo</span>
                       ) : (
                         <span className="text-slate-500">Inactivo</span>
                       )}

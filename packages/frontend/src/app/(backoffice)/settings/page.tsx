@@ -18,10 +18,10 @@ const ROLES = [
 ];
 
 const ROLE_COLORS: Record<string, string> = {
-  Admin:        'bg-blue-100 text-blue-700',
-  Vendedor:     'bg-green-100 text-green-700',
-  Logistica:    'bg-purple-100 text-purple-700',
-  Contabilidad: 'bg-yellow-100 text-yellow-700',
+  Admin:        'bg-blue-50 text-blue-600 border-blue-200',
+  Vendedor:     'bg-green-50 text-green-600 border-green-200',
+  Logistica:    'bg-purple-50 text-purple-600 border-purple-200',
+  Contabilidad: 'bg-yellow-50 text-yellow-700 border-yellow-200',
 };
 
 export default function SettingsPage() {
@@ -68,12 +68,12 @@ export default function SettingsPage() {
       <Header title="Configuración" />
       <div className="p-6 max-w-3xl space-y-6">
 
-        {/* Gestión de usuarios */}
+        {/* Usuarios */}
         <div className="card overflow-hidden">
-          <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
+          <div className="px-5 py-4 border-b border-slate-200 flex items-center justify-between">
             <div>
-              <h2 className="font-semibold text-slate-700">Usuarios de la empresa</h2>
-              <p className="text-xs text-slate-400 mt-0.5">Administrá quién tiene acceso al backoffice</p>
+              <h2 className="font-bold text-slate-900">Usuarios de la empresa</h2>
+              <p className="text-xs text-slate-500 mt-0.5">Administrá quién tiene acceso al backoffice</p>
             </div>
             <button
               onClick={() => { setShowInvite(!showInvite); setInviteToken(''); }}
@@ -84,71 +84,57 @@ export default function SettingsPage() {
             </button>
           </div>
 
-          {/* Formulario de invitación */}
           {showInvite && (
-            <div className="px-5 py-4 bg-orange-50 border-b border-orange-100">
+            <div className="px-5 py-4 bg-orange-50 border-b border-orange-200">
               {inviteToken ? (
                 <div className="space-y-3">
-                  <p className="text-sm font-medium text-slate-700">
+                  <p className="text-sm font-semibold text-slate-900">
                     ¡Invitación creada! Compartí este enlace con el nuevo usuario:
                   </p>
                   <div className="flex gap-2">
-                    <div className="flex-1 bg-white border border-slate-200 rounded-lg px-3 py-2 text-xs font-mono text-slate-600 truncate">
+                    <div className="flex-1 bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-xs font-mono text-slate-600 truncate">
                       {`${typeof window !== 'undefined' ? window.location.origin : ''}/accept-invite?token=${inviteToken}`}
                     </div>
                     <button
                       onClick={copyToken}
                       className="btn-secondary text-sm flex items-center gap-1.5 whitespace-nowrap"
                     >
-                      {copied ? <CheckCheck size={14} className="text-green-500" /> : <Copy size={14} />}
+                      {copied ? <CheckCheck size={14} className="text-green-600" /> : <Copy size={14} />}
                       {copied ? 'Copiado' : 'Copiar'}
                     </button>
                   </div>
-                  <p className="text-xs text-slate-400">
+                  <p className="text-xs text-slate-500">
                     El usuario usará este enlace para configurar su contraseña y acceder.
                   </p>
                   <button
                     onClick={() => { setShowInvite(false); setInviteToken(''); }}
-                    className="text-sm text-orange-600 hover:text-orange-700 font-medium"
+                    className="text-sm text-orange-500 hover:text-orange-600 font-medium transition-colors"
                   >
                     Invitar otro usuario
                   </button>
                 </div>
               ) : (
                 <div className="space-y-3">
-                  <p className="text-sm font-medium text-slate-700">Datos del nuevo usuario</p>
+                  <p className="text-sm font-semibold text-slate-900">Datos del nuevo usuario</p>
                   <div className="grid grid-cols-2 gap-3">
                     <div>
-                      <label className="block text-xs text-slate-500 mb-1">Nombre</label>
-                      <input
-                        className="input w-full text-sm"
-                        placeholder="Juan"
-                        value={form.firstName}
-                        onChange={(e) => setForm({ ...form, firstName: e.target.value })}
-                      />
+                      <label className="block text-xs text-slate-600 mb-1">Nombre</label>
+                      <input className="input w-full text-sm" placeholder="Juan" value={form.firstName}
+                        onChange={(e) => setForm({ ...form, firstName: e.target.value })} />
                     </div>
                     <div>
-                      <label className="block text-xs text-slate-500 mb-1">Apellido</label>
-                      <input
-                        className="input w-full text-sm"
-                        placeholder="García"
-                        value={form.lastName}
-                        onChange={(e) => setForm({ ...form, lastName: e.target.value })}
-                      />
+                      <label className="block text-xs text-slate-600 mb-1">Apellido</label>
+                      <input className="input w-full text-sm" placeholder="García" value={form.lastName}
+                        onChange={(e) => setForm({ ...form, lastName: e.target.value })} />
                     </div>
                   </div>
                   <div>
-                    <label className="block text-xs text-slate-500 mb-1">Email</label>
-                    <input
-                      className="input w-full text-sm"
-                      type="email"
-                      placeholder="juan@empresa.com"
-                      value={form.email}
-                      onChange={(e) => setForm({ ...form, email: e.target.value })}
-                    />
+                    <label className="block text-xs text-slate-600 mb-1">Email</label>
+                    <input className="input w-full text-sm" type="email" placeholder="juan@empresa.com" value={form.email}
+                      onChange={(e) => setForm({ ...form, email: e.target.value })} />
                   </div>
                   <div>
-                    <label className="block text-xs text-slate-500 mb-1">Rol</label>
+                    <label className="block text-xs text-slate-600 mb-1">Rol</label>
                     <div className="grid grid-cols-2 gap-2">
                       {ROLES.map((r) => (
                         <button
@@ -156,7 +142,7 @@ export default function SettingsPage() {
                           type="button"
                           onClick={() => setForm({ ...form, role: r.value })}
                           className={clsx(
-                            'flex items-start gap-2 p-2.5 rounded-lg border text-left transition-colors',
+                            'flex items-start gap-2 p-2.5 rounded-xl border text-left transition-colors',
                             form.role === r.value
                               ? 'border-orange-400 bg-orange-50'
                               : 'border-slate-200 bg-white hover:bg-slate-50',
@@ -169,19 +155,15 @@ export default function SettingsPage() {
                             {form.role === r.value && <div className="w-1.5 h-1.5 bg-white rounded-full" />}
                           </div>
                           <div>
-                            <p className="text-sm font-medium text-slate-700">{r.label}</p>
-                            <p className="text-xs text-slate-400">{r.desc}</p>
+                            <p className="text-sm font-semibold text-slate-900">{r.label}</p>
+                            <p className="text-xs text-slate-500">{r.desc}</p>
                           </div>
                         </button>
                       ))}
                     </div>
                   </div>
                   <div className="flex gap-2 pt-1">
-                    <button
-                      type="button"
-                      onClick={() => setShowInvite(false)}
-                      className="btn-secondary text-sm"
-                    >
+                    <button type="button" onClick={() => setShowInvite(false)} className="btn-secondary text-sm">
                       Cancelar
                     </button>
                     <button
@@ -201,42 +183,43 @@ export default function SettingsPage() {
             </div>
           )}
 
-          {/* Lista de usuarios */}
           {isLoading ? (
-            <div className="p-6 text-center text-slate-400 text-sm">Cargando usuarios...</div>
+            <div className="p-6 text-center text-slate-500 text-sm">Cargando usuarios...</div>
           ) : users.length === 0 ? (
-            <div className="p-6 text-center text-slate-400 text-sm">No hay usuarios en esta empresa.</div>
+            <div className="p-6 text-center text-slate-500 text-sm">No hay usuarios en esta empresa.</div>
           ) : (
             <table className="w-full text-sm">
-              <thead className="bg-slate-50 border-b border-slate-100">
+              <thead className="bg-slate-50 border-b border-slate-200">
                 <tr>
-                  <th className="text-left px-5 py-3 text-xs font-medium text-slate-500">Usuario</th>
-                  <th className="text-left px-4 py-3 text-xs font-medium text-slate-500">Rol</th>
-                  <th className="text-left px-4 py-3 text-xs font-medium text-slate-500">Estado</th>
-                  <th className="text-left px-4 py-3 text-xs font-medium text-slate-500">Último acceso</th>
+                  <th className="text-left px-5 py-3 text-xs font-medium text-slate-500 uppercase tracking-wide">Usuario</th>
+                  <th className="text-left px-4 py-3 text-xs font-medium text-slate-500 uppercase tracking-wide">Rol</th>
+                  <th className="text-left px-4 py-3 text-xs font-medium text-slate-500 uppercase tracking-wide">Estado</th>
+                  <th className="text-left px-4 py-3 text-xs font-medium text-slate-500 uppercase tracking-wide">Último acceso</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-50">
+              <tbody className="divide-y divide-slate-100">
                 {users.map((u: any) => (
-                  <tr key={u.id} className="hover:bg-slate-50">
+                  <tr key={u.id} className="hover:bg-orange-50/50 transition-colors">
                     <td className="px-5 py-3">
-                      <p className="font-medium text-slate-800">{u.firstName} {u.lastName}</p>
-                      <p className="text-xs text-slate-400">{u.email}</p>
+                      <p className="font-semibold text-slate-900">{u.firstName} {u.lastName}</p>
+                      <p className="text-xs text-slate-500">{u.email}</p>
                     </td>
                     <td className="px-4 py-3">
-                      <span className={clsx('inline-flex px-2 py-0.5 rounded-full text-xs font-medium', ROLE_COLORS[u.role] ?? 'bg-slate-100 text-slate-500')}>
+                      <span className={clsx('inline-flex px-2 py-0.5 rounded-full text-xs font-semibold border', ROLE_COLORS[u.role] ?? 'bg-slate-100 text-slate-600 border-slate-200')}>
                         {u.role}
                       </span>
                     </td>
                     <td className="px-4 py-3">
                       <span className={clsx(
-                        'inline-flex px-2 py-0.5 rounded-full text-xs font-medium',
-                        u.isActive ? 'bg-green-100 text-green-700' : 'bg-slate-100 text-slate-500',
+                        'inline-flex px-2 py-0.5 rounded-full text-xs font-semibold border',
+                        u.isActive
+                          ? 'bg-green-50 text-green-600 border-green-200'
+                          : 'bg-slate-100 text-slate-500 border-slate-200',
                       )}>
-                        {u.isActive ? 'Activo' : u.inviteToken ? 'Pendiente invitación' : 'Inactivo'}
+                        {u.isActive ? 'Activo' : u.inviteToken ? 'Pendiente' : 'Inactivo'}
                       </span>
                     </td>
-                    <td className="px-4 py-3 text-xs text-slate-400">
+                    <td className="px-4 py-3 text-xs text-slate-500">
                       {u.lastLoginAt
                         ? format(new Date(u.lastLoginAt), "d MMM yyyy 'a las' HH:mm", { locale: es })
                         : '—'}
@@ -248,9 +231,7 @@ export default function SettingsPage() {
           )}
         </div>
 
-        {/* Perfil de empresa */}
         <CompanyProfile companyId={companyId} />
-
       </div>
     </div>
   );
@@ -272,18 +253,8 @@ function CompanyProfile({ companyId }: { companyId: string }) {
 
   useEffect(() => {
     if (company) {
-      setProfile({
-        phone: company.phone ?? '',
-        address: company.address ?? '',
-        city: company.city ?? '',
-        province: company.province ?? '',
-      });
-      setBanking({
-        cbu: company.bankingData?.cbu ?? '',
-        alias: company.bankingData?.alias ?? '',
-        bank: company.bankingData?.bank ?? '',
-        accountHolder: company.bankingData?.accountHolder ?? '',
-      });
+      setProfile({ phone: company.phone ?? '', address: company.address ?? '', city: company.city ?? '', province: company.province ?? '' });
+      setBanking({ cbu: company.bankingData?.cbu ?? '', alias: company.bankingData?.alias ?? '', bank: company.bankingData?.bank ?? '', accountHolder: company.bankingData?.accountHolder ?? '' });
       setZones(company.coverageZones ?? []);
     }
   }, [company]);
@@ -294,19 +265,12 @@ function CompanyProfile({ companyId }: { companyId: string }) {
   });
 
   const handleSave = () => {
-    update.mutate({
-      ...profile,
-      bankingData: banking,
-      coverageZones: zones,
-    });
+    update.mutate({ ...profile, bankingData: banking, coverageZones: zones });
   };
 
   const addZone = () => {
     const z = newZone.trim().replace(/\D/g, '').slice(0, 8);
-    if (z && !zones.includes(z)) {
-      setZones([...zones, z]);
-      setNewZone('');
-    }
+    if (z && !zones.includes(z)) { setZones([...zones, z]); setNewZone(''); }
   };
 
   if (isLoading || !company) return null;
@@ -314,63 +278,47 @@ function CompanyProfile({ companyId }: { companyId: string }) {
   return (
     <div className="space-y-5">
 
-      {/* Datos de la empresa */}
+      {/* Datos empresa */}
       <div className="card p-5 space-y-4">
         <div className="flex items-center gap-2">
-          <Building2 size={16} className="text-slate-400" />
-          <h2 className="font-semibold text-slate-700">Datos de la empresa</h2>
+          <Building2 size={16} className="text-slate-500" />
+          <h2 className="font-bold text-slate-900">Datos de la empresa</h2>
         </div>
 
-        <div className="grid grid-cols-2 gap-3 pb-3 border-b border-slate-100">
+        <div className="grid grid-cols-2 gap-3 pb-3 border-b border-slate-200">
           <div>
-            <label className="block text-xs text-slate-500 mb-1">Razón social</label>
-            <p className="text-sm font-medium text-slate-700">{company.razonSocial}</p>
+            <label className="block text-xs text-slate-600 mb-1">Razón social</label>
+            <p className="text-sm font-semibold text-slate-900">{company.razonSocial}</p>
           </div>
           <div>
-            <label className="block text-xs text-slate-500 mb-1">CUIT</label>
+            <label className="block text-xs text-slate-600 mb-1">CUIT</label>
             <p className="text-sm font-mono text-slate-700">{company.cuit}</p>
           </div>
         </div>
 
         <div className="grid grid-cols-2 gap-3">
           <div>
-            <label className="block text-sm font-medium text-slate-600 mb-1">Teléfono</label>
-            <input
-              className="input w-full text-sm"
-              value={profile.phone}
-              onChange={(e) => setProfile({ ...profile, phone: e.target.value })}
-              placeholder="+54 11 1234-5678"
-            />
+            <label className="label">Teléfono</label>
+            <input className="input w-full text-sm" value={profile.phone}
+              onChange={(e) => setProfile({ ...profile, phone: e.target.value })} placeholder="+54 11 1234-5678" />
           </div>
           <div>
-            <label className="block text-sm font-medium text-slate-600 mb-1">Provincia</label>
-            <input
-              className="input w-full text-sm"
-              value={profile.province}
-              onChange={(e) => setProfile({ ...profile, province: e.target.value })}
-              placeholder="Buenos Aires"
-            />
+            <label className="label">Provincia</label>
+            <input className="input w-full text-sm" value={profile.province}
+              onChange={(e) => setProfile({ ...profile, province: e.target.value })} placeholder="Buenos Aires" />
           </div>
         </div>
 
         <div className="grid grid-cols-2 gap-3">
           <div>
-            <label className="block text-sm font-medium text-slate-600 mb-1">Ciudad</label>
-            <input
-              className="input w-full text-sm"
-              value={profile.city}
-              onChange={(e) => setProfile({ ...profile, city: e.target.value })}
-              placeholder="CABA"
-            />
+            <label className="label">Ciudad</label>
+            <input className="input w-full text-sm" value={profile.city}
+              onChange={(e) => setProfile({ ...profile, city: e.target.value })} placeholder="CABA" />
           </div>
           <div>
-            <label className="block text-sm font-medium text-slate-600 mb-1">Dirección</label>
-            <input
-              className="input w-full text-sm"
-              value={profile.address}
-              onChange={(e) => setProfile({ ...profile, address: e.target.value })}
-              placeholder="Av. Corrientes 1234"
-            />
+            <label className="label">Dirección</label>
+            <input className="input w-full text-sm" value={profile.address}
+              onChange={(e) => setProfile({ ...profile, address: e.target.value })} placeholder="Av. Corrientes 1234" />
           </div>
         </div>
       </div>
@@ -378,50 +326,33 @@ function CompanyProfile({ companyId }: { companyId: string }) {
       {/* Datos bancarios */}
       <div className="card p-5 space-y-4">
         <div className="flex items-center gap-2">
-          <CreditCard size={16} className="text-slate-400" />
-          <h2 className="font-semibold text-slate-700">Datos bancarios</h2>
+          <CreditCard size={16} className="text-slate-500" />
+          <h2 className="font-bold text-slate-900">Datos bancarios</h2>
         </div>
 
         <div className="grid grid-cols-2 gap-3">
           <div>
-            <label className="block text-sm font-medium text-slate-600 mb-1">CBU</label>
-            <input
-              className="input w-full text-sm font-mono"
-              value={banking.cbu}
-              onChange={(e) => setBanking({ ...banking, cbu: e.target.value })}
-              placeholder="0000000000000000000000"
-              maxLength={22}
-            />
+            <label className="label">CBU</label>
+            <input className="input w-full text-sm font-mono" value={banking.cbu}
+              onChange={(e) => setBanking({ ...banking, cbu: e.target.value })} placeholder="0000000000000000000000" maxLength={22} />
           </div>
           <div>
-            <label className="block text-sm font-medium text-slate-600 mb-1">Alias</label>
-            <input
-              className="input w-full text-sm"
-              value={banking.alias}
-              onChange={(e) => setBanking({ ...banking, alias: e.target.value })}
-              placeholder="empresa.banco.alias"
-            />
+            <label className="label">Alias</label>
+            <input className="input w-full text-sm" value={banking.alias}
+              onChange={(e) => setBanking({ ...banking, alias: e.target.value })} placeholder="empresa.banco.alias" />
           </div>
         </div>
 
         <div className="grid grid-cols-2 gap-3">
           <div>
-            <label className="block text-sm font-medium text-slate-600 mb-1">Banco</label>
-            <input
-              className="input w-full text-sm"
-              value={banking.bank}
-              onChange={(e) => setBanking({ ...banking, bank: e.target.value })}
-              placeholder="Banco Nación"
-            />
+            <label className="label">Banco</label>
+            <input className="input w-full text-sm" value={banking.bank}
+              onChange={(e) => setBanking({ ...banking, bank: e.target.value })} placeholder="Banco Nación" />
           </div>
           <div>
-            <label className="block text-sm font-medium text-slate-600 mb-1">Titular de la cuenta</label>
-            <input
-              className="input w-full text-sm"
-              value={banking.accountHolder}
-              onChange={(e) => setBanking({ ...banking, accountHolder: e.target.value })}
-              placeholder="Empresa S.A."
-            />
+            <label className="label">Titular de la cuenta</label>
+            <input className="input w-full text-sm" value={banking.accountHolder}
+              onChange={(e) => setBanking({ ...banking, accountHolder: e.target.value })} placeholder="Empresa S.A." />
           </div>
         </div>
       </div>
@@ -429,10 +360,10 @@ function CompanyProfile({ companyId }: { companyId: string }) {
       {/* Zonas de cobertura */}
       <div className="card p-5 space-y-4">
         <div className="flex items-center gap-2">
-          <MapPin size={16} className="text-slate-400" />
-          <h2 className="font-semibold text-slate-700">Zonas de cobertura</h2>
+          <MapPin size={16} className="text-slate-500" />
+          <h2 className="font-bold text-slate-900">Zonas de cobertura</h2>
         </div>
-        <p className="text-xs text-slate-400">Agregá los códigos postales donde hacen entregas.</p>
+        <p className="text-xs text-slate-500">Agregá los códigos postales donde hacen entregas.</p>
 
         <div className="flex gap-2">
           <input
@@ -450,9 +381,9 @@ function CompanyProfile({ companyId }: { companyId: string }) {
         {zones.length > 0 && (
           <div className="flex flex-wrap gap-2">
             {zones.map((z) => (
-              <span key={z} className="inline-flex items-center gap-1 bg-slate-100 text-slate-700 text-xs font-mono px-2.5 py-1 rounded-full">
+              <span key={z} className="inline-flex items-center gap-1 bg-slate-100 text-slate-700 text-xs font-mono px-2.5 py-1 rounded-full border border-slate-200">
                 {z}
-                <button type="button" onClick={() => setZones(zones.filter((x) => x !== z))} className="text-slate-400 hover:text-red-500 ml-0.5">
+                <button type="button" onClick={() => setZones(zones.filter((x) => x !== z))} className="text-slate-500 hover:text-red-400 ml-0.5 transition-colors">
                   <X size={11} />
                 </button>
               </span>
@@ -461,22 +392,16 @@ function CompanyProfile({ companyId }: { companyId: string }) {
         )}
 
         {zones.length === 0 && (
-          <p className="text-xs text-slate-400 italic">Sin zonas de cobertura configuradas.</p>
+          <p className="text-xs text-slate-500 italic">Sin zonas de cobertura configuradas.</p>
         )}
       </div>
 
-      {/* Guardar */}
       <div className="flex justify-end">
-        <button
-          onClick={handleSave}
-          disabled={update.isPending}
-          className="btn-primary flex items-center gap-2 disabled:opacity-60"
-        >
+        <button onClick={handleSave} disabled={update.isPending} className="btn-primary flex items-center gap-2 disabled:opacity-60">
           {update.isPending && <Loader2 size={15} className="animate-spin" />}
           {update.isPending ? 'Guardando...' : update.isSuccess ? '¡Guardado!' : 'Guardar configuración'}
         </button>
       </div>
-
     </div>
   );
 }

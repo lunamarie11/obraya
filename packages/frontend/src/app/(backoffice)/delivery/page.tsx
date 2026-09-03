@@ -2,277 +2,318 @@
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { api, formatARS } from '@/lib/api';
-import { Header } from '@/components/layout/Header';
-import { Truck, CheckCircle2, DollarSign, MapPin, Clock, History } from 'lucide-react';
+import {
+  Truck, MapPin, CheckCircle2, Clock, Package,
+  ChevronRight, Zap, DollarSign, Navigation, AlertCircle,
+} from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
+import { clsx } from 'clsx';
 
-// Comisión del repartidor: 8% del total del pedido
-const DELIVERY_COMMISSION = 0.08;
-const earning = (totalCentavos: number) => Math.round(Number(totalCentavos) * DELIVERY_COMMISSION);
+const COMMISSION = 0.08;
+const earn = (cents: number) => Math.round(Number(cents) * COMMISSION);
+
+// Estado local del flow de entrega (la API solo tiene Despachado → Entregado)
+type DeliveryStep = 'available' | 'heading' | 'arrived' | 'picked' | 'delivering' | 'done';
+
+const STEPS: { key: DeliveryStep; label: string; icon: React.ReactNode; cta: string }[] = [
+  { key: 'heading',   label: 'Yendo al origen',     icon: <Navigation size={16} />,  cta: 'Llegué al origen' },
+  { key: 'arrived',   label: 'En el origen',         icon: <MapPin size={16} />,      cta: 'Tomé el pedido' },
+  { key: 'picked',    label: 'Pedido en mano',       icon: <Package size={16} />,     cta: 'Salir a entregar' },
+  { key: 'delivering',label: 'En camino al cliente', icon: <Truck size={16} />,       cta: 'Entregué el pedido' },
+];
 
 export default function DeliveryPage() {
-  const queryClient = useQueryClient();
-  const [confirmingId, setConfirmingId] = useState<string | null>(null);
+  const router = useRouter();
+  const qc = useQueryClient();
 
-  const { data: pendingData, isLoading: pendingLoading } = useQuery({
+  // Pedido activo local (solo persiste en esta sesión)
+  const [activeOrderId, setActiveOrderId] = useState<string | null>(null);
+  const [deliveryStep, setDeliveryStep] = useState<DeliveryStep>('available');
+  const [isOnline, setIsOnline] = useState(true);
+
+  const { data: pendingData, isLoading } = useQuery({
     queryKey: ['delivery-pending'],
-    queryFn: () =>
-      api.get('/orders', { params: { status: 'Despachado', limit: 50 } }).then((r) => r.data),
+    queryFn: () => api.get('/orders', { params: { status: 'Despachado', limit: 50 } }).then(r => r.data),
     refetchInterval: 30_000,
+    enabled: isOnline,
   });
 
-  const { data: historyData, isLoading: historyLoading } = useQuery({
+  const { data: historyData } = useQuery({
     queryKey: ['delivery-history'],
-    queryFn: () =>
-      api.get('/orders', { params: { status: 'Entregado', limit: 100 } }).then((r) => r.data),
+    queryFn: () => api.get('/orders', { params: { status: 'Entregado', limit: 200 } }).then(r => r.data),
   });
 
   const markDelivered = useMutation({
-    mutationFn: (orderId: string) =>
-      api.put(`/orders/${orderId}/status`, { status: 'Entregado' }),
+    mutationFn: (id: string) => api.put(`/orders/${id}/status`, { status: 'Entregado' }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['delivery-pending'] });
-      queryClient.invalidateQueries({ queryKey: ['delivery-history'] });
-      setConfirmingId(null);
+      qc.invalidateQueries({ queryKey: ['delivery-pending'] });
+      qc.invalidateQueries({ queryKey: ['delivery-history'] });
+      setActiveOrderId(null);
+      setDeliveryStep('available');
     },
   });
 
-  const pendingOrders: any[] = pendingData?.data ?? [];
+  const pendingOrders: any[] = (pendingData?.data ?? []).filter((o: any) => o.id !== activeOrderId);
   const historyOrders: any[] = historyData?.data ?? [];
-
-  const totalPendingEarnings = pendingOrders.reduce(
-    (sum, o) => sum + earning(o.totalAmount),
-    0,
-  );
+  const activeOrder = activeOrderId ? (pendingData?.data ?? []).find((o: any) => o.id === activeOrderId) : null;
 
   const todayStr = new Date().toDateString();
-  const deliveredToday = historyOrders.filter(
-    (o) => o.actualDeliveryDate && new Date(o.actualDeliveryDate).toDateString() === todayStr,
+  const todayDeliveries = historyOrders.filter(o =>
+    o.actualDeliveryDate && new Date(o.actualDeliveryDate).toDateString() === todayStr,
   );
-  const todayEarnings = deliveredToday.reduce((sum, o) => sum + earning(o.totalAmount), 0);
+  const todayEarnings = todayDeliveries.reduce((s, o) => s + earn(o.totalAmount), 0);
+  const weekEarnings = historyOrders.slice(0, 20).reduce((s, o) => s + earn(o.totalAmount), 0);
+
+  function handleStepCta() {
+    if (deliveryStep === 'heading')    setDeliveryStep('arrived');
+    else if (deliveryStep === 'arrived')    setDeliveryStep('picked');
+    else if (deliveryStep === 'picked')     setDeliveryStep('delivering');
+    else if (deliveryStep === 'delivering') {
+      if (activeOrderId) markDelivered.mutate(activeOrderId);
+    }
+  }
+
+  function takeOrder(order: any) {
+    setActiveOrderId(order.id);
+    setDeliveryStep('heading');
+  }
+
+  const currentStepIndex = STEPS.findIndex(s => s.key === deliveryStep);
+  const currentStepInfo = STEPS[currentStepIndex];
 
   return (
-    <div>
-      <Header title="Mis Entregas" />
-      <div className="p-6 space-y-6">
-
-        {/* KPIs */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div className="card p-5">
-            <div className="flex items-center justify-between mb-3">
-              <span className="text-sm text-slate-500">Pendientes de entrega</span>
-              <div className="w-9 h-9 rounded-lg bg-purple-50 flex items-center justify-center">
-                <Truck size={18} className="text-purple-500" />
-              </div>
-            </div>
-            <p className="text-2xl font-bold text-slate-800">{pendingOrders.length}</p>
-            <p className="text-xs text-slate-400 mt-1">pedidos listos para entregar</p>
+    <div className="min-h-screen bg-slate-50">
+      {/* Header */}
+      <header className="h-14 bg-white border-b border-slate-200 flex items-center justify-between px-5 sticky top-0 z-10">
+        <div className="flex items-center gap-3">
+          <div className="w-8 h-8 rounded-xl bg-orange-500 flex items-center justify-center">
+            <Truck size={16} className="text-white" />
           </div>
+          <span className="font-bold text-slate-900">Mis Entregas</span>
+        </div>
+        {/* Online toggle */}
+        <button
+          onClick={() => setIsOnline(v => !v)}
+          className={clsx(
+            'flex items-center gap-2 px-4 py-1.5 rounded-full text-xs font-bold transition-all',
+            isOnline
+              ? 'bg-green-50 text-green-600 border border-green-200'
+              : 'bg-slate-100 text-slate-500 border border-slate-300',
+          )}
+        >
+          <span className={clsx('w-2 h-2 rounded-full', isOnline ? 'bg-green-500 animate-pulse' : 'bg-slate-400')} />
+          {isOnline ? 'En línea' : 'Sin conexión'}
+        </button>
+      </header>
 
-          <div className="card p-5">
-            <div className="flex items-center justify-between mb-3">
-              <span className="text-sm text-slate-500">Ganancia estimada</span>
-              <div className="w-9 h-9 rounded-lg bg-green-50 flex items-center justify-center">
-                <DollarSign size={18} className="text-green-500" />
+      <div className="p-4 space-y-4 max-w-2xl mx-auto">
+
+        {/* Stats bar */}
+        <div className="grid grid-cols-3 gap-3">
+          {[
+            { label: 'Hoy', value: `${todayDeliveries.length} entregas`, icon: <CheckCircle2 size={15} className="text-green-600" />, bg: 'bg-green-50' },
+            { label: 'Ganado hoy', value: formatARS(todayEarnings), icon: <DollarSign size={15} className="text-orange-500" />, bg: 'bg-orange-50' },
+            { label: 'Esta semana', value: formatARS(weekEarnings), icon: <Zap size={15} className="text-purple-600" />, bg: 'bg-purple-50' },
+          ].map(s => (
+            <div key={s.label} className="bg-white border border-slate-200 rounded-2xl p-3 shadow-sm">
+              <div className={clsx('w-7 h-7 rounded-xl flex items-center justify-center mb-2', s.bg)}>{s.icon}</div>
+              <p className="text-slate-900 font-bold text-sm leading-tight">{s.value}</p>
+              <p className="text-slate-500 text-xs mt-0.5">{s.label}</p>
+            </div>
+          ))}
+        </div>
+
+        {/* Entrega activa */}
+        {activeOrder && (
+          <section>
+            <h2 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2 px-1">Entrega activa</h2>
+            <div className="bg-orange-50 border border-orange-200 rounded-2xl overflow-hidden">
+              {/* Progress steps */}
+              <div className="flex items-center justify-between px-5 py-3 border-b border-orange-200">
+                {STEPS.map((step, i) => (
+                  <div key={step.key} className="flex items-center gap-1.5">
+                    <div className={clsx(
+                      'w-7 h-7 rounded-full flex items-center justify-center text-xs transition-all',
+                      i < currentStepIndex
+                        ? 'bg-green-500 text-white'
+                        : i === currentStepIndex
+                        ? 'bg-orange-500 text-white shadow-lg shadow-orange-500/30'
+                        : 'bg-slate-200 text-slate-400',
+                    )}>
+                      {i < currentStepIndex ? <CheckCircle2 size={14} /> : step.icon}
+                    </div>
+                    {i < STEPS.length - 1 && (
+                      <div className={clsx('h-0.5 w-6', i < currentStepIndex ? 'bg-green-500' : 'bg-slate-300')} />
+                    )}
+                  </div>
+                ))}
+              </div>
+
+              <div className="p-4 space-y-3">
+                {/* Status label */}
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <span className="text-orange-500">{currentStepInfo?.icon}</span>
+                    <span className="text-orange-600 font-semibold text-sm">{currentStepInfo?.label}</span>
+                  </div>
+                  <span className="text-slate-500 text-xs font-mono">{activeOrder.orderNumber}</span>
+                </div>
+
+                {/* Addresses */}
+                <div className="space-y-2 bg-white border border-slate-200 rounded-xl p-3">
+                  <div className="flex items-start gap-2.5">
+                    <div className="w-5 h-5 rounded-full bg-orange-100 flex items-center justify-center shrink-0 mt-0.5">
+                      <Package size={11} className="text-orange-500" />
+                    </div>
+                    <div>
+                      <p className="text-xs text-slate-500">Retirá en</p>
+                      <p className="text-sm text-slate-900 font-medium">Ferretería ObraYa Demo</p>
+                      <p className="text-xs text-slate-500">Av. Corrientes 1234, CABA</p>
+                    </div>
+                  </div>
+                  <div className="border-l-2 border-dashed border-slate-300 h-4 ml-2.5" />
+                  <div className="flex items-start gap-2.5">
+                    <div className="w-5 h-5 rounded-full bg-green-100 flex items-center justify-center shrink-0 mt-0.5">
+                      <MapPin size={11} className="text-green-600" />
+                    </div>
+                    <div>
+                      <p className="text-xs text-slate-500">Entregá en</p>
+                      <p className="text-sm text-slate-900 font-medium">{activeOrder.buyerName}</p>
+                      <p className="text-xs text-slate-500">{activeOrder.deliveryAddress?.street}, {activeOrder.deliveryAddress?.city}</p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Items summary */}
+                <div className="text-xs text-slate-500">
+                  {activeOrder.items?.length} ítem{activeOrder.items?.length !== 1 ? 's' : ''} · {formatARS(activeOrder.totalAmount)}
+                  <span className="ml-2 text-green-600 font-semibold">+{formatARS(earn(activeOrder.totalAmount))} para vos</span>
+                </div>
+
+                {/* CTA */}
+                <button
+                  onClick={handleStepCta}
+                  disabled={markDelivered.isPending}
+                  className="w-full py-3.5 bg-orange-500 hover:bg-orange-600 disabled:opacity-60 text-white font-bold rounded-xl transition-colors text-sm"
+                >
+                  {markDelivered.isPending ? 'Confirmando...' : currentStepInfo?.cta}
+                </button>
+
+                {/* Ver detalle */}
+                <button
+                  onClick={() => router.push(`/delivery/${activeOrderId}`)}
+                  className="w-full py-2.5 text-slate-500 text-xs font-medium hover:text-slate-900 transition-colors flex items-center justify-center gap-1"
+                >
+                  Ver detalle completo <ChevronRight size={12} />
+                </button>
               </div>
             </div>
-            <p className="text-2xl font-bold text-slate-800">{formatARS(totalPendingEarnings)}</p>
-            <p className="text-xs text-slate-400 mt-1">comisión 8% sobre pedidos pendientes</p>
+          </section>
+        )}
+
+        {/* Sin conexión */}
+        {!isOnline && (
+          <div className="bg-white border border-slate-200 rounded-2xl p-6 text-center shadow-sm">
+            <AlertCircle size={32} className="text-slate-400 mx-auto mb-2" />
+            <p className="text-slate-700 font-medium">Sin conexión</p>
+            <p className="text-slate-500 text-sm mt-1">Activá tu estado para ver pedidos disponibles.</p>
           </div>
+        )}
 
-          <div className="card p-5">
-            <div className="flex items-center justify-between mb-3">
-              <span className="text-sm text-slate-500">Entregados hoy</span>
-              <div className="w-9 h-9 rounded-lg bg-orange-50 flex items-center justify-center">
-                <CheckCircle2 size={18} className="text-orange-500" />
-              </div>
+        {/* Pedidos disponibles */}
+        {isOnline && !activeOrder && (
+          <section>
+            <div className="flex items-center justify-between mb-2 px-1">
+              <h2 className="text-xs font-bold text-slate-500 uppercase tracking-wider">
+                Pedidos disponibles
+              </h2>
+              {isLoading && <span className="text-xs text-slate-400 animate-pulse">Actualizando...</span>}
             </div>
-            <p className="text-2xl font-bold text-slate-800">{deliveredToday.length}</p>
-            <p className="text-xs text-slate-400 mt-1">{formatARS(todayEarnings)} ganados hoy</p>
+
+            {pendingOrders.length === 0 ? (
+              <div className="bg-white border border-slate-200 rounded-2xl p-8 text-center shadow-sm">
+                <Clock size={32} className="text-slate-300 mx-auto mb-3" />
+                <p className="text-slate-600 font-medium">Sin pedidos disponibles</p>
+                <p className="text-slate-500 text-sm mt-1">Los pedidos nuevos aparecerán acá automáticamente.</p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {pendingOrders.map((order: any) => (
+                  <OrderCard key={order.id} order={order} onTake={() => takeOrder(order)} />
+                ))}
+              </div>
+            )}
+          </section>
+        )}
+
+        {isOnline && activeOrder && pendingOrders.length > 0 && (
+          <section>
+            <h2 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2 px-1">
+              Más pedidos ({pendingOrders.length})
+            </h2>
+            <p className="text-xs text-slate-500 text-center py-4">Terminá la entrega actual primero.</p>
+          </section>
+        )}
+
+      </div>
+    </div>
+  );
+}
+
+function OrderCard({ order, onTake }: { order: any; onTake: () => void }) {
+  const earnings = earn(order.totalAmount);
+  const itemCount = order.items?.length ?? 0;
+  const createdAt = order.createdAt ? new Date(order.createdAt) : null;
+
+  return (
+    <div className="bg-white border border-slate-200 hover:border-orange-300 rounded-2xl overflow-hidden transition-all shadow-sm">
+      <div className="p-4">
+        <div className="flex items-start justify-between mb-3">
+          <div>
+            <span className="text-xs font-mono text-slate-500">{order.orderNumber}</span>
+            <p className="text-slate-900 font-semibold text-sm mt-0.5">{order.buyerName}</p>
+          </div>
+          <div className="text-right">
+            <p className="text-green-600 font-extrabold text-lg">+{formatARS(earnings)}</p>
+            <p className="text-slate-500 text-xs">tu ganancia</p>
           </div>
         </div>
 
-        {/* Pedidos entrantes */}
-        <section>
-          <h2 className="text-base font-semibold text-slate-800 mb-3 flex items-center gap-2">
-            <Truck size={16} className="text-purple-500" />
-            Pedidos para entregar
-            {pendingOrders.length > 0 && (
-              <span className="bg-purple-100 text-purple-700 text-xs font-medium px-2 py-0.5 rounded-full">
-                {pendingOrders.length}
-              </span>
-            )}
-          </h2>
-
-          <div className="card overflow-hidden">
-            {pendingLoading ? (
-              <div className="p-8 text-center text-slate-400 text-sm">Cargando pedidos...</div>
-            ) : pendingOrders.length === 0 ? (
-              <div className="p-12 text-center">
-                <CheckCircle2 size={40} className="text-green-400 mx-auto mb-3" />
-                <p className="font-medium text-slate-600">¡Todo al día!</p>
-                <p className="text-sm text-slate-400 mt-1">No hay pedidos pendientes de entrega.</p>
-              </div>
-            ) : (
-              <table className="w-full text-sm">
-                <thead className="bg-slate-50 border-b border-slate-200">
-                  <tr>
-                    <th className="text-left px-4 py-3 font-medium text-slate-600">N° Pedido</th>
-                    <th className="text-left px-4 py-3 font-medium text-slate-600">Comprador</th>
-                    <th className="text-left px-4 py-3 font-medium text-slate-600">Dirección</th>
-                    <th className="text-left px-4 py-3 font-medium text-slate-600">Total pedido</th>
-                    <th className="text-left px-4 py-3 font-medium text-slate-600">Mi ganancia</th>
-                    <th className="text-left px-4 py-3 font-medium text-slate-600">Entrega estimada</th>
-                    <th className="px-4 py-3" />
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {pendingOrders.map((order: any) => (
-                    <tr key={order.id} className="hover:bg-slate-50 transition-colors">
-                      <td className="px-4 py-3 font-mono font-medium text-slate-800">
-                        {order.orderNumber}
-                      </td>
-                      <td className="px-4 py-3">
-                        <p className="text-slate-700 font-medium">{order.buyerName ?? '—'}</p>
-                        {order.buyerPhone && (
-                          <p className="text-xs text-slate-400">{order.buyerPhone}</p>
-                        )}
-                      </td>
-                      <td className="px-4 py-3">
-                        {order.deliveryAddress ? (
-                          <div className="flex items-start gap-1">
-                            <MapPin size={13} className="text-slate-400 mt-0.5 flex-shrink-0" />
-                            <span className="text-xs text-slate-600 leading-tight">
-                              {order.deliveryAddress.street}, {order.deliveryAddress.city}
-                            </span>
-                          </div>
-                        ) : (
-                          <span className="text-slate-400">—</span>
-                        )}
-                      </td>
-                      <td className="px-4 py-3 font-medium text-slate-800">
-                        {formatARS(Number(order.totalAmount))}
-                      </td>
-                      <td className="px-4 py-3">
-                        <span className="text-green-700 font-semibold">
-                          {formatARS(earning(order.totalAmount))}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3 text-slate-500 text-xs">
-                        {order.scheduledDeliveryDate
-                          ? format(new Date(order.scheduledDeliveryDate), "d MMM, HH:mm", { locale: es })
-                          : '—'}
-                      </td>
-                      <td className="px-4 py-3">
-                        {confirmingId === order.id ? (
-                          <div className="flex items-center gap-1">
-                            <button
-                              onClick={() => markDelivered.mutate(order.id)}
-                              disabled={markDelivered.isPending}
-                              className="text-xs bg-green-500 hover:bg-green-600 text-white px-2 py-1.5 rounded font-medium transition-colors disabled:opacity-60"
-                            >
-                              {markDelivered.isPending ? '...' : 'Confirmar'}
-                            </button>
-                            <button
-                              onClick={() => setConfirmingId(null)}
-                              className="text-xs text-slate-500 hover:text-slate-700 px-2 py-1"
-                            >
-                              Cancelar
-                            </button>
-                          </div>
-                        ) : (
-                          <button
-                            onClick={() => setConfirmingId(order.id)}
-                            className="text-xs bg-orange-50 hover:bg-orange-100 text-orange-600 font-medium px-3 py-1.5 rounded-lg transition-colors border border-orange-200"
-                          >
-                            Marcar entregado
-                          </button>
-                        )}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            )}
+        {/* Addresses */}
+        <div className="space-y-2 mb-3">
+          <div className="flex items-center gap-2.5">
+            <div className="w-2 h-2 rounded-full bg-orange-500 shrink-0 ml-0.5" />
+            <p className="text-xs text-slate-500">Retirá en <span className="text-slate-700 font-medium">Ferretería ObraYa</span></p>
           </div>
-        </section>
-
-        {/* Historial */}
-        <section>
-          <h2 className="text-base font-semibold text-slate-800 mb-3 flex items-center gap-2">
-            <History size={16} className="text-slate-400" />
-            Historial de entregas
-            {historyOrders.length > 0 && (
-              <span className="text-xs text-slate-400 font-normal">
-                — {historyOrders.length} en total
-              </span>
-            )}
-          </h2>
-
-          <div className="card overflow-hidden">
-            {historyLoading ? (
-              <div className="p-8 text-center text-slate-400 text-sm">Cargando historial...</div>
-            ) : historyOrders.length === 0 ? (
-              <div className="p-8 text-center text-slate-400 text-sm">
-                Aún no hay entregas completadas.
-              </div>
-            ) : (
-              <table className="w-full text-sm">
-                <thead className="bg-slate-50 border-b border-slate-200">
-                  <tr>
-                    <th className="text-left px-4 py-3 font-medium text-slate-600">N° Pedido</th>
-                    <th className="text-left px-4 py-3 font-medium text-slate-600">Comprador</th>
-                    <th className="text-left px-4 py-3 font-medium text-slate-600">Dirección</th>
-                    <th className="text-left px-4 py-3 font-medium text-slate-600">Total pedido</th>
-                    <th className="text-left px-4 py-3 font-medium text-slate-600">Ganancia cobrada</th>
-                    <th className="text-left px-4 py-3 font-medium text-slate-600">Fecha entrega</th>
-                    <th className="text-left px-4 py-3 font-medium text-slate-600">Estado</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {historyOrders.map((order: any) => (
-                    <tr key={order.id} className="hover:bg-slate-50 transition-colors">
-                      <td className="px-4 py-3 font-mono font-medium text-slate-800">
-                        {order.orderNumber}
-                      </td>
-                      <td className="px-4 py-3 text-slate-700">{order.buyerName ?? '—'}</td>
-                      <td className="px-4 py-3">
-                        {order.deliveryAddress ? (
-                          <div className="flex items-start gap-1">
-                            <MapPin size={13} className="text-slate-400 mt-0.5 flex-shrink-0" />
-                            <span className="text-xs text-slate-600 leading-tight">
-                              {order.deliveryAddress.street}, {order.deliveryAddress.city}
-                            </span>
-                          </div>
-                        ) : (
-                          <span className="text-slate-400">—</span>
-                        )}
-                      </td>
-                      <td className="px-4 py-3 font-medium text-slate-800">
-                        {formatARS(Number(order.totalAmount))}
-                      </td>
-                      <td className="px-4 py-3">
-                        <span className="text-green-700 font-semibold">
-                          {formatARS(earning(order.totalAmount))}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3 text-slate-500 text-xs">
-                        {order.actualDeliveryDate
-                          ? format(new Date(order.actualDeliveryDate), "d MMM yyyy, HH:mm", { locale: es })
-                          : '—'}
-                      </td>
-                      <td className="px-4 py-3">
-                        <span className="badge-entregado">Entregado</span>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            )}
+          <div className="border-l border-dashed border-slate-300 h-3 ml-1.5" />
+          <div className="flex items-center gap-2.5">
+            <MapPin size={14} className="text-green-600 shrink-0" />
+            <p className="text-xs text-slate-500 truncate">
+              {order.deliveryAddress?.street}, <span className="text-slate-700 font-medium">{order.deliveryAddress?.city}</span>
+            </p>
           </div>
-        </section>
+        </div>
+
+        {/* Meta */}
+        <div className="flex items-center justify-between text-xs text-slate-500 mb-3">
+          <span>{itemCount} ítem{itemCount !== 1 ? 's' : ''} · {formatARS(order.totalAmount)}</span>
+          {createdAt && (
+            <span className="flex items-center gap-1">
+              <Clock size={11} />
+              {format(createdAt, "HH:mm", { locale: es })}
+            </span>
+          )}
+        </div>
+
+        <button
+          onClick={onTake}
+          className="w-full py-3 bg-orange-500 hover:bg-orange-600 text-white font-bold rounded-xl text-sm transition-colors"
+        >
+          Tomar pedido
+        </button>
       </div>
     </div>
   );

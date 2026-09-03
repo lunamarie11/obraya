@@ -8,7 +8,7 @@ import { Eye, EyeOff, Loader2, CheckCircle } from 'lucide-react';
 function AcceptInviteForm() {
   const searchParams = useSearchParams();
   const router = useRouter();
-  const token = searchParams.get('token') ?? '';
+  const token = searchParams?.get('token') ?? '';
 
   const [password, setPassword] = useState('');
   const [confirm, setConfirm] = useState('');

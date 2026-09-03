@@ -18,10 +18,10 @@ const STATUSES = [
 ];
 
 const STATUS_COLORS: Record<string, string> = {
-  pending:   'bg-yellow-100 text-yellow-700',
-  active:    'bg-green-100 text-green-700',
-  suspended: 'bg-red-100 text-red-700',
-  rejected:  'bg-slate-100 text-slate-500',
+  pending:   'bg-yellow-50 text-yellow-700 border border-yellow-200',
+  active:    'bg-green-50 text-green-600 border border-green-200',
+  suspended: 'bg-red-50 text-red-600 border border-red-200',
+  rejected:  'bg-slate-100 text-slate-500 border border-slate-200',
 };
 
 const STATUS_LABELS: Record<string, string> = {
@@ -71,9 +71,9 @@ export default function CompaniesPage() {
 
   return (
     <div>
-      <header className="h-14 bg-slate-900 border-b border-slate-800 flex items-center px-6 sticky top-0 z-10">
-        <h1 className="text-base font-semibold text-white flex items-center gap-2">
-          <Building2 size={16} className="text-slate-400" />
+      <header className="h-14 bg-white border-b border-slate-200 flex items-center px-6 sticky top-0 z-10">
+        <h1 className="text-base font-semibold text-slate-900 flex items-center gap-2">
+          <Building2 size={16} className="text-slate-500" />
           Empresas
         </h1>
       </header>
@@ -85,7 +85,7 @@ export default function CompaniesPage() {
           <div className="relative flex-1 min-w-48">
             <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
             <input
-              className="w-full bg-slate-800 border border-slate-700 rounded-lg pl-9 pr-3 py-2 text-sm text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+              className="w-full bg-white border border-slate-300 rounded-lg pl-9 pr-3 py-2 text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent"
               placeholder="Buscar por empresa, CUIT o email..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
@@ -100,7 +100,7 @@ export default function CompaniesPage() {
                   'px-3 py-1.5 rounded-full text-xs font-medium transition-colors border',
                   statusFilter === s.value
                     ? 'bg-orange-500 text-white border-orange-500'
-                    : 'bg-slate-800 text-slate-400 border-slate-700 hover:bg-slate-700 hover:text-white',
+                    : 'bg-white text-slate-600 border-slate-300 hover:bg-slate-50 hover:text-slate-900',
                 )}
               >
                 {s.label}
@@ -110,41 +110,41 @@ export default function CompaniesPage() {
         </div>
 
         {/* Tabla */}
-        <div className="bg-slate-800 border border-slate-700 rounded-xl overflow-hidden">
+        <div className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-sm">
           {isLoading ? (
             <div className="p-8 text-center text-slate-500 text-sm">Cargando empresas...</div>
           ) : filtered.length === 0 ? (
             <div className="p-8 text-center text-slate-500 text-sm">No se encontraron empresas.</div>
           ) : (
             <table className="w-full text-sm">
-              <thead className="border-b border-slate-700">
+              <thead className="bg-slate-50 border-b border-slate-200">
                 <tr>
-                  <th className="text-left px-4 py-3 font-medium text-slate-400 text-xs">Empresa</th>
-                  <th className="text-left px-4 py-3 font-medium text-slate-400 text-xs">CUIT</th>
-                  <th className="text-left px-4 py-3 font-medium text-slate-400 text-xs">Ubicación</th>
-                  <th className="text-left px-4 py-3 font-medium text-slate-400 text-xs">Usuarios</th>
-                  <th className="text-left px-4 py-3 font-medium text-slate-400 text-xs">Estado</th>
-                  <th className="text-left px-4 py-3 font-medium text-slate-400 text-xs">Alta</th>
+                  <th className="text-left px-4 py-3 font-medium text-slate-500 text-xs">Empresa</th>
+                  <th className="text-left px-4 py-3 font-medium text-slate-500 text-xs">CUIT</th>
+                  <th className="text-left px-4 py-3 font-medium text-slate-500 text-xs">Ubicación</th>
+                  <th className="text-left px-4 py-3 font-medium text-slate-500 text-xs">Usuarios</th>
+                  <th className="text-left px-4 py-3 font-medium text-slate-500 text-xs">Estado</th>
+                  <th className="text-left px-4 py-3 font-medium text-slate-500 text-xs">Alta</th>
                   <th className="px-4 py-3" />
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-700">
+              <tbody className="divide-y divide-slate-100">
                 {filtered.map((company: any) => (
-                  <tr key={company.id} className="hover:bg-slate-700/40 transition-colors">
+                  <tr key={company.id} className="hover:bg-orange-50/50 transition-colors">
                     <td className="px-4 py-3">
                       <Link
                         href={`/superadmin/companies/${company.id}`}
-                        className="font-medium text-white hover:text-orange-400 transition-colors"
+                        className="font-medium text-slate-900 hover:text-orange-500 transition-colors"
                       >
                         {company.razonSocial}
                       </Link>
                       <p className="text-xs text-slate-500">{company.email}</p>
                     </td>
-                    <td className="px-4 py-3 font-mono text-slate-300 text-xs">{company.cuit}</td>
-                    <td className="px-4 py-3 text-slate-400 text-xs">
+                    <td className="px-4 py-3 font-mono text-slate-700 text-xs">{company.cuit}</td>
+                    <td className="px-4 py-3 text-slate-500 text-xs">
                       {[company.city, company.province].filter(Boolean).join(', ') || '—'}
                     </td>
-                    <td className="px-4 py-3 text-slate-300 text-center">{company.usersCount}</td>
+                    <td className="px-4 py-3 text-slate-700 text-center">{company.usersCount}</td>
                     <td className="px-4 py-3">
                       <span className={clsx(
                         'inline-flex px-2 py-0.5 rounded-full text-xs font-medium',
@@ -161,7 +161,7 @@ export default function CompaniesPage() {
                         {company.status === 'pending' && (
                           <button
                             onClick={() => setConfirmAction({ id: company.id, status: 'active', name: company.razonSocial })}
-                            className="p-1.5 rounded-lg bg-green-500/10 hover:bg-green-500/20 text-green-400 transition-colors"
+                            className="p-1.5 rounded-lg bg-green-50 hover:bg-green-100 text-green-600 transition-colors"
                             title="Aprobar"
                           >
                             <CheckCircle2 size={15} />
@@ -170,7 +170,7 @@ export default function CompaniesPage() {
                         {company.status === 'active' && (
                           <button
                             onClick={() => setConfirmAction({ id: company.id, status: 'suspended', name: company.razonSocial })}
-                            className="p-1.5 rounded-lg bg-red-500/10 hover:bg-red-500/20 text-red-400 transition-colors"
+                            className="p-1.5 rounded-lg bg-red-50 hover:bg-red-100 text-red-500 transition-colors"
                             title="Suspender"
                           >
                             <XCircle size={15} />
@@ -179,7 +179,7 @@ export default function CompaniesPage() {
                         {company.status === 'suspended' && (
                           <button
                             onClick={() => setConfirmAction({ id: company.id, status: 'active', name: company.razonSocial })}
-                            className="p-1.5 rounded-lg bg-green-500/10 hover:bg-green-500/20 text-green-400 transition-colors"
+                            className="p-1.5 rounded-lg bg-green-50 hover:bg-green-100 text-green-600 transition-colors"
                             title="Reactivar"
                           >
                             <CheckCircle2 size={15} />
@@ -187,7 +187,7 @@ export default function CompaniesPage() {
                         )}
                         <button
                           onClick={() => setDeleteId(company.id)}
-                          className="p-1.5 rounded-lg bg-slate-700 hover:bg-red-500/20 text-slate-400 hover:text-red-400 transition-colors"
+                          className="p-1.5 rounded-lg bg-slate-100 hover:bg-red-50 text-slate-500 hover:text-red-500 transition-colors"
                           title="Eliminar empresa"
                         >
                           <Trash2 size={15} />
@@ -204,22 +204,22 @@ export default function CompaniesPage() {
 
       {/* Modal de confirmación */}
       {confirmAction && (
-        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
-          <div className="bg-slate-800 border border-slate-700 rounded-2xl p-6 w-full max-w-sm shadow-2xl">
-            <h3 className="font-semibold text-white mb-2">
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white border border-slate-200 rounded-2xl p-6 w-full max-w-sm shadow-2xl">
+            <h3 className="font-semibold text-slate-900 mb-2">
               {confirmAction.status === 'active' ? 'Aprobar empresa' : 'Suspender empresa'}
             </h3>
-            <p className="text-sm text-slate-400 mb-5">
+            <p className="text-sm text-slate-500 mb-5">
               ¿Confirmás que querés{' '}
-              <span className={confirmAction.status === 'active' ? 'text-green-400' : 'text-red-400'}>
+              <span className={confirmAction.status === 'active' ? 'text-green-600' : 'text-red-500'}>
                 {confirmAction.status === 'active' ? 'aprobar' : 'suspender'}
               </span>{' '}
-              a <span className="text-white font-medium">{confirmAction.name}</span>?
+              a <span className="text-slate-900 font-medium">{confirmAction.name}</span>?
             </p>
             <div className="flex gap-2">
               <button
                 onClick={() => setConfirmAction(null)}
-                className="flex-1 bg-slate-700 hover:bg-slate-600 text-slate-300 text-sm font-medium py-2 rounded-lg transition-colors"
+                className="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-600 text-sm font-medium py-2 rounded-lg transition-colors"
               >
                 Cancelar
               </button>
@@ -242,13 +242,13 @@ export default function CompaniesPage() {
 
       {deleteId && (
         <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
-          <div className="bg-slate-800 border border-slate-700 rounded-2xl p-6 w-full max-w-sm shadow-2xl">
-            <h3 className="font-semibold text-white mb-2">Eliminar empresa</h3>
-            <p className="text-sm text-slate-400 mb-5">
+          <div className="bg-white border border-slate-200 rounded-2xl p-6 w-full max-w-sm shadow-2xl">
+            <h3 className="font-semibold text-slate-900 mb-2">Eliminar empresa</h3>
+            <p className="text-sm text-slate-500 mb-5">
               Se eliminarán también todos sus usuarios. Esta acción no se puede deshacer.
             </p>
             <div className="flex gap-2">
-              <button onClick={() => setDeleteId(null)} className="flex-1 bg-slate-700 hover:bg-slate-600 text-slate-300 text-sm font-medium py-2 rounded-lg">Cancelar</button>
+              <button onClick={() => setDeleteId(null)} className="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-600 text-sm font-medium py-2 rounded-lg">Cancelar</button>
               <button onClick={() => deleteCompany.mutate(deleteId!)} disabled={deleteCompany.isPending}
                 className="flex-1 bg-red-500 hover:bg-red-600 text-white text-sm font-medium py-2 rounded-lg disabled:opacity-60">
                 {deleteCompany.isPending ? '...' : 'Eliminar'}

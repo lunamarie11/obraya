@@ -1,163 +1,144 @@
-import Link from 'next/link';
-import Reveal from '@/components/Reveal';
-import ScreenshotCarousel from '@/components/ScreenshotCarousel';
+'use client';
+
+import { useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { useQuery } from '@tanstack/react-query';
+import { Search } from 'lucide-react';
+import { MarketplaceHeader } from '@/components/marketplace/MarketplaceHeader';
+import { CategoryChips } from '@/components/marketplace/CategoryChips';
+import { StoreCard } from '@/components/marketplace/StoreCard';
+import { CartStickyBar } from '@/components/cart/CartStickyBar';
+import { BottomTabBar } from '@/components/nav/BottomTabBar';
+import { getPublicCompanies } from '@/lib/marketplace';
 import DemoCredentials from '@/components/DemoCredentials';
 
+const PROMOS = [
+  { title: 'Envío el mismo día', desc: 'Pedidos antes de las 14hs, en tu obra hoy.', gradient: 'from-orange-500 to-amber-500' },
+  { title: 'Precios por volumen', desc: 'Descuentos automáticos a partir de ciertas cantidades.', gradient: 'from-slate-800 to-slate-700' },
+  { title: 'Fabricantes verificados', desc: 'Comprá directo, sin intermediarios.', gradient: 'from-cyan-600 to-blue-600' },
+];
+
 export default function Home() {
+  const router = useRouter();
+  const [search, setSearch] = useState('');
+
+  const { data: companies, isLoading } = useQuery({
+    queryKey: ['public-companies'],
+    queryFn: getPublicCompanies,
+  });
+
+  function goToMarketplace(params: Record<string, string>) {
+    const qs = new URLSearchParams(params).toString();
+    router.push(qs ? `/marketplace?${qs}` : '/marketplace');
+  }
+
+  function handleSearchSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (search.trim()) goToMarketplace({ search: search.trim() });
+  }
+
   return (
-    <main className="min-h-screen bg-gradient-to-b from-white to-slate-50 text-slate-800">
-      <header className="max-w-7xl mx-auto p-6 flex items-center justify-between">
-        <div className="flex items-center gap-4">
-          <div className="text-2xl font-extrabold">Obra<span className="text-orange-500">Ya</span></div>
-          <nav className="hidden md:flex items-center gap-6 text-sm text-slate-600">
-            <Link href="/marketplace" className="hover:underline">Marketplace</Link>
-            <Link href="/delivery" className="hover:underline">Delivery</Link>
-            <Link href="/superadmin" className="hover:underline">Backoffice</Link>
-          </nav>
-        </div>
+    <div className="min-h-screen bg-slate-50 pb-tabbar">
+      <MarketplaceHeader showSearch={false} />
 
-        <div className="flex items-center gap-3">
-          <Link href="/login" className="px-4 py-2 text-sm">Entrar</Link>
-          <Link href="/register" className="px-4 py-2 bg-orange-500 text-white rounded-full text-sm shadow hover:bg-orange-600">Registrarse</Link>
-        </div>
-      </header>
+      {/* Hero + buscador prominente */}
+      <section className="max-w-7xl mx-auto px-4 sm:px-6 pt-6 pb-4">
+        <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 mb-1">
+          ¿Qué necesitás para tu obra?
+        </h1>
+        <p className="text-sm text-slate-500 mb-4">
+          Materiales de construcción directo de fabricantes y distribuidores.
+        </p>
+        <form onSubmit={handleSearchSubmit} className="relative">
+          <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 w-5 h-5 pointer-events-none" />
+          <input
+            type="search"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Buscá cemento, pisos, pintura..."
+            className="w-full h-14 bg-white border border-slate-200 rounded-2xl pl-12 pr-4 text-base text-slate-900 placeholder-slate-400 shadow-sm focus:outline-none focus:ring-2 focus:ring-orange-500 transition-all"
+          />
+        </form>
+      </section>
 
-      <section className="max-w-7xl mx-auto px-6 py-24 grid gap-12 lg:grid-cols-2 items-center">
-        <Reveal className="space-y-6">
-          <div>
-            <h2 className="text-5xl font-extrabold leading-tight mb-4">Materiales y servicios para la construcción — en una sola plataforma</h2>
-            <p className="text-lg text-slate-600 mb-6">ObraYa conecta fabricantes, distribuidores y profesionales con un catálogo global, logística integrada y dashboards en tiempo real. Diseñado para empresas que escalan.</p>
+      {/* Chips de categoría */}
+      <section className="max-w-7xl mx-auto">
+        <CategoryChips value="" onChange={(key) => goToMarketplace(key ? { category: key } : {})} />
+      </section>
 
-            <div className="flex gap-3 mb-6">
-              <Link href="/marketplace" className="px-6 py-3 bg-orange-500 text-white rounded-full shadow hover:bg-orange-600">Explorar Marketplace</Link>
-              <Link href="/superadmin/monitoring" className="px-6 py-3 border border-slate-200 rounded-full">Ver demo admin</Link>
+      {/* Carrusel de promos */}
+      <section className="max-w-7xl mx-auto px-4 sm:px-6 py-4">
+        <div className="flex gap-3 overflow-x-auto scrollbar-hide pb-1">
+          {PROMOS.map((promo) => (
+            <div
+              key={promo.title}
+              className={`shrink-0 w-72 h-32 rounded-2xl bg-gradient-to-br ${promo.gradient} p-5 flex flex-col justify-end text-white shadow-sm`}
+            >
+              <h3 className="font-bold text-base leading-tight">{promo.title}</h3>
+              <p className="text-xs text-white/85 mt-1">{promo.desc}</p>
             </div>
+          ))}
+        </div>
+      </section>
 
-              <div className="mt-4">
-                <Reveal><DemoCredentials /></Reveal>
-              </div>
+      {/* Grid de fabricantes/distribuidores */}
+      <section className="max-w-7xl mx-auto px-4 sm:px-6 py-4">
+        <h2 className="text-lg font-bold text-slate-900 mb-3">Fabricantes y distribuidores</h2>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+          {isLoading
+            ? Array.from({ length: 6 }).map((_, i) => <StoreCardSkeleton key={i} />)
+            : companies?.length
+              ? companies.map((c) => <StoreCard key={c.id} company={c} />)
+              : <EmptyStores />}
+        </div>
+      </section>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm text-slate-600">
-              <div className="flex items-start gap-3">
-                <div className="w-10 h-10 bg-slate-100 rounded flex items-center justify-center font-semibold">✓</div>
-                <div>
-                  <div className="font-medium">Catálogo global</div>
-                  <div className="text-xs">Miles de SKUs, variantes y precios por volumen.</div>
-                </div>
-              </div>
-              <div className="flex items-start gap-3">
-                <div className="w-10 h-10 bg-slate-100 rounded flex items-center justify-center font-semibold">⚡</div>
-                <div>
-                  <div className="font-medium">Logística y tracking</div>
-                  <div className="text-xs">Seguimiento en tiempo real y optimización de rutas.</div>
-                </div>
-              </div>
-            </div>
+      {/* Acceso demo (dev) — colapsado para no dominar la experiencia de comprador */}
+      <section className="max-w-7xl mx-auto px-4 sm:px-6 py-8">
+        <details className="group">
+          <summary className="cursor-pointer text-sm font-medium text-slate-500 hover:text-slate-700 select-none">
+            ¿Sos del equipo ObraYa? Probar cuentas demo
+          </summary>
+          <div className="mt-4">
+            <DemoCredentials />
           </div>
-        </Reveal>
-
-        <Reveal>
-          <div className="order-first lg:order-last">
-            <div className="bg-white rounded-3xl shadow-2xl overflow-hidden border border-slate-100">
-              <div className="w-full h-96 bg-[url('https://images.unsplash.com/photo-1504208434309-cb69f4fe52b0?q=80&w=1400&auto=format&fit=crop&s=9f7e3d2b7f3c0f4e')] bg-cover bg-center"></div>
-              <div className="p-6">
-                <h3 className="text-lg font-semibold">Operá a escala internacional</h3>
-                <p className="text-sm text-slate-600 mt-2">Panel corporativo, APIs abiertas y soporte para integraciones empresariales.</p>
-              </div>
-            </div>
-          </div>
-        </Reveal>
+        </details>
       </section>
 
-      <section className="max-w-7xl mx-auto px-6 py-8">
-        <Reveal>
-          <h3 className="text-2xl font-bold mb-6">Screenshots</h3>
-          <ScreenshotCarousel />
-        </Reveal>
-      </section>
-
-      <section className="bg-white py-16">
-        <div className="max-w-7xl mx-auto px-6">
-          <h3 className="text-2xl font-bold mb-6">Módulos principales</h3>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <Reveal><Feature title="Marketplace" desc="Catálogo unificado con ferreterías, distribuidores y productos. Búsqueda, filtros y checkout integrado." /></Reveal>
-            <Reveal><Feature title="Delivery" desc="Asignación de riders, seguimiento en tiempo real y cálculo de ganancias por entrega." /></Reveal>
-            <Reveal><Feature title="Arquitecto & Obras" desc="Gestión de proyectos, nómina de contratistas y calculadora por m2 para presupuestos rápidos." /></Reveal>
-          </div>
-
-          <div className="mt-8 grid grid-cols-1 md:grid-cols-2 gap-6">
-            <Reveal><Feature title="Backoffice (Admin)" desc="Panel separado para admins con gestión de usuarios, empresas y KPIs en tiempo real." /></Reveal>
-            <Reveal><Feature title="KPIs y Dashboards" desc="Métricas en tiempo real por usuario, tienda o región: ventas, stock bajo, tiempo de entrega." /></Reveal>
-          </div>
-        </div>
-      </section>
-
-      <section className="max-w-7xl mx-auto px-6 py-20">
-        <div className="grid md:grid-cols-2 gap-8 items-center">
-          <Reveal>
-            <div>
-              <h3 className="text-3xl font-bold mb-4">Misión</h3>
-              <p className="text-lg text-slate-600 mb-6">Nuestra misión es empoderar a empresas del sector de la construcción con una plataforma SaaS empresarial que centraliza catálogo, ventas, logística y métricas en tiempo real para optimizar operaciones, reducir tiempos y aumentar la rentabilidad.</p>
-
-              <h3 className="text-3xl font-bold mb-4">Visión</h3>
-              <p className="text-lg text-slate-600">Ser la plataforma de referencia en Latinoamérica y luego globalmente, donde fabricantes, distribuidores y profesionales construyen, venden y gestionan proyectos con la mayor eficiencia y transparencia, impulsados por datos y automatización.</p>
-            </div>
-          </Reveal>
-
-          <Reveal>
-            <div className="bg-slate-50 p-6 rounded-xl border">
-              <h4 className="text-xl font-semibold mb-3">Por qué elegir ObraYa</h4>
-              <ul className="space-y-3 text-slate-600">
-                <li>Integración completa: catálogo, stock, pedidos y entregas.</li>
-                <li>KPIs en tiempo real y dashboards configurables.</li>
-                <li>APIs abiertas y fácil integración con ERPs y marketplaces.</li>
-                <li>Escalabilidad empresarial y soporte local.</li>
-              </ul>
-              <div className="mt-6">
-                <Link href="/register" className="inline-block px-5 py-3 bg-orange-500 text-white rounded-md shadow">Comenzar ahora</Link>
-              </div>
-            </div>
-          </Reveal>
-        </div>
-      </section>
-
-      <section className="max-w-7xl mx-auto px-6 py-16">
-        <h3 className="text-2xl font-bold mb-6">Clientes y casos de éxito</h3>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <Testimonial name="Martín - Distribuidor" body="Reducimos faltantes de stock y aumentamos ventas online 28% en 2 meses." />
-          <Testimonial name="Lucía - Constructora" body="Buscar y pedir materiales ahora es mucho más rápido para mi equipo." />
-          <Testimonial name="Diego - Fabricante" body="El backoffice nos permitió automatizar precios por volumen." />
-        </div>
-      </section>
-
-      <footer className="bg-slate-900 text-white py-8 mt-12">
-        <div className="max-w-7xl mx-auto px-6 flex flex-col md:flex-row items-center justify-between">
+      <footer className="bg-slate-900 text-white py-8 mt-4">
+        <div className="max-w-7xl mx-auto px-6 flex flex-col md:flex-row items-center justify-between text-sm">
           <div>© {new Date().getFullYear()} ObraYa</div>
-          <div className="flex gap-4 mt-4 md:mt-0">
-            <Link href="#" className="text-slate-300 hover:text-white text-sm">Política de privacidad</Link>
-            <Link href="#" className="text-slate-300 hover:text-white text-sm">Términos</Link>
+          <div className="flex gap-4 mt-4 md:mt-0 text-slate-300">
+            <span>Política de privacidad</span>
+            <span>Términos</span>
           </div>
         </div>
       </footer>
-    </main>
-  );
-}
 
-function Feature({ title, desc }: { title: string; desc: string }) {
-  return (
-    <div className="p-6 border rounded-lg">
-      <h4 className="font-semibold mb-2">{title}</h4>
-      <p className="text-sm text-slate-600">{desc}</p>
+      <CartStickyBar />
+      <BottomTabBar />
     </div>
   );
 }
 
-function Testimonial({ name, body }: { name: string; body: string }) {
+function StoreCardSkeleton() {
   return (
-    <blockquote className="p-6 border rounded-lg bg-slate-50">
-      <p className="text-sm text-slate-700">“{body}”</p>
-      <footer className="mt-3 text-xs text-slate-500">— {name}</footer>
-    </blockquote>
+    <div className="card-ios p-4 flex items-center gap-3 animate-pulse">
+      <div className="w-14 h-14 rounded-2xl bg-slate-100 shrink-0" />
+      <div className="flex-1 space-y-2">
+        <div className="h-3 bg-slate-100 rounded-full w-2/3" />
+        <div className="h-3 bg-slate-100 rounded-full w-1/2" />
+      </div>
+    </div>
   );
 }
 
+function EmptyStores() {
+  return (
+    <div className="col-span-full py-16 flex flex-col items-center gap-3 text-center">
+      <span className="text-5xl">🏭</span>
+      <h3 className="text-lg font-bold text-slate-800">Todavía no hay fabricantes activos</h3>
+      <p className="text-slate-500 text-sm max-w-xs">Muy pronto vas a poder comprar directo a fabricantes y distribuidores verificados.</p>
+    </div>
+  );
+}

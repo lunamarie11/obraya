@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { api } from '@/lib/api';
+import { persistSession } from '@/lib/auth';
 
 export default function DemoCredentials() {
   const users = [
@@ -25,11 +26,7 @@ export default function DemoCredentials() {
       const payload: any = { email };
       if (process.env.NEXT_PUBLIC_DEMO_SECRET) payload.demoSecret = process.env.NEXT_PUBLIC_DEMO_SECRET;
       const res = await api.post('/auth/demo', payload);
-      const data = res.data;
-      if (typeof window !== 'undefined') {
-        localStorage.setItem('accessToken', data.accessToken);
-        localStorage.setItem('refreshToken', data.refreshToken);
-      }
+      persistSession(res.data);
       setSuccess('Login demo exitoso — redirigiendo...');
       setTimeout(() => router.push('/'), 800);
     } catch (err: any) {

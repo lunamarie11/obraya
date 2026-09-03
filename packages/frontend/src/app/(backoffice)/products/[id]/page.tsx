@@ -94,15 +94,15 @@ function PricesSection({ productId }: { productId: string }) {
   };
 
   return (
-    <div className="card overflow-hidden">
-      <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
+    <div className="card overflow-hidden mt-6">
+      <div className="px-5 py-4 border-b border-slate-200 flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <DollarSign size={15} className="text-slate-400" />
-          <h2 className="font-semibold text-slate-700">Precios</h2>
+          <DollarSign size={15} className="text-slate-500" />
+          <h2 className="font-bold text-slate-900">Precios</h2>
         </div>
         <button
           onClick={() => setShowHistory(!showHistory)}
-          className="text-xs text-slate-400 hover:text-orange-500 flex items-center gap-1"
+          className="text-xs text-slate-500 hover:text-orange-500 flex items-center gap-1 transition-colors"
         >
           <History size={13} /> Historial
         </button>
@@ -111,34 +111,34 @@ function PricesSection({ productId }: { productId: string }) {
       {showHistory ? (
         <div className="px-5 py-4 space-y-2 max-h-64 overflow-y-auto">
           {history.length === 0 ? (
-            <p className="text-sm text-slate-400 text-center py-4">Sin cambios registrados.</p>
+            <p className="text-sm text-slate-500 text-center py-4">Sin cambios registrados.</p>
           ) : (
             history.map((h: any) => (
-              <div key={h.id} className="flex items-start justify-between text-sm border-b border-slate-50 pb-2">
+              <div key={h.id} className="flex items-start justify-between text-sm border-b border-slate-100 pb-2">
                 <div>
                   <span className="font-medium text-slate-700">{h.type}</span>
                   <span className="text-slate-400 mx-2">→</span>
-                  <span className="text-slate-800">{formatARS(h.basePrice)}</span>
-                  {h.reason && <p className="text-xs text-slate-400 mt-0.5 italic">{h.reason}</p>}
+                  <span className="text-slate-900">{formatARS(h.basePrice)}</span>
+                  {h.reason && <p className="text-xs text-slate-500 mt-0.5 italic">{h.reason}</p>}
                 </div>
-                <span className="text-xs text-slate-400 whitespace-nowrap ml-3">
+                <span className="text-xs text-slate-500 whitespace-nowrap ml-3">
                   {new Date(h.changedAt).toLocaleDateString('es-AR')}
                 </span>
               </div>
             ))
           )}
-          <button onClick={() => setShowHistory(false)} className="text-xs text-orange-500 mt-1">← Volver</button>
+          <button onClick={() => setShowHistory(false)} className="text-xs text-orange-500 mt-1 hover:text-orange-600">← Volver</button>
         </div>
       ) : (
         <div className="px-5 py-4 space-y-4">
           {/* Tabs B2C / B2B */}
-          <div className="flex gap-1 bg-slate-100 p-1 rounded-lg w-fit">
+          <div className="flex gap-1 bg-slate-100 p-1 rounded-xl w-fit">
             {(['B2C', 'B2B'] as PriceType[]).map((t) => (
               <button
                 key={t}
                 onClick={() => setTab(t)}
-                className={`px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${
-                  tab === t ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-700'
+                className={`px-4 py-1.5 rounded-lg text-sm font-semibold transition-colors ${
+                  tab === t ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'
                 }`}
               >
                 {t === 'B2C' ? 'B2C (con IVA)' : 'B2B (sin IVA)'}
@@ -148,9 +148,9 @@ function PricesSection({ productId }: { productId: string }) {
 
           {/* Precio base */}
           <div>
-            <label className="block text-sm font-medium text-slate-600 mb-1">Precio base (ARS)</label>
+            <label className="label">Precio base (ARS)</label>
             <div className="relative">
-              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm">$</span>
+              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 text-sm">$</span>
               <input
                 type="number"
                 min="0"
@@ -162,8 +162,8 @@ function PricesSection({ productId }: { productId: string }) {
               />
             </div>
             {current && (
-              <p className="text-xs text-slate-400 mt-1">
-                Precio actual: <span className="font-medium text-slate-600">{formatARS(current.basePrice)}</span>
+              <p className="text-xs text-slate-500 mt-1">
+                Precio actual: <span className="font-medium text-slate-700">{formatARS(current.basePrice)}</span>
               </p>
             )}
           </div>
@@ -171,17 +171,17 @@ function PricesSection({ productId }: { productId: string }) {
           {/* Descuentos por volumen */}
           <div>
             <div className="flex items-center justify-between mb-2">
-              <label className="text-sm font-medium text-slate-600">Descuentos por volumen</label>
+              <label className="label mb-0">Descuentos por volumen</label>
               <button
                 type="button"
                 onClick={() => setVolumeRows([...volumeRows, { minQuantity: '', discountPercent: '' }])}
-                className="text-xs text-orange-500 hover:text-orange-600 flex items-center gap-1"
+                className="text-xs text-orange-500 hover:text-orange-600 flex items-center gap-1 transition-colors"
               >
                 <Plus size={12} /> Agregar
               </button>
             </div>
             {volumeRows.length === 0 ? (
-              <p className="text-xs text-slate-400 italic">Sin descuentos por volumen</p>
+              <p className="text-xs text-slate-500 italic">Sin descuentos por volumen</p>
             ) : (
               <div className="space-y-2">
                 {volumeRows.map((row, i) => (
@@ -201,9 +201,9 @@ function PricesSection({ productId }: { productId: string }) {
                         value={row.discountPercent}
                         onChange={(e) => setVolumeRows(volumeRows.map((r, j) => j === i ? { ...r, discountPercent: e.target.value } : r))}
                       />
-                      <span className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs">%</span>
+                      <span className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 text-xs">%</span>
                     </div>
-                    <button type="button" onClick={() => setVolumeRows(volumeRows.filter((_, j) => j !== i))} className="text-slate-400 hover:text-red-500">
+                    <button type="button" onClick={() => setVolumeRows(volumeRows.filter((_, j) => j !== i))} className="text-slate-500 hover:text-red-400 transition-colors">
                       <Trash2 size={14} />
                     </button>
                   </div>
@@ -219,10 +219,10 @@ function PricesSection({ productId }: { productId: string }) {
                 type="checkbox"
                 checked={useScheduled}
                 onChange={(e) => setUseScheduled(e.target.checked)}
-                className="rounded border-slate-300 text-orange-500 focus:ring-orange-500"
+                className="rounded border-slate-300 bg-white text-orange-500 focus:ring-orange-500"
               />
               <span className="text-sm font-medium text-slate-600">Descuento programado</span>
-              <Tag size={13} className="text-slate-400" />
+              <Tag size={13} className="text-slate-500" />
             </label>
             {useScheduled && (
               <div className="mt-3 space-y-2 pl-5">
@@ -244,7 +244,7 @@ function PricesSection({ productId }: { productId: string }) {
                     <input type="number" min="0.01" max="100" step="0.01" className="input w-full text-sm pr-7"
                       value={scheduled.discountPercent}
                       onChange={(e) => setScheduled({ ...scheduled, discountPercent: e.target.value })} />
-                    <span className="absolute right-3 bottom-2.5 text-slate-400 text-xs">%</span>
+                    <span className="absolute right-3 bottom-2.5 text-slate-500 text-xs">%</span>
                   </div>
                   <div>
                     <label className="block text-xs text-slate-500 mb-1">Etiqueta (opcional)</label>
@@ -259,7 +259,7 @@ function PricesSection({ productId }: { productId: string }) {
 
           {/* Motivo */}
           <div>
-            <label className="block text-sm font-medium text-slate-600 mb-1">Motivo del cambio (opcional)</label>
+            <label className="label">Motivo del cambio (opcional)</label>
             <input
               className="input w-full text-sm"
               placeholder="Ej: Actualización de lista de precios junio 2026"
@@ -291,8 +291,8 @@ const CATEGORIES = [
 const UNITS = ['m2', 'm3', 'ml', 'kg', 'tn', 'bolsa', 'unidad', 'caja', 'rollo', 'pallet'];
 
 export default function EditProductPage() {
-  const { id } = useParams<{ id: string }>();
-  const router = useRouter();
+  const params = useParams() as { id: string };
+  const { id } = params;
   const qc = useQueryClient();
 
   const { data: product, isLoading } = useQuery({
@@ -383,7 +383,7 @@ export default function EditProductPage() {
         <Header title="Editar producto" />
         <div className="p-6 space-y-4">
           {Array.from({ length: 3 }).map((_, i) => (
-            <div key={i} className="card p-4 h-32 animate-pulse bg-slate-100" />
+            <div key={i} className="card p-4 h-32 animate-pulse bg-slate-200" />
           ))}
         </div>
       </div>
@@ -395,16 +395,16 @@ export default function EditProductPage() {
       <Header title="Editar producto" />
       <div className="p-6 max-w-2xl">
 
-        <Link href="/products" className="inline-flex items-center gap-1.5 text-sm text-slate-500 hover:text-slate-700 mb-5">
+        <Link href="/products" className="inline-flex items-center gap-1.5 text-sm text-slate-500 hover:text-slate-900 mb-5 transition-colors">
           <ArrowLeft size={15} /> Volver a productos
         </Link>
 
-        <form onSubmit={handleSubmit} className="space-y-6">
+        <form onSubmit={handleSubmit} className="space-y-5">
 
           {/* Imágenes */}
           <div className="card p-5 space-y-3">
             <div className="flex items-center justify-between">
-              <h2 className="font-semibold text-slate-700">Imágenes</h2>
+              <h2 className="font-bold text-slate-900">Imágenes</h2>
               <label className={`btn-secondary text-sm flex items-center gap-1.5 cursor-pointer ${uploading ? 'opacity-60 pointer-events-none' : ''}`}>
                 {uploading ? <Loader2 size={14} className="animate-spin" /> : <Upload size={14} />}
                 {uploading ? 'Subiendo...' : 'Subir imagen'}
@@ -421,13 +421,13 @@ export default function EditProductPage() {
             {product?.images?.length > 0 ? (
               <div className="grid grid-cols-4 gap-2">
                 {product.images.map((url: string, i: number) => (
-                  <div key={i} className="relative aspect-square rounded-lg overflow-hidden bg-slate-100">
+                  <div key={i} className="relative aspect-square rounded-xl overflow-hidden bg-slate-100">
                     <img src={url} alt="" className="w-full h-full object-cover" />
                   </div>
                 ))}
               </div>
             ) : (
-              <div className="border-2 border-dashed border-slate-200 rounded-lg p-6 text-center text-sm text-slate-400">
+              <div className="border-2 border-dashed border-slate-300 rounded-xl p-6 text-center text-sm text-slate-500">
                 Sin imágenes aún. Subí hasta 10 fotos del producto.
               </div>
             )}
@@ -435,12 +435,10 @@ export default function EditProductPage() {
 
           {/* Información básica */}
           <div className="card p-5 space-y-4">
-            <h2 className="font-semibold text-slate-700">Información básica</h2>
+            <h2 className="font-bold text-slate-900">Información básica</h2>
 
             <div>
-              <label className="block text-sm font-medium text-slate-600 mb-1">
-                Nombre <span className="text-red-500">*</span>
-              </label>
+              <label className="label">Nombre <span className="text-red-400">*</span></label>
               <input
                 className="input w-full"
                 value={form.name}
@@ -450,7 +448,7 @@ export default function EditProductPage() {
 
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium text-slate-600 mb-1">SKU</label>
+                <label className="label">SKU</label>
                 <input
                   className="input w-full font-mono"
                   value={form.sku}
@@ -458,7 +456,7 @@ export default function EditProductPage() {
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-slate-600 mb-1">Marca</label>
+                <label className="label">Marca</label>
                 <input
                   className="input w-full"
                   value={form.brand}
@@ -468,7 +466,7 @@ export default function EditProductPage() {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-slate-600 mb-1">Descripción</label>
+              <label className="label">Descripción</label>
               <textarea
                 className="input w-full h-24 resize-none"
                 value={form.description}
@@ -479,11 +477,11 @@ export default function EditProductPage() {
 
           {/* Clasificación */}
           <div className="card p-5 space-y-4">
-            <h2 className="font-semibold text-slate-700">Clasificación</h2>
+            <h2 className="font-bold text-slate-900">Clasificación</h2>
 
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium text-slate-600 mb-1">Categoría</label>
+                <label className="label">Categoría</label>
                 <select
                   className="input w-full"
                   value={form.category}
@@ -494,7 +492,7 @@ export default function EditProductPage() {
                 </select>
               </div>
               <div>
-                <label className="block text-sm font-medium text-slate-600 mb-1">Subcategoría</label>
+                <label className="label">Subcategoría</label>
                 <input
                   className="input w-full"
                   value={form.subcategory}
@@ -504,17 +502,17 @@ export default function EditProductPage() {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-slate-600 mb-1">Unidad de medida</label>
+              <label className="label">Unidad de medida</label>
               <div className="flex flex-wrap gap-2">
                 {UNITS.map((u) => (
                   <button
                     key={u}
                     type="button"
                     onClick={() => setForm({ ...form, unitOfMeasure: form.unitOfMeasure === u ? '' : u })}
-                    className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-colors ${
+                    className={`px-3 py-1.5 rounded-full text-xs font-semibold border transition-colors ${
                       form.unitOfMeasure === u
                         ? 'bg-orange-500 text-white border-orange-500'
-                        : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
+                        : 'bg-white text-slate-600 border-slate-300 hover:bg-slate-50 hover:text-slate-900'
                     }`}
                   >
                     {u}
@@ -528,8 +526,8 @@ export default function EditProductPage() {
           <div className="card p-5 space-y-4">
             <div className="flex items-center justify-between">
               <div>
-                <h2 className="font-semibold text-slate-700">Variantes</h2>
-                <p className="text-xs text-slate-400 mt-0.5">Ej: tamaños, colores, presentaciones</p>
+                <h2 className="font-bold text-slate-900">Variantes</h2>
+                <p className="text-xs text-slate-500 mt-0.5">Ej: tamaños, colores, presentaciones</p>
               </div>
               <button type="button" onClick={addVariant} className="btn-secondary text-sm flex items-center gap-1.5">
                 <Plus size={14} /> Agregar
@@ -537,13 +535,13 @@ export default function EditProductPage() {
             </div>
 
             {variants.length === 0 && (
-              <p className="text-sm text-slate-400 text-center py-4 border border-dashed border-slate-200 rounded-lg">
+              <p className="text-sm text-slate-500 text-center py-4 border border-dashed border-slate-300 rounded-xl">
                 Sin variantes — presentación única
               </p>
             )}
 
             {variants.map((variant, i) => (
-              <div key={i} className="flex gap-3 items-start p-3 bg-slate-50 rounded-lg">
+              <div key={i} className="flex gap-3 items-start p-3 bg-slate-50 rounded-xl border border-slate-200">
                 <div className="flex-1 grid grid-cols-2 gap-3">
                   <div>
                     <label className="block text-xs text-slate-500 mb-1">Nombre *</label>
@@ -562,7 +560,7 @@ export default function EditProductPage() {
                     />
                   </div>
                 </div>
-                <button type="button" onClick={() => removeVariant(i)} className="text-slate-400 hover:text-red-500 mt-6">
+                <button type="button" onClick={() => removeVariant(i)} className="text-slate-500 hover:text-red-400 mt-6 transition-colors">
                   <Trash2 size={15} />
                 </button>
               </div>
@@ -585,11 +583,10 @@ export default function EditProductPage() {
           </div>
 
           {update.isError && (
-            <p className="text-sm text-red-500 text-center">Error al guardar. Intentá de nuevo.</p>
+            <p className="text-sm text-red-400 text-center">Error al guardar. Intentá de nuevo.</p>
           )}
         </form>
 
-        {/* Precios — fuera del form de producto */}
         <PricesSection productId={id} />
       </div>
     </div>

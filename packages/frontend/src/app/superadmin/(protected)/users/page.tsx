@@ -10,11 +10,11 @@ import { clsx } from 'clsx';
 
 const ROLES = ['SuperAdmin', 'Admin', 'Vendedor', 'Logistica', 'Contabilidad'];
 const ROLE_COLORS: Record<string, string> = {
-  SuperAdmin: 'bg-orange-100 text-orange-700',
-  Admin: 'bg-blue-100 text-blue-700',
-  Vendedor: 'bg-green-100 text-green-700',
-  Logistica: 'bg-purple-100 text-purple-700',
-  Contabilidad: 'bg-yellow-100 text-yellow-700',
+  SuperAdmin:   'bg-orange-500/10 text-orange-400 border border-orange-500/20',
+  Admin:        'bg-blue-500/10 text-blue-400 border border-blue-500/20',
+  Vendedor:     'bg-green-500/10 text-green-400 border border-green-500/20',
+  Logistica:    'bg-purple-500/10 text-purple-400 border border-purple-500/20',
+  Contabilidad: 'bg-yellow-500/10 text-yellow-400 border border-yellow-500/20',
 };
 
 export default function UsersPage() {
@@ -108,7 +108,7 @@ export default function UsersPage() {
                           </button>
                         </div>
                       ) : (
-                        <span className={clsx('inline-flex px-2 py-0.5 rounded-full text-xs font-medium', ROLE_COLORS[u.role] ?? 'bg-slate-100 text-slate-600')}>
+                        <span className={clsx('inline-flex px-2 py-0.5 rounded-full text-xs font-semibold', ROLE_COLORS[u.role] ?? 'bg-slate-700 text-slate-400 border border-slate-600')}>
                           {u.role}
                         </span>
                       )}
@@ -118,7 +118,7 @@ export default function UsersPage() {
                         onClick={() => updateUser.mutate({ id: u.id, data: { isActive: !u.isActive } })}
                         className={clsx(
                           'inline-flex px-2 py-0.5 rounded-full text-xs font-medium transition-opacity hover:opacity-70',
-                          u.isActive ? 'bg-green-100 text-green-700' : 'bg-slate-100 text-slate-500',
+                          u.isActive ? 'bg-green-500/10 text-green-400 border-green-500/20' : 'bg-slate-700/50 text-slate-400 border-slate-600',
                         )}
                       >
                         {u.isActive ? 'Activo' : 'Inactivo'}

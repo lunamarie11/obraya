@@ -21,16 +21,20 @@ function clearCookies() {
   document.cookie = 'userRole=; path=/; max-age=0';
 }
 
-export async function login(email: string, password: string): Promise<AuthUser> {
-  const { data } = await api.post('/auth/login', { email, password });
-
-  // Guardar en localStorage (para el cliente Axios) Y en cookie (para el middleware)
+// Guarda la sesión en localStorage (para el cliente Axios) Y en cookie (para el
+// middleware). La usan tanto login() como el demo-login, para que ambos caminos
+// dejen al usuario en el mismo estado autenticado.
+export function persistSession(data: { accessToken: string; refreshToken: string; user: AuthUser }) {
   localStorage.setItem('accessToken', data.accessToken);
   localStorage.setItem('refreshToken', data.refreshToken);
   localStorage.setItem('user', JSON.stringify(data.user));
   setCookie('accessToken', data.accessToken);
   setCookie('userRole', data.user.role);
+}
 
+export async function login(email: string, password: string): Promise<AuthUser> {
+  const { data } = await api.post('/auth/login', { email, password });
+  persistSession(data);
   return data.user;
 }
 
@@ -50,7 +54,9 @@ export async function register(payload: {
 }
 
 export function logout() {
-  localStorage.clear();
+  localStorage.removeItem('accessToken');
+  localStorage.removeItem('refreshToken');
+  localStorage.removeItem('user');
   clearCookies();
   window.location.href = '/login';
 }

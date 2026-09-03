@@ -1,34 +1,49 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 
-const PUBLIC_PATHS = ['/login', '/register', '/superadmin'];
+// Rutas completamente públicas — marketplace buyer-facing
+const PUBLIC_PREFIXES = [
+  '/',
+  '/marketplace',
+  '/cart',
+  '/checkout',
+  '/order-confirmation',
+  '/login',
+  '/register',
+  '/accept-invite',
+];
+
+// Rutas que solo puede ver SuperAdmin
+const SUPERADMIN_PREFIXES = ['/superadmin/dashboard', '/superadmin/companies', '/superadmin/users', '/superadmin/orders', '/superadmin/products', '/superadmin/monitoring'];
 
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
-  // Rutas públicas siempre permitidas
-  if (PUBLIC_PATHS.some((p) => pathname === p || pathname.startsWith(p + '/'))) {
-    // Bloquear acceso a /superadmin/dashboard sin rol SuperAdmin
-    if (pathname.startsWith('/superadmin/') || pathname === '/superadmin') {
-      // La página de login /superadmin es pública; el dashboard requiere rol
-      if (pathname !== '/superadmin') {
-        const role = request.cookies.get('userRole')?.value;
-        if (role !== 'SuperAdmin') {
-          return NextResponse.redirect(new URL('/superadmin', request.url));
-        }
+  // Rutas públicas — buyer experience + auth pages
+  const isPublic = PUBLIC_PREFIXES.some(
+    (p) => pathname === p || (p !== '/' && pathname.startsWith(p + '/')) || (p !== '/' && pathname === p),
+  ) || pathname === '/';
+
+  if (isPublic) {
+    // /superadmin protegido dentro de las públicas
+    if (pathname.startsWith('/superadmin/')) {
+      const role = request.cookies.get('userRole')?.value;
+      if (role !== 'SuperAdmin') {
+        return NextResponse.redirect(new URL('/superadmin', request.url));
       }
     }
     return NextResponse.next();
   }
 
-  // Todas las demás rutas requieren token
+  // Rutas del backoffice — requieren token
   const token = request.cookies.get('accessToken')?.value;
   if (!token) {
     return NextResponse.redirect(new URL('/login', request.url));
   }
 
-  // Evitar que usuarios normales accedan a rutas de superadmin
-  if (pathname.startsWith('/superadmin')) {
+  // Superadmin routes — requieren rol SuperAdmin
+  const isSuperAdminRoute = SUPERADMIN_PREFIXES.some((p) => pathname.startsWith(p));
+  if (isSuperAdminRoute) {
     const role = request.cookies.get('userRole')?.value;
     if (role !== 'SuperAdmin') {
       return NextResponse.redirect(new URL('/login', request.url));
