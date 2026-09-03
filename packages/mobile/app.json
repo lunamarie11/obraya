@@ -1,0 +1,25 @@
+{
+  "expo": {
+    "name": "ObraYa",
+    "slug": "obraya",
+    "scheme": "obraya",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "light",
+    "assetBundlePatterns": ["**/*"],
+    "plugins": ["expo-router"],
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.obraya.app"
+    },
+    "android": {
+      "package": "com.obraya.app",
+      "adaptiveIcon": {
+        "backgroundColor": "#f97316"
+      }
+    },
+    "web": {
+      "bundler": "metro"
+    }
+  }
+}
