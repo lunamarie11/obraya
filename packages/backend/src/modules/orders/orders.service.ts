@@ -1,5 +1,6 @@
 import {
   Injectable,
+  Logger,
   NotFoundException,
   BadRequestException,
 } from '@nestjs/common';
@@ -13,9 +14,13 @@ import { UpdateOrderStatusDto } from './dto/update-order-status.dto';
 import { SendMessageDto } from './dto/send-message.dto';
 import { OrderQueryDto } from './dto/order-query.dto';
 import { StockService } from '../stock/stock.service';
+import { AfipService } from '../afip/afip.service';
+import { Company } from '../users/entities/company.entity';
 
 @Injectable()
 export class OrdersService {
+  private readonly logger = new Logger(OrdersService.name);
+
   constructor(
     @InjectRepository(Order)
     private readonly orderRepo: Repository<Order>,
@@ -25,6 +30,7 @@ export class OrdersService {
     private readonly messageRepo: Repository<OrderMessage>,
     private readonly dataSource: DataSource,
     private readonly stockService: StockService,
+    private readonly afipService: AfipService,
   ) {}
 
   private generateOrderNumber(): string {
@@ -201,6 +207,28 @@ export class OrdersService {
 
       order.status = dto.status;
       if (dto.rejectionReason) order.rejectionReason = dto.rejectionReason;
+
+      // Al despachar: emitir factura electrónica AFIP (ver ADR-010). Es el
+      // estado más cercano al movimiento real de la mercadería y solo
+      // transiciona a Entregado, así que no hay riesgo de tener que anular
+      // la factura por una cancelación posterior. Best-effort: si AFIP no
+      // está configurado o falla, no bloquea el cambio de estado del pedido.
+      if (dto.status === OrderStatus.DESPACHADO) {
+        try {
+          const company = await manager.getRepository(Company).findOne({ where: { id: companyId } });
+          const invoice = company ? await this.afipService.createInvoice({ order, company }) : null;
+          if (invoice) {
+            order.afipCae = invoice.cae;
+            order.afipCaeExpiration = invoice.caeExpiration;
+            order.afipInvoiceNumber = invoice.invoiceNumber;
+            order.afipInvoiceType = invoice.invoiceType;
+            order.afipStatus = 'emitida';
+          }
+        } catch (err) {
+          order.afipStatus = 'error';
+          this.logger.warn(`No se pudo emitir factura AFIP para ${order.orderNumber}: ${(err as Error).message}`);
+        }
+      }
 
       await orderRepo.save(order);
 

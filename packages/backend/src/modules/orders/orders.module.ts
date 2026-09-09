@@ -8,12 +8,15 @@ import { OrdersController } from './orders.controller';
 import { BuyerOrdersController } from './buyer-orders.controller';
 import { StockModule } from '../stock/stock.module';
 import { BuyersModule } from '../buyers/buyers.module';
+import { AfipModule } from '../afip/afip.module';
+import { Company } from '../users/entities/company.entity';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([Order, OrderItem, OrderMessage]),
+    TypeOrmModule.forFeature([Order, OrderItem, OrderMessage, Company]),
     StockModule,
     BuyersModule,
+    AfipModule,
   ],
   controllers: [OrdersController, BuyerOrdersController],
   providers: [OrdersService],

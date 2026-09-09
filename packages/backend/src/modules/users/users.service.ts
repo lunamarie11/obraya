@@ -1,5 +1,6 @@
 import {
   Injectable,
+  Logger,
   ConflictException,
   NotFoundException,
   BadRequestException,
@@ -8,18 +9,22 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import * as bcrypt from 'bcrypt';
 import { v4 as uuidv4 } from 'uuid';
-import { Company, CompanyStatus } from './entities/company.entity';
+import { Company, CompanyStatus, CompanyIvaCondition } from './entities/company.entity';
 import { CompanyUser, UserRole } from './entities/company-user.entity';
 import { RegisterCompanyDto } from './dto/register-company.dto';
 import { InviteUserDto } from './dto/invite-user.dto';
+import { AfipService } from '../afip/afip.service';
 
 @Injectable()
 export class UsersService {
+  private readonly logger = new Logger(UsersService.name);
+
   constructor(
     @InjectRepository(Company)
     private readonly companyRepo: Repository<Company>,
     @InjectRepository(CompanyUser)
     private readonly companyUserRepo: Repository<CompanyUser>,
+    private readonly afipService: AfipService,
   ) {}
 
   async registerCompany(dto: RegisterCompanyDto): Promise<{ company: Company; adminUser: CompanyUser }> {
@@ -50,8 +55,19 @@ export class UsersService {
       city: dto.city,
       province: dto.province,
       status: CompanyStatus.PENDING,
+      ivaCondition: dto.ivaCondition ?? CompanyIvaCondition.RESPONSABLE_INSCRIPTO,
     });
     await this.companyRepo.save(company);
+
+    // Validación de CUIT contra el padrón de AFIP (ver ADR-010). Best-effort:
+    // no bloquea el registro si AFIP no está configurado o el padrón no
+    // responde (en homologación no es confiable para CUITs de terceros).
+    this.afipService
+      .getTaxpayerDetails(dto.cuit)
+      .then((info) => {
+        if (info) this.logger.log(`Padrón AFIP encontró datos para CUIT ${dto.cuit} al registrar ${company.razonSocial}`);
+      })
+      .catch((err) => this.logger.warn(`No se pudo validar el CUIT ${dto.cuit} contra AFIP: ${(err as Error).message}`));
 
     // Crear usuario administrador
     const passwordHash = await bcrypt.hash(dto.adminPassword, 12);

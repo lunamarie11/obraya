@@ -9,6 +9,7 @@ Registro de decisiones arquitectonicas del proyecto ObraYa.
 | 003 | Endpoint publico de solo lectura para el marketplace del comprador | Aceptado | 2026-07-21 |
 | 004 | Historial de "Mis pedidos" del comprador sin entidad Buyer | Aceptado | 2026-08-31 |
 | 005 | Scaffold de la app mobile de compradores (Expo Router) | Aceptado | 2026-08-31 |
+| 010 | Integracion AFIP: validacion real de CUIT y facturacion electronica | Aceptado | 2026-09-03 |
 
 ## Como agregar un ADR
 

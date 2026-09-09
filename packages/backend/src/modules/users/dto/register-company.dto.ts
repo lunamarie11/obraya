@@ -5,9 +5,12 @@ import {
   Length,
   Matches,
   IsOptional,
+  IsEnum,
   MinLength,
 } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { IsValidCuit } from '../../../common/validators/cuit.validator';
+import { CompanyIvaCondition } from '../entities/company.entity';
 
 export class RegisterCompanyDto {
   @ApiProperty({ description: 'CUIT sin guiones (11 dígitos)', example: '30500010912' })
@@ -15,7 +18,17 @@ export class RegisterCompanyDto {
   @IsNotEmpty()
   @Length(11, 11, { message: 'El CUIT debe tener exactamente 11 dígitos' })
   @Matches(/^\d{11}$/, { message: 'El CUIT debe contener solo números' })
+  @IsValidCuit()
   cuit: string;
+
+  @ApiPropertyOptional({
+    description: 'Condición frente al IVA (determina el tipo de factura a emitir, ver ADR-010)',
+    enum: CompanyIvaCondition,
+    default: CompanyIvaCondition.RESPONSABLE_INSCRIPTO,
+  })
+  @IsOptional()
+  @IsEnum(CompanyIvaCondition)
+  ivaCondition?: CompanyIvaCondition;
 
   @ApiProperty({ description: 'Razón social de la empresa', example: 'Cerámicas del Sur S.A.' })
   @IsString()

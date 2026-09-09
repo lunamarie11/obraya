@@ -15,6 +15,16 @@ export enum CompanyStatus {
   REJECTED = 'rejected',
 }
 
+// Condición frente al IVA del fabricante/vendedor. Determina el tipo de
+// factura electrónica que se emite (ver ADR-010): Responsable Inscripto
+// factura Factura B, Monotributo/Exento facturan Factura C. Como los
+// compradores (Buyer) no tienen CUIT propio, nunca se emite Factura A.
+export enum CompanyIvaCondition {
+  RESPONSABLE_INSCRIPTO = 'RI',
+  MONOTRIBUTO = 'MONOTRIBUTO',
+  EXENTO = 'EXENTO',
+}
+
 @Entity('companies')
 export class Company {
   @PrimaryGeneratedColumn('uuid')
@@ -41,6 +51,14 @@ export class Company {
     default: CompanyStatus.PENDING,
   })
   status: CompanyStatus;
+
+  @Column({
+    name: 'iva_condition',
+    type: 'enum',
+    enum: CompanyIvaCondition,
+    default: CompanyIvaCondition.RESPONSABLE_INSCRIPTO,
+  })
+  ivaCondition: CompanyIvaCondition;
 
   // Datos bancarios (encriptados en v2, por ahora JSON)
   @Column({ name: 'banking_data', type: 'jsonb', nullable: true })

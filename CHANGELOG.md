@@ -4,6 +4,53 @@ Cada cambio importante del proyecto se documenta aqui. Las decisiones arquitecto
 
 ---
 
+## [0.13.0] - 2026-09-03
+
+### Decisiones Tomadas
+
+- **Integración AFIP completa** (checksum de CUIT + arquitectura de módulo + facturación
+  electrónica real), ver ADR-010. Se optó por el patrón best-effort ya usado por
+  `PaymentsService`/`NotificationsService`: el módulo se deshabilita solo si faltan
+  credenciales, sin bloquear el resto de la app.
+- **Solo Factura B/C, nunca Factura A**: `Buyer` no tiene CUIT propio (siempre consumidor
+  final ante AFIP), así que Factura A no es posible con el modelo de datos actual.
+  Documentado como limitación conocida en ADR-010, no como bug.
+- **Disparador de facturación: transición a `Despachado`** (no `Aceptado` ni `Entregado`):
+  es el estado más cercano al movimiento real de la mercadería y no puede revertirse a un
+  estado anterior, evitando el riesgo de tener que anular una factura ya emitida.
+- **Sin migration manual**: se siguió la convención ya establecida en el repo (carpeta
+  `migrations/` vacía, `synchronize: true` en desarrollo) para los nuevos campos de
+  `Company` y `Order`.
+
+### Agregado
+
+- `packages/backend/src/common/validators/cuit.validator.ts`: checksum real de CUIT
+  (mod 11) + decorador `@IsValidCuit()`, aplicado en `RegisterCompanyDto`.
+- `packages/backend/src/modules/afip/` (`AfipModule`/`AfipService`): wrapper sobre
+  `@afipsdk/afip.js` — `getTaxpayerDetails()` (padrón, best-effort) y `createInvoice()`
+  (Factura B/C vía WSFEv1, `ElectronicBilling.createNextVoucher`). Funciona out-of-the-box
+  en `AFIP_ENV=testing` contra los servidores reales de homologación de AFIP usando el
+  CUIT público `20409378472`, sin certificado propio.
+- `Company.ivaCondition` (`RESPONSABLE_INSCRIPTO` | `MONOTRIBUTO` | `EXENTO`): determina
+  el tipo de factura a emitir.
+- `Order` agrega `afipCae`, `afipCaeExpiration`, `afipInvoiceNumber`, `afipInvoiceType`,
+  `afipStatus` (mismo patrón que los campos `mp*` de Mercado Pago, ver ADR-007).
+- `UsersService.registerCompany()` valida el CUIT contra el padrón de AFIP (best-effort,
+  no bloqueante). `OrdersService.updateStatus()` emite la factura al pasar a `Despachado`
+  (best-effort, no bloquea el cambio de estado si AFIP falla).
+- Variables de entorno: `AFIP_CUIT`, `AFIP_PTO_VTA` (`AFIP_CERT_PATH`/`AFIP_KEY_PATH`/
+  `AFIP_ENV` ya existían declaradas sin usar).
+
+### Verificado
+
+- `npx tsc --noEmit` sin errores en `packages/backend`.
+- Suite completa de Jest: 57 tests pasando (incluye 6 nuevos de checksum de CUIT y 7 de
+  `AfipService`, más el ajuste del mock de `AfipService`/`Company` en
+  `orders.service.spec.ts` para la nueva dependencia).
+
+---
+
+
 ## [0.8.0] - 2026-08-31
 
 ### Decisiones Tomadas

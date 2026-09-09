@@ -99,6 +99,25 @@ export class Order {
   @Column({ name: 'actual_delivery_date', nullable: true })
   actualDeliveryDate: Date;
 
+  // Factura electrónica AFIP (ver ADR-010). Se emite al pasar a Despachado;
+  // nulos si AFIP no está configurado o el pedido aún no llegó a ese estado.
+  @Column({ name: 'afip_cae', nullable: true, length: 20 })
+  afipCae: string;
+
+  @Column({ name: 'afip_cae_expiration', nullable: true })
+  afipCaeExpiration: Date;
+
+  @Column({ name: 'afip_invoice_number', nullable: true, length: 20 })
+  afipInvoiceNumber: string;
+
+  // 'B' | 'C' — nunca 'A' (Buyer no tiene CUIT propio, ver ADR-010)
+  @Column({ name: 'afip_invoice_type', nullable: true, length: 5 })
+  afipInvoiceType: string;
+
+  // 'emitida' | 'error'
+  @Column({ name: 'afip_status', nullable: true, length: 20 })
+  afipStatus: string;
+
   @CreateDateColumn({ name: 'created_at' })
   createdAt: Date;
 

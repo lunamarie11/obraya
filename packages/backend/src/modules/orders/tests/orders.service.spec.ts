@@ -7,6 +7,8 @@ import { Order, OrderStatus } from '../entities/order.entity';
 import { OrderItem } from '../entities/order-item.entity';
 import { OrderMessage, MessageSender } from '../entities/order-message.entity';
 import { StockService } from '../../stock/stock.service';
+import { AfipService } from '../../afip/afip.service';
+import { Company } from '../../users/entities/company.entity';
 
 function makeOrder(overrides: Partial<Order> = {}): Order {
   const o = new Order();
@@ -39,6 +41,15 @@ const mockStockService = {
   updateStock: jest.fn(),
 };
 
+const mockAfipService = {
+  createInvoice: jest.fn().mockResolvedValue(null),
+  getTaxpayerDetails: jest.fn().mockResolvedValue(null),
+};
+
+const mockCompanyRepo = {
+  findOne: jest.fn().mockResolvedValue(null),
+};
+
 // DataSource mock que ejecuta el callback con repos mockeados
 const mockDataSource = {
   transaction: jest.fn(async (cb) => {
@@ -52,6 +63,7 @@ const mockDataSource = {
     };
     return cb({ getRepository: (entity: any) => {
       if (entity === Order) return orderRepo;
+      if (entity === Company) return mockCompanyRepo;
       return messageRepo;
     }});
   }),
@@ -69,6 +81,7 @@ describe('OrdersService', () => {
         { provide: getRepositoryToken(OrderMessage), useValue: mockMessageRepo },
         { provide: DataSource, useValue: mockDataSource },
         { provide: StockService, useValue: mockStockService },
+        { provide: AfipService, useValue: mockAfipService },
       ],
     }).compile();
 

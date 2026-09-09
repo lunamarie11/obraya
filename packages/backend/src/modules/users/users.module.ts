@@ -10,10 +10,12 @@ import { AuthService } from './auth.service';
 import { UsersController } from './users.controller';
 import { AuthController } from './auth.controller';
 import { JwtStrategy } from './strategies/jwt.strategy';
+import { AfipModule } from '../afip/afip.module';
 
 @Module({
   imports: [
     TypeOrmModule.forFeature([Company, CompanyUser]),
+    AfipModule,
     PassportModule.register({ defaultStrategy: 'jwt' }),
     JwtModule.registerAsync({
       imports: [ConfigModule],

@@ -23,7 +23,8 @@ Construir el panel de control para que fabricantes y distribuidores gestionen su
 ### 1. Registro de Empresa
 - Alta con CUIT, razon social, logo, datos bancarios
 - Zonas de cobertura (seleccion en mapa o por codigo postal)
-- Validacion de CUIT contra AFIP (web service)
+- Validacion de CUIT contra AFIP (web service) — **Implementado**, ver ADR-010
+  (checksum real + consulta best-effort al padron)
 - Aprobacion manual por equipo ObraYa en v1, automatica en v2
 
 ### 2. Gestion de Productos
@@ -124,7 +125,8 @@ GET    /api/v1/reports/stock           # Reporte de stock
 
 ## Dependencias
 
-- Integracion AFIP para validacion de CUIT
+- Integracion AFIP para validacion de CUIT — **Implementado**, ver ADR-010. Tambien
+  incluye emision de factura electronica (Factura B/C) al despachar un pedido.
 - MercadoPago para recibir pagos (Fase 2, pero el modelo de datos debe contemplarlo)
 - Servicio de imagenes (S3 + CDN)
 - Servicio de email transaccional (SES o SendGrid)
