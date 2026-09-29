@@ -23,10 +23,10 @@ Ver `docs/specs/MVP-backoffice-fabricantes.md`.
 | Dashboard de ventas + KPIs | Implementado |
 | Reportes (ventas, stock) exportables | Implementado |
 | Roles y permisos (Admin/Vendedor/Logística/Contabilidad) | Implementado a nivel de rol (`RolesGuard`), con permisos granulares por sección donde la spec lo requiere: Logística puede configurar zonas de entrega sin acceso a datos bancarios/perfil, que son Admin-only (ver ADR-016, 2026-09-29) |
-| Invitación de usuarios por email | **Parcial**: genera token de invitación pero no hay envío real de email (sin SES/SendGrid conectado) |
-| Configuración logística (zonas, tiempos, costo de envío) | **Parcial**: `Company.coverageZones` es un array simple (jsonb), no hay polígonos en mapa, tiempos por zona ni costo por peso/volumen |
+| Invitación de usuarios por email | Implementado (ADR-011): `EmailService` envía por AWS SES, patrón best-effort (se deshabilita solo si faltan credenciales); usado en `UsersService.inviteUser()` |
+| Configuración logística (zonas, tiempos, costo de envío) | Implementado (ADR-012): `Company.deliveryZones` con `promisedHours`, `shippingCost` y `fleetType` por zona; `coverageZones` quedó como getter derivado para compatibilidad |
 
-**Pendiente real de Fase 1:** conectar un proveedor de email transaccional (invitaciones, notificaciones de pedido), y decidir si la config logística por zona/costo se necesita antes del lanzamiento o se pospone a Fase 4.
+**Fase 1 está funcionalmente cerrada.** Esta tabla quedó desactualizada respecto al resumen ejecutivo (que sí reflejaba el estado real); corregido el 2026-09-29.
 
 ---
 
@@ -74,9 +74,9 @@ Fase 2 está funcionalmente **cerrada**. Lo único fuera de alcance por diseño:
 
 ## Fase 3 - Lanzamiento AMBA (Dic 2026)
 
-No hay spec propio todavía en `docs/specs/`. Para llegar a un lanzamiento real en AMBA,
-además de cerrar los pendientes de Fase 1 (email transaccional, config logística mínima),
-faltaría definir:
+No hay spec propio todavía en `docs/specs/`. Los pendientes de Fase 1 (email
+transaccional, config logística mínima) ya están resueltos (ver tabla arriba).
+Para llegar a un lanzamiento real en AMBA faltaría definir:
 
 - ~~Aprobación manual de fabricantes~~ — **Implementado**: `Company.status = PENDING`,
   `AdminService.updateCompanyStatus()` aprueba/rechaza (`approvedAt`/`approvedBy`).

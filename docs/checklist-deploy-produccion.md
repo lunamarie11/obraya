@@ -99,8 +99,9 @@ CI/CD. Ya construido y verificado:
 - `infra/docker/Dockerfile.frontend` — multi-stage, usa el build
   `standalone` de Next.js (`next.config.js`). Verificado end-to-end: build
   de Docker exitoso, contenedor arranca y responde HTTP 200.
-- `.github/workflows/ci.yml` — build + test de backend (jest, 72 tests),
-  build de frontend y typecheck de mobile en cada PR y push a `main`.
+- `.github/workflows/ci.yml` — lint + build + test de backend (jest, 100
+  tests), lint + build de frontend, lint + typecheck de mobile y lint de
+  shared, en cada PR y push a `main`.
 
 **Sigue pendiente** (todo lo que implica costo real o acceso a la cuenta de
 AWS, fuera del alcance de ADR-015 — requiere aprobación explícita antes de
