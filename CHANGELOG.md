@@ -4,6 +4,41 @@ Cada cambio importante del proyecto se documenta aqui. Las decisiones arquitecto
 
 ---
 
+## [0.19.0] - 2026-09-29
+
+### Decisiones Tomadas
+
+- **Migration inicial de TypeORM**: cierra el gap #1 del checklist de deploy
+  a producción (`docs/checklist-deploy-produccion.md`, sección 2). El
+  proyecto corrió siempre con `synchronize: true` en desarrollo y no existía
+  ninguna migration todavía — un deploy tal cual antes de este cambio
+  dejaba la base de producción sin tablas.
+- Se generó con `typeorm migration:generate` contra un contenedor Postgres
+  16 temporal y descartable (no contra la DB de desarrollo local, que ya
+  tenía el schema sincronizado y el diff hubiera salido vacío), sin tocar
+  ninguno de los stacks Docker existentes en la máquina (ni `obraya-*` de
+  este repo ni `obraya_*` del otro checkout en `/Users/dely/obraya`).
+
+### Agregado
+
+- `packages/backend/src/database/migrations/1790689901672-InitialSchema.ts`:
+  15 tablas (companies, company_users, products, product_variants, stock,
+  stock_movements, prices, price_history, orders, order_items,
+  order_messages, reviews, buyers, buyer_favorites, buyer_addresses) con
+  sus enums, índices únicos y foreign keys.
+
+### Verificado
+
+- `migration:run` contra la DB temporal se ejecuta sin errores (TypeORM crea
+  la extensión `uuid-ossp` automáticamente antes de correr las migrations).
+- Un segundo `migration:generate` contra esa misma DB ya migrada devuelve
+  "No changes in database schema were found" — confirma que el schema
+  generado coincide exactamente con las entities actuales.
+- `npx tsc --noEmit` sin errores en backend, frontend y mobile; `npx jest`
+  72/72 tests OK (sin cambios de lógica de negocio en este pase).
+
+---
+
 ## [0.18.0] - 2026-09-23
 
 ### Decisiones Tomadas

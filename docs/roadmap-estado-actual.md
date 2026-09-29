@@ -88,12 +88,18 @@ está sin empezar. Es coherente con el plan (Fase 4, post-validación).
 
 ## Resumen ejecutivo
 
+**Nota (2026-09-29):** esta sección quedó desactualizada respecto al resto del
+documento — los 4 gaps listados abajo ya se resolvieron en commits
+posteriores (ver CHANGELOG 0.11.0 a 0.18.0 y ADR-011/012/014). Ver
+`docs/checklist-deploy-produccion.md` para el estado real y actualizado de
+lo que falta antes de un deploy a producción (ese sí se mantiene al día).
+
 - **Fase 1 y Fase 2:** funcionalmente completas. Mercado Pago, AFIP, marketplace de
   comprador (web + mobile) y backoffice de fabricantes ya están implementados.
-- **Gaps concretos antes de un lanzamiento real:**
-  1. Email transaccional real (invitaciones, notificaciones) — hoy no se envía nada.
-  2. Reindexado masivo de Elasticsearch.
-  3. Config logística por zona (costos, tiempos) más allá del array simple de `coverageZones`.
-  4. Checklist de producción (secrets, monitoreo).
+- ~~**Gaps concretos antes de un lanzamiento real:**~~
+  1. ~~Email transaccional real (invitaciones, notificaciones) — hoy no se envía nada.~~ Resuelto, ver ADR-011.
+  2. ~~Reindexado masivo de Elasticsearch.~~ Resuelto.
+  3. ~~Config logística por zona (costos, tiempos) más allá del array simple de `coverageZones`.~~ Resuelto, ver ADR-012.
+  4. ~~Checklist de producción (secrets, monitoreo).~~ Resuelto, ver ADR-014 y `docs/checklist-deploy-produccion.md` (incluye ahora también la migration inicial de TypeORM, generada y verificada el 2026-09-29).
 - **Logística real (Fase 4)** es la pieza grande que falta desde cero, pero está fuera de
   alcance hasta después del lanzamiento según el plan original.

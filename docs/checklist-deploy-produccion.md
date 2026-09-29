@@ -28,27 +28,20 @@ no reutilizarlos en producción bajo ningún concepto**, aunque tengan más de
 que *falte* un secret o que sea el placeholder/corto, no que haya sido
 expuesto).
 
-## 2. Base de datos — bloqueante
+## 2. Base de datos — RESUELTO (2026-09-29)
 
-- **No existe ninguna migration todavía** (`packages/backend/src/database/migrations/`
-  solo tiene un `.gitkeep`). El proyecto corrió siempre con `synchronize: true`
-  en desarrollo (`database.module.ts`), que en producción está
-  deliberadamente apagado (`synchronize: config.get('app.nodeEnv') === 'development'`).
-  **Si se despliega tal cual hoy, la base de producción queda sin tablas.**
-  Antes del primer deploy:
-  1. Generar la migration inicial contra una base vacía (no contra la de
-     desarrollo, que ya tiene el schema sincronizado y el diff saldría vacío):
-     ```bash
-     npm run build --workspace=@obraya/backend
-     # crear una DB vacía temporal y apuntar las envs ahí, ej.:
-     DATABASE_NAME=obraya_migration_gen npx typeorm migration:generate \
-       -d packages/backend/dist/database/data-source.js \
-       packages/backend/src/database/migrations/InitialSchema
-     ```
-  2. Revisar el SQL generado a mano antes de commitear (TypeORM no siempre
-     infiere índices/constraints exactamente igual que `synchronize`).
-  3. `npm run migration:run --workspace=@obraya/backend` como paso del deploy,
-     antes de levantar la nueva versión de la app.
+- **Migration inicial generada y verificada**:
+  `packages/backend/src/database/migrations/1790689901672-InitialSchema.ts`.
+  Generada con `typeorm migration:generate` contra una DB Postgres 16 vacía
+  (contenedor temporal descartable, no contra la de desarrollo local, que ya
+  tenía el schema sincronizado y el diff hubiera salido vacío). Verificada
+  de punta a punta contra esa misma DB temporal: `migration:run` la ejecuta
+  sin errores (TypeORM crea la extensión `uuid-ossp` automáticamente antes
+  de correr las migrations) y un segundo `migration:generate` posterior
+  devuelve "No changes in database schema were found" — confirma que
+  coincide exactamente con las entities actuales.
+- Sigue pendiente como paso de deploy: `npm run migration:run --workspace=@obraya/backend`
+  antes de levantar la nueva versión de la app en producción.
 - `ssl: { rejectUnauthorized: false }` en producción (`database.module.ts`):
   suficiente para managed Postgres con certificados autofirmados (RDS, etc.),
   pero no valida la cadena — aceptable para MVP, revisar si se necesita
@@ -122,7 +115,7 @@ poder desplegar hace falta decidir y construir:
 ## 7. Orden sugerido antes del primer deploy
 
 1. Decidir la infraestructura de destino (sección 6) — bloquea todo lo demás.
-2. Generar y verificar la migration inicial (sección 2).
+2. ~~Generar y verificar la migration inicial (sección 2)~~ — **hecho**.
 3. Generar `JWT_SECRET`/`JWT_REFRESH_SECRET` nuevos y configurar
    `DATABASE_PASSWORD` real (sección 1) — sin esto el backend no arranca.
 4. Configurar credenciales reales de MercadoPago/AFIP/SES/FCM/Sentry/S3
@@ -130,6 +123,7 @@ poder desplegar hace falta decidir y construir:
    apagada.
 5. DNS + dominios reales en `cors.config.ts` (sección 4).
 6. Armar Dockerfile de frontend + compose/pipeline de producción (sección 6).
-7. Deploy, correr migrations, smoke test de `/api/v1/health` y de un flujo
-   de compra end-to-end contra las integraciones reales (MercadoPago/AFIP en
-   modo producción suelen comportarse distinto que en sandbox).
+7. Deploy, correr `migration:run` (sección 2), smoke test de `/api/v1/health`
+   y de un flujo de compra end-to-end contra las integraciones reales
+   (MercadoPago/AFIP en modo producción suelen comportarse distinto que en
+   sandbox).
