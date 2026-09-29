@@ -1,0 +1,38 @@
+# Multi-stage Dockerfile for Next.js frontend (ver ADR-015)
+
+# Build stage
+FROM node:20-alpine AS builder
+
+WORKDIR /app
+
+# Copy package files
+COPY package*.json ./
+COPY packages/frontend/package*.json ./packages/frontend/
+COPY packages/shared/package*.json ./packages/shared/
+
+# Install dependencies
+RUN npm ci
+
+# Copy source code
+COPY . .
+
+# Build the application (requiere output: 'standalone' en next.config.js)
+RUN npm run build --workspace=@obraya/frontend
+
+# Runtime stage
+FROM node:20-alpine
+
+WORKDIR /app
+
+ENV NODE_ENV=production
+ENV PORT=3001
+ENV HOSTNAME=0.0.0.0
+
+# El build standalone de Next.js ya incluye su propio node_modules mínimo
+COPY --from=builder /app/packages/frontend/.next/standalone ./
+COPY --from=builder /app/packages/frontend/.next/static ./packages/frontend/.next/static
+COPY --from=builder /app/packages/frontend/public ./packages/frontend/public
+
+EXPOSE 3001
+
+CMD ["node", "packages/frontend/server.js"]
