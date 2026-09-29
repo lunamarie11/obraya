@@ -8,13 +8,14 @@ import type { PublicCompany } from '@obraya/shared';
 import { useFavorites } from '@/hooks/useFavorites';
 
 // El rating es un dato real agregado desde Review (ver ADR-008). El ETA de
-// entrega sigue siendo placeholder hasta que exista un modelo de logística real
-// (ver docs/adrs/ADR-003-endpoint-publico-marketplace.md) — no expandirlo.
-function placeholderEta(coverageZones?: string[]): string {
-  const zones = coverageZones?.length ?? 0;
-  if (zones >= 5) return '30-45 min';
-  if (zones >= 1) return '45-60 min';
-  return '60-90 min';
+// entrega es un dato real agregado desde Company.deliveryZones (ver ADR-012):
+// min/maxPromisedHours vienen del backend, no hay heurística acá. Si la
+// empresa todavía no configuró ninguna zona, se muestra "A coordinar" (mismo
+// texto que usa el checkout cuando no hay cotización disponible).
+function formatDeliveryEta(minHours?: number, maxHours?: number): string {
+  if (minHours == null || maxHours == null) return 'A coordinar';
+  if (minHours === maxHours) return `~${minHours}hs`;
+  return `${minHours}-${maxHours}hs`;
 }
 
 export function StoreCard({ company }: { company: PublicCompany }) {
@@ -65,7 +66,7 @@ export function StoreCard({ company }: { company: PublicCompany }) {
             )}
             <span className="flex items-center gap-1">
               <Clock size={12} />
-              {placeholderEta(company.coverageZones)}
+              {formatDeliveryEta(company.minPromisedHours, company.maxPromisedHours)}
             </span>
           </div>
           {(company.city || company.province) && (

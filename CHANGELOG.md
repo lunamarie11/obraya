@@ -4,6 +4,44 @@ Cada cambio importante del proyecto se documenta aqui. Las decisiones arquitecto
 
 ---
 
+## [0.22.0] - 2026-09-29
+
+### Decisiones Tomadas
+
+- **ETA de entrega real en el listado del marketplace** (`StoreCard.tsx`,
+  web + mobile): reemplaza el placeholder heurístico ("cuantas más zonas,
+  ETA más corta", en minutos, fuera de alcance explícito desde ADR-003 y
+  ADR-008) por `minPromisedHours`/`maxPromisedHours` reales, agregados de
+  `Company.deliveryZones` (ADR-012) — el mismo dato que ya usan
+  `/shipping-quote` y el checkout, ahora también expuesto en el listado.
+  Si la empresa no configuró zonas, muestra "A coordinar" en vez de inventar
+  un rango.
+
+### Modificado
+
+- `packages/backend/src/modules/marketplace/marketplace-public.service.ts`:
+  `toPublicCompany()` agrega `minPromisedHours`/`maxPromisedHours`.
+- `packages/shared/src/types/index.ts`: `PublicCompany` agrega esos dos
+  campos opcionales.
+- `packages/frontend/src/components/marketplace/StoreCard.tsx` y
+  `packages/mobile/src/components/StoreCard.tsx`: `placeholderEta()` →
+  `formatDeliveryEta()`, usa los campos reales.
+- `docs/adrs/ADR-012-config-logistica-zonas-envio.md`: nota de actualización
+  documentando el cierre de este placeholder.
+
+### Agregado
+
+- 2 tests nuevos en `marketplace-public.service.spec.ts` (rango min/max con
+  varias zonas, `undefined` sin zonas configuradas); test existente
+  actualizado con los nuevos campos.
+
+### Verificado
+
+- `npx tsc --noEmit` sin errores en backend, frontend y mobile.
+- Jest: 80/80 tests OK (78 previos + 2 nuevos).
+
+---
+
 ## [0.21.0] - 2026-09-29
 
 ### Decisiones Tomadas

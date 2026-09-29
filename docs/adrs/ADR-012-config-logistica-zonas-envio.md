@@ -87,3 +87,13 @@ polígonos.
   código postal a mano. Aceptable para el volumen inicial de fabricantes.
 - **Bajo**: sin geocoding, un comprador con un código postal mal tipeado
   simplemente no recibe cotización (degradación silenciosa, no error visible).
+
+## Actualización (2026-09-29)
+
+El ETA placeholder de `StoreCard.tsx` (que ADR-003 y ADR-008 dejaron
+explícitamente fuera de alcance por no existir todavía un dato real) se
+reemplazó por `minPromisedHours`/`maxPromisedHours`, agregados desde
+`Company.deliveryZones` en `MarketplacePublicService.toPublicCompany()` —
+el mismo dato que ya alimenta `/shipping-quote` y el checkout, ahora también
+expuesto en el listado. Si la empresa no configuró ninguna zona, se muestra
+"A coordinar" en vez de un rango inventado.

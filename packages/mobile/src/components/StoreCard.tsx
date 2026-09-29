@@ -7,14 +7,13 @@ import { colors, radius, shadow } from '../theme';
 import { useFavorites } from '../hooks/useFavorites';
 
 // Espejo de packages/frontend/src/components/marketplace/StoreCard.tsx.
-// El rating es un dato real agregado desde Review (ver ADR-008) — se dejó de
-// usar el hash placeholder. El ETA de entrega sigue siendo placeholder hasta
-// que exista un modelo de logística real (no expandir, ver ADR-003).
-function placeholderEta(coverageZones?: string[]): string {
-  const zones = coverageZones?.length ?? 0;
-  if (zones >= 5) return '30-45 min';
-  if (zones >= 1) return '45-60 min';
-  return '60-90 min';
+// El rating es un dato real agregado desde Review (ver ADR-008). El ETA de
+// entrega es un dato real agregado desde Company.deliveryZones (ver
+// ADR-012): min/maxPromisedHours vienen del backend, sin heurística acá.
+function formatDeliveryEta(minHours?: number, maxHours?: number): string {
+  if (minHours == null || maxHours == null) return 'A coordinar';
+  if (minHours === maxHours) return `~${minHours}hs`;
+  return `${minHours}-${maxHours}hs`;
 }
 
 export function StoreCard({ company }: { company: PublicCompany }) {
@@ -62,7 +61,7 @@ export function StoreCard({ company }: { company: PublicCompany }) {
           )}
           <View style={styles.metaItem}>
             <Clock size={12} color={colors.slate500} />
-            <Text style={styles.metaText}>{placeholderEta(company.coverageZones)}</Text>
+            <Text style={styles.metaText}>{formatDeliveryEta(company.minPromisedHours, company.maxPromisedHours)}</Text>
           </View>
         </View>
         {(company.city || company.province) && (

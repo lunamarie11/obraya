@@ -11,9 +11,11 @@ import { SearchService } from '../search/search.service';
 import { ReviewsService, ReviewAggregate } from '../reviews/reviews.service';
 
 // Endpoint de solo lectura, sin JWT (ver docs/adrs/ADR-003-endpoint-publico-marketplace.md).
-// El rating (averageRating/reviewCount) sí es un dato real desde ADR-008: se agrega
-// en batch desde ReviewsService. El ETA de entrega sigue siendo placeholder en el
-// frontend hasta tener un modelo de logística real.
+// El rating (averageRating/reviewCount) es un dato real desde ADR-008: se agrega
+// en batch desde ReviewsService. El ETA de entrega (min/maxPromisedHours) es un
+// dato real desde ADR-012: agregado (min/max) de Company.deliveryZones, ya que
+// en este listado no hay un código postal de comprador para resolver una zona
+// puntual (eso sigue siendo el endpoint /shipping-quote).
 
 @Injectable()
 export class MarketplacePublicService {
@@ -32,6 +34,10 @@ export class MarketplacePublicService {
   ) {}
 
   private toPublicCompany(company: Company, aggregate?: ReviewAggregate) {
+    const promisedHours = (company.deliveryZones ?? [])
+      .map((zone) => zone.promisedHours)
+      .filter((hours) => Number.isFinite(hours));
+
     return {
       id: company.id,
       razonSocial: company.razonSocial,
@@ -41,6 +47,8 @@ export class MarketplacePublicService {
       coverageZones: company.coverageZones,
       averageRating: aggregate?.averageRating ?? 0,
       reviewCount: aggregate?.reviewCount ?? 0,
+      minPromisedHours: promisedHours.length ? Math.min(...promisedHours) : undefined,
+      maxPromisedHours: promisedHours.length ? Math.max(...promisedHours) : undefined,
     };
   }
 

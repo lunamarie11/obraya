@@ -44,7 +44,11 @@ Ver `docs/specs/marketplace-comprador.md`. Todo el backlog priorizado (7 items) 
 7. **Mercado Pago (Checkout Pro) en checkout** — ADR-007, ya integrado
 
 Fase 2 está funcionalmente **cerrada**. Lo único fuera de alcance por diseño:
-- Tiempo de entrega real en la ficha de fabricante (placeholder; requiere logística real).
+- ~~Tiempo de entrega real en la ficha de fabricante (placeholder; requiere logística real).~~
+  Resuelto (2026-09-29, ver ADR-012 "Actualización"): `StoreCard.tsx` (web y mobile) ya
+  muestra `min/maxPromisedHours` real agregado de `Company.deliveryZones`, no un
+  placeholder. Sigue faltando el ETA en vivo de un repartidor (eso sí requiere
+  logística real, Fase 4).
 - Home dinámica en mobile (arquitectura distinta a la web, decisión tomada en ADR-005).
 
 ---

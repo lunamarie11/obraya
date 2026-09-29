@@ -136,10 +136,37 @@ describe('MarketplacePublicService', () => {
           coverageZones: ['1000', '1001'],
           averageRating: 0,
           reviewCount: 0,
+          minPromisedHours: 24,
+          maxPromisedHours: 24,
         },
       ]);
       expect(result[0]).not.toHaveProperty('cuit');
       expect(result[0]).not.toHaveProperty('bankingData');
+    });
+
+    it('devuelve el rango min/max de promisedHours cuando hay varias zonas configuradas', async () => {
+      mockCompanyRepo.find.mockResolvedValue([
+        makeCompany({
+          deliveryZones: [
+            { id: 'zone-1', name: 'CABA', zipCodes: ['1000'], promisedHours: 24, fleetType: FleetType.PROPIA, shippingCost: 0 },
+            { id: 'zone-2', name: 'GBA', zipCodes: ['1600'], promisedHours: 48, fleetType: FleetType.TERCERIZADA, shippingCost: 500 },
+          ],
+        }),
+      ]);
+
+      const result = await service.findActiveCompanies();
+
+      expect(result[0].minPromisedHours).toBe(24);
+      expect(result[0].maxPromisedHours).toBe(48);
+    });
+
+    it('no incluye min/maxPromisedHours si la empresa no configuró ninguna zona', async () => {
+      mockCompanyRepo.find.mockResolvedValue([makeCompany({ deliveryZones: [] })]);
+
+      const result = await service.findActiveCompanies();
+
+      expect(result[0].minPromisedHours).toBeUndefined();
+      expect(result[0].maxPromisedHours).toBeUndefined();
     });
   });
 

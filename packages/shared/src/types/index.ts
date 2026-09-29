@@ -98,6 +98,9 @@ export type PaymentMethod = 'Efectivo' | 'Transferencia' | 'MercadoPago';
 
 // Datos públicos de una empresa/fabricante, sin autenticación (ver ADR-003).
 // averageRating/reviewCount son datos reales agregados desde Review (ver ADR-008).
+// minPromisedHours/maxPromisedHours son datos reales agregados desde
+// Company.deliveryZones (ver ADR-012) — undefined si la empresa no configuró
+// ninguna zona todavía.
 export interface PublicCompany {
   id: string;
   razonSocial: string;
@@ -107,6 +110,8 @@ export interface PublicCompany {
   coverageZones?: string[];
   averageRating?: number;
   reviewCount?: number;
+  minPromisedHours?: number;
+  maxPromisedHours?: number;
 }
 
 // Cotización de envío pública (ver ADR-012, GET /public/companies/:id/shipping-quote).
