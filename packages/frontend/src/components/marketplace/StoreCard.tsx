@@ -7,17 +7,9 @@ import { Star, Clock, Heart } from 'lucide-react';
 import type { PublicCompany } from '@obraya/shared';
 import { useFavorites } from '@/hooks/useFavorites';
 
-// Rating y ETA todavía no existen como datos reales en el backend (ver
-// docs/adrs/ADR-003-endpoint-publico-marketplace.md). Se derivan de forma
-// estable a partir del id/coverageZones para que la UI no salte entre
-// valores random en cada render, pero son placeholders explícitos hasta
-// que exista un modelo real de reviews/logística.
-function placeholderRating(id: string): string {
-  let hash = 0;
-  for (let i = 0; i < id.length; i++) hash = (hash * 31 + id.charCodeAt(i)) >>> 0;
-  return (4 + (hash % 10) / 10).toFixed(1);
-}
-
+// El rating es un dato real agregado desde Review (ver ADR-008). El ETA de
+// entrega sigue siendo placeholder hasta que exista un modelo de logística real
+// (ver docs/adrs/ADR-003-endpoint-publico-marketplace.md) — no expandirlo.
 function placeholderEta(coverageZones?: string[]): string {
   const zones = coverageZones?.length ?? 0;
   if (zones >= 5) return '30-45 min';
@@ -59,10 +51,18 @@ export function StoreCard({ company }: { company: PublicCompany }) {
         <div className="min-w-0 flex-1">
           <h3 className="font-semibold text-sm text-slate-900 truncate">{company.razonSocial}</h3>
           <div className="flex items-center gap-3 mt-1 text-xs text-slate-500">
-            <span className="flex items-center gap-1">
-              <Star size={12} className="text-amber-400 fill-amber-400" />
-              {placeholderRating(company.id)}
-            </span>
+            {company.reviewCount ? (
+              <span className="flex items-center gap-1">
+                <Star size={12} className="text-amber-400 fill-amber-400" />
+                {company.averageRating?.toFixed(1)}
+                <span className="text-slate-400">({company.reviewCount})</span>
+              </span>
+            ) : (
+              <span className="flex items-center gap-1 text-slate-400">
+                <Star size={12} />
+                Nuevo
+              </span>
+            )}
             <span className="flex items-center gap-1">
               <Clock size={12} />
               {placeholderEta(company.coverageZones)}

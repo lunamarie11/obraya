@@ -25,6 +25,37 @@ export enum CompanyIvaCondition {
   EXENTO = 'EXENTO',
 }
 
+// Ver spec MVP-backoffice-fabricantes.md, punto 8 "Configuracion Logistica".
+export enum FleetType {
+  PROPIA = 'propia',
+  TERCERIZADA = 'tercerizada',
+  RETIRO_LOCAL = 'retiro_local',
+}
+
+export interface DeliveryZone {
+  id: string;
+  name: string;
+  // Códigos postales cubiertos por esta zona (match exacto, ver resolveDeliveryZone).
+  zipCodes: string[];
+  promisedHours: number;
+  fleetType: FleetType;
+  // Costo de envío en centavos de ARS, igual convención que Order.totalAmount.
+  shippingCost: number;
+}
+
+// Resuelve la zona de entrega para un código postal dado. Match exacto sobre
+// zipCodes (sin geocoding/polígonos, ver limitación conocida en ADR-012).
+// Si la empresa no configuró zonas, o el código postal no matchea ninguna,
+// devuelve null: el checkout no bloquea, solo no puede cotizar el envío.
+export function resolveDeliveryZone(
+  zones: DeliveryZone[] | null | undefined,
+  postalCode: string | null | undefined,
+): DeliveryZone | null {
+  if (!zones?.length || !postalCode) return null;
+  const normalized = postalCode.trim().toUpperCase();
+  return zones.find((zone) => zone.zipCodes.some((zip) => zip.trim().toUpperCase() === normalized)) ?? null;
+}
+
 @Entity('companies')
 export class Company {
   @PrimaryGeneratedColumn('uuid')
@@ -69,9 +100,17 @@ export class Company {
     accountHolder?: string;
   };
 
-  // Zonas de cobertura por código postal
-  @Column({ name: 'coverage_zones', type: 'jsonb', nullable: true })
-  coverageZones: string[];
+  // Zonas de entrega configuradas (ver DeliveryZone arriba). Reemplaza al viejo
+  // `coverageZones: string[]` (solo códigos postales, sin costo/tiempo/flota).
+  @Column({ name: 'delivery_zones', type: 'jsonb', nullable: true })
+  deliveryZones: DeliveryZone[];
+
+  // Derivado de deliveryZones: lista plana de códigos postales cubiertos, para
+  // los componentes que solo necesitan "cuántas zonas cubre" (StoreCard ETA
+  // placeholder). No se persiste.
+  get coverageZones(): string[] {
+    return (this.deliveryZones ?? []).flatMap((z) => z.zipCodes);
+  }
 
   @Column({ nullable: true, length: 300 })
   address: string;

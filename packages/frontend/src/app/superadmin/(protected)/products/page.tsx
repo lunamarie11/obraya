@@ -3,7 +3,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import { api } from '@/lib/api';
-import { Search, Trash2, ToggleLeft, ToggleRight } from 'lucide-react';
+import { Search, Trash2, ToggleLeft, ToggleRight, RefreshCw } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { clsx } from 'clsx';
@@ -36,13 +36,33 @@ export default function AdminProductsPage() {
     },
   });
 
+  // Reindexado masivo en Elasticsearch (ver ADR-007, riesgo pendiente resuelto).
+  const reindexSearch = useMutation({
+    mutationFn: () => api.post('/admin/search/reindex').then((r) => r.data),
+  });
+
   const products: any[] = data?.data ?? [];
 
   return (
     <div>
-      <header className="h-14 bg-slate-900 border-b border-slate-800 flex items-center px-6 sticky top-0 z-10">
-        <h1 className="text-base font-semibold text-white">Productos</h1>
-        {data?.total != null && <span className="ml-3 text-xs text-slate-500">{data.total} en total</span>}
+      <header className="h-14 bg-slate-900 border-b border-slate-800 flex items-center justify-between px-6 sticky top-0 z-10">
+        <div className="flex items-center">
+          <h1 className="text-base font-semibold text-white">Productos</h1>
+          {data?.total != null && <span className="ml-3 text-xs text-slate-500">{data.total} en total</span>}
+        </div>
+        <button
+          onClick={() => reindexSearch.mutate()}
+          disabled={reindexSearch.isPending}
+          title="Reindexa todos los productos en Elasticsearch (uso puntual si la busqueda se desincroniza)"
+          className="inline-flex items-center gap-1.5 text-xs bg-slate-800 hover:bg-slate-700 text-slate-300 px-3 py-1.5 rounded-lg border border-slate-700 disabled:opacity-50"
+        >
+          <RefreshCw size={13} className={reindexSearch.isPending ? 'animate-spin' : ''} />
+          {reindexSearch.isPending
+            ? 'Reindexando...'
+            : reindexSearch.isSuccess
+              ? `Reindexados ${reindexSearch.data?.indexed ?? 0}`
+              : 'Reindexar búsqueda'}
+        </button>
       </header>
 
       <div className="p-6 space-y-4">

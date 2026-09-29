@@ -13,7 +13,14 @@ export const api = axios.create({
 // Rutas del comprador de marketplace (ver ADR-006): usan un JWT propio (Buyer),
 // separado del JWT de CompanyUser que usa el resto de la API (backoffice).
 function isBuyerRoute(url?: string) {
-  return !!url && (url.includes('/buyer-auth') || url.includes('/buyer-orders') || url.includes('/buyer-addresses'));
+  return (
+    !!url &&
+    (url.includes('/buyer-auth') ||
+      url.includes('/buyer-orders') ||
+      url.includes('/buyer-addresses') ||
+      url.includes('/buyer-favorites') ||
+      url.includes('/buyer-reviews'))
+  );
 }
 
 api.interceptors.request.use(async (config) => {

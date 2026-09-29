@@ -2,10 +2,12 @@
 
 import React from 'react';
 import { useRouter } from 'next/navigation';
-import { useQuery } from '@tanstack/react-query';
-import { MapPin, Package, RotateCcw, ShoppingBag } from 'lucide-react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { MapPin, Package, RotateCcw, ShoppingBag, Star } from 'lucide-react';
+import { clsx } from 'clsx';
 import { api, formatARS } from '@/lib/api';
 import { addToCart } from '@/lib/cart';
+import { getMyReviews, createReview } from '@/lib/marketplace';
 import { MarketplaceHeader } from '@/components/marketplace/MarketplaceHeader';
 import { BottomTabBar } from '@/components/nav/BottomTabBar';
 import { OrderStatusStepper } from '@/components/order/OrderStatusStepper';
@@ -121,6 +123,9 @@ export default function OrderDetailPage({ params }: { params: { id: string } }) 
           </div>
         </div>
 
+        {/* Calificar pedido (solo si ya fue entregado) */}
+        {order.status === 'Entregado' && <ReviewSection orderId={order.id} />}
+
         {/* Actions */}
         <div className="flex flex-col gap-3">
           <button
@@ -138,6 +143,95 @@ export default function OrderDetailPage({ params }: { params: { id: string } }) 
         </div>
       </main>
       <BottomTabBar />
+    </div>
+  );
+}
+
+// Calificar un pedido entregado (backlog #6 marketplace-comprador.md, ver ADR-008).
+// Un pedido admite una sola reseña: si ya existe, se muestra en modo lectura.
+function ReviewSection({ orderId }: { orderId: string }) {
+  const queryClient = useQueryClient();
+  const [rating, setRating] = React.useState(0);
+  const [hoverRating, setHoverRating] = React.useState(0);
+  const [comment, setComment] = React.useState('');
+  const [error, setError] = React.useState<string | null>(null);
+  const [submitting, setSubmitting] = React.useState(false);
+
+  const { data: myReviews, isLoading } = useQuery({
+    queryKey: ['buyer-reviews-mine'],
+    queryFn: getMyReviews,
+  });
+
+  const existingReview = myReviews?.find((r) => r.orderId === orderId);
+
+  async function handleSubmit() {
+    if (rating < 1) {
+      setError('Elegí una cantidad de estrellas');
+      return;
+    }
+    setError(null);
+    setSubmitting(true);
+    try {
+      await createReview({ orderId, rating, comment: comment.trim() || undefined });
+      await queryClient.invalidateQueries({ queryKey: ['buyer-reviews-mine'] });
+    } catch {
+      setError('No pudimos guardar tu reseña. Probá de nuevo en unos minutos.');
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  if (isLoading) return null;
+
+  return (
+    <div className="card-ios p-5">
+      <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-3">
+        {existingReview ? 'Tu calificación' : 'Calificá este pedido'}
+      </p>
+      <div className="flex items-center gap-1 mb-3">
+        {Array.from({ length: 5 }).map((_, i) => {
+          const value = i + 1;
+          const filled = existingReview
+            ? value <= existingReview.rating
+            : value <= (hoverRating || rating);
+          return (
+            <button
+              key={value}
+              type="button"
+              disabled={!!existingReview}
+              onClick={() => setRating(value)}
+              onMouseEnter={() => !existingReview && setHoverRating(value)}
+              onMouseLeave={() => !existingReview && setHoverRating(0)}
+              className={clsx(!existingReview && 'btn-ios')}
+            >
+              <Star size={24} className={filled ? 'text-amber-400 fill-amber-400' : 'text-slate-200'} />
+            </button>
+          );
+        })}
+      </div>
+
+      {existingReview ? (
+        existingReview.comment && <p className="text-sm text-slate-700">{existingReview.comment}</p>
+      ) : (
+        <>
+          <textarea
+            value={comment}
+            onChange={(e) => setComment(e.target.value)}
+            placeholder="Contanos cómo fue tu experiencia (opcional)"
+            rows={3}
+            maxLength={1000}
+            className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-orange-500 resize-none"
+          />
+          {error && <p className="text-sm text-red-500 mt-2">{error}</p>}
+          <button
+            onClick={handleSubmit}
+            disabled={submitting}
+            className="mt-3 w-full py-3 bg-orange-500 text-white rounded-xl font-bold hover:bg-orange-600 transition-colors btn-ios shadow-sm disabled:opacity-50"
+          >
+            {submitting ? 'Enviando...' : 'Enviar calificación'}
+          </button>
+        </>
+      )}
     </div>
   );
 }

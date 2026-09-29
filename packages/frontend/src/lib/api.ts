@@ -13,7 +13,8 @@ function isBuyerRoute(url?: string) {
     (url.includes('/buyer-auth') ||
       url.includes('/buyer-orders') ||
       url.includes('/buyer-addresses') ||
-      url.includes('/buyer-favorites'))
+      url.includes('/buyer-favorites') ||
+      url.includes('/buyer-reviews'))
   );
 }
 

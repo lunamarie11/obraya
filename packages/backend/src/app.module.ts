@@ -1,10 +1,14 @@
 // ObraYa - Módulo principal (monolito modular)
 // Cada módulo de negocio es independiente y extraíble a microservicio (ver ADR-002)
 
-import { Module } from '@nestjs/common';
+import { MiddlewareConsumer, Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { DatabaseModule } from './database/database.module';
 import { appConfig, databaseConfig, jwtConfig, storageConfig } from './config/app.config';
+import { ThrottlingModule } from './config/throttling.module';
+import { CommonModule } from './common/common.module';
+import { SanitizeMiddleware } from './common/sanitize.middleware';
+import { ErrorTrackingModule } from './common/error-tracking/error-tracking.module';
 
 // Módulos de negocio - MVP Backoffice (Fase 1)
 import { UsersModule } from './modules/users/users.module';
@@ -18,11 +22,13 @@ import { AdminModule } from './modules/admin/admin.module';
 import { MonitoringModule } from './modules/monitoring/monitoring.module';
 import { MarketplaceModule } from './modules/marketplace/marketplace.module';
 import { BuyersModule } from './modules/buyers/buyers.module';
+import { PaymentsModule } from './modules/payments/payments.module';
+import { NotificationsModule } from './modules/notifications/notifications.module';
+import { SearchModule } from './modules/search/search.module';
+import { ReviewsModule } from './modules/reviews/reviews.module';
 
-// Módulos de negocio - Fase 2+
-// import { PaymentsModule } from './modules/payments/payments.module';
+// Módulos de negocio - Fase 4+
 // import { LogisticsModule } from './modules/logistics/logistics.module';
-// import { NotificationsModule } from './modules/notifications/notifications.module';
 // import { AnalyticsModule } from './modules/analytics/analytics.module';
 
 @Module({
@@ -32,6 +38,9 @@ import { BuyersModule } from './modules/buyers/buyers.module';
       load: [appConfig, databaseConfig, jwtConfig, storageConfig],
       envFilePath: '.env',
     }),
+    ThrottlingModule,
+    CommonModule,
+    ErrorTrackingModule,
     DatabaseModule,
     UsersModule,
     ProductsModule,
@@ -44,6 +53,14 @@ import { BuyersModule } from './modules/buyers/buyers.module';
     MonitoringModule,
     MarketplaceModule,
     BuyersModule,
+    PaymentsModule,
+    NotificationsModule,
+    SearchModule,
+    ReviewsModule,
   ],
 })
-export class AppModule {}
+export class AppModule {
+  configure(consumer: MiddlewareConsumer) {
+    consumer.apply(SanitizeMiddleware).forRoutes('*');
+  }
+}

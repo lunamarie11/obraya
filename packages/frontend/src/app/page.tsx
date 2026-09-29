@@ -1,16 +1,21 @@
 'use client';
 
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueries } from '@tanstack/react-query';
 import { Search } from 'lucide-react';
 import { MarketplaceHeader } from '@/components/marketplace/MarketplaceHeader';
 import { CategoryChips } from '@/components/marketplace/CategoryChips';
 import { StoreCard } from '@/components/marketplace/StoreCard';
+import { ProductCard, ProductCardSkeleton, type ProductCardData } from '@/components/marketplace/ProductCard';
 import { CartStickyBar } from '@/components/cart/CartStickyBar';
 import { BottomTabBar } from '@/components/nav/BottomTabBar';
-import { getPublicCompanies } from '@/lib/marketplace';
+import { getPublicCompanies, getPublicProduct, getActivePromotions } from '@/lib/marketplace';
+import { getStoredBuyer } from '@/lib/buyer-auth';
+import { addToCart } from '@/lib/cart';
+import { api, formatARS } from '@/lib/api';
 import DemoCredentials from '@/components/DemoCredentials';
+import type { Order } from '@obraya/shared';
 
 const PROMOS = [
   { title: 'Envío el mismo día', desc: 'Pedidos antes de las 14hs, en tu obra hoy.', gradient: 'from-orange-500 to-amber-500' },
@@ -21,11 +26,79 @@ const PROMOS = [
 export default function Home() {
   const router = useRouter();
   const [search, setSearch] = useState('');
+  const [addedId, setAddedId] = useState<string | null>(null);
+  const buyer = useMemo(() => getStoredBuyer(), []);
 
   const { data: companies, isLoading } = useQuery({
     queryKey: ['public-companies'],
     queryFn: getPublicCompanies,
   });
+
+  // Banners dinámicos (backlog #5, ver ADR-009): productos con descuento
+  // programado activo ahora. Si no hay ninguno (nadie programó un descuento
+  // todavía), se cae a los banners genéricos de propuesta de valor.
+  const { data: promotions } = useQuery({
+    queryKey: ['active-promotions'],
+    queryFn: getActivePromotions,
+  });
+
+  // "Mejor calificados": mismo dato que ya trae /public/companies (averageRating
+  // real, ver ADR-008), ordenado client-side. Solo se muestran empresas con al
+  // menos una reseña para no mezclar "sin calificar" con "mal calificado".
+  const topRated = useMemo(
+    () =>
+      (companies ?? [])
+        .filter((c) => (c.reviewCount ?? 0) > 0)
+        .sort((a, b) => (b.averageRating ?? 0) - (a.averageRating ?? 0))
+        .slice(0, 6),
+    [companies],
+  );
+
+  // "Pedí de nuevo": productos distintos de los últimos pedidos del comprador
+  // logueado (backlog #5 marketplace-comprador.md). Se re-resuelven contra
+  // /public/products/:id para mostrar precio/imagen actuales, no los del pedido.
+  const { data: buyerOrders } = useQuery({
+    queryKey: ['buyer-orders'],
+    queryFn: () => api.get('/buyer-orders').then((r) => r.data as Order[]),
+    enabled: !!buyer,
+  });
+
+  const reorderProductIds = useMemo(() => {
+    const orders = [...(buyerOrders ?? [])].sort(
+      (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+    );
+    const seen = new Set<string>();
+    for (const order of orders) {
+      for (const item of order.items ?? []) {
+        seen.add(item.productId);
+        if (seen.size >= 8) break;
+      }
+      if (seen.size >= 8) break;
+    }
+    return Array.from(seen);
+  }, [buyerOrders]);
+
+  const reorderQueries = useQueries({
+    queries: reorderProductIds.map((productId) => ({
+      queryKey: ['public-product', productId],
+      queryFn: () => getPublicProduct(productId),
+      enabled: !!buyer,
+      retry: false,
+    })),
+  });
+
+  const reorderProducts: ProductCardData[] = reorderQueries
+    .map((q) => q.data)
+    .filter((p): p is NonNullable<typeof p> => !!p);
+  const reorderLoading = !!buyer && reorderProductIds.length > 0 && reorderQueries.some((q) => q.isLoading);
+
+  function handleQuickAdd(e: React.MouseEvent, product: ProductCardData) {
+    e.preventDefault();
+    const price = product.price?.finalPrice ?? product.price?.basePrice;
+    addToCart({ productId: product.id, companyId: product.companyId, name: product.name, price, quantity: 1 });
+    setAddedId(product.id);
+    setTimeout(() => setAddedId(null), 1200);
+  }
 
   function goToMarketplace(params: Record<string, string>) {
     const qs = new URLSearchParams(params).toString();
@@ -66,20 +139,73 @@ export default function Home() {
         <CategoryChips value="" onChange={(key) => goToMarketplace(key ? { category: key } : {})} />
       </section>
 
-      {/* Carrusel de promos */}
+      {/* Carrusel de promos: productos con descuento activo (real), o los
+          banners genéricos de propuesta de valor si todavía no hay ninguno */}
       <section className="max-w-7xl mx-auto px-4 sm:px-6 py-4">
         <div className="flex gap-3 overflow-x-auto scrollbar-hide pb-1">
-          {PROMOS.map((promo) => (
-            <div
-              key={promo.title}
-              className={`shrink-0 w-72 h-32 rounded-2xl bg-gradient-to-br ${promo.gradient} p-5 flex flex-col justify-end text-white shadow-sm`}
-            >
-              <h3 className="font-bold text-base leading-tight">{promo.title}</h3>
-              <p className="text-xs text-white/85 mt-1">{promo.desc}</p>
-            </div>
-          ))}
+          {promotions?.length
+            ? promotions.map((promo) => (
+                <div
+                  key={promo.productId}
+                  role="button"
+                  onClick={() => router.push(`/marketplace/products/${promo.productId}`)}
+                  className="shrink-0 w-72 h-32 rounded-2xl bg-gradient-to-br from-orange-500 to-red-500 p-5 flex flex-col justify-end text-white shadow-sm cursor-pointer"
+                >
+                  <span className="text-xs font-bold uppercase tracking-wide text-white/90">
+                    {promo.label ?? `${promo.discountPercent}% OFF`}
+                  </span>
+                  <h3 className="font-bold text-base leading-tight truncate">{promo.productName}</h3>
+                  <p className="text-xs text-white/85 mt-1">
+                    {formatARS(promo.finalPrice)}{' '}
+                    <span className="line-through text-white/60">{formatARS(promo.basePrice)}</span>
+                  </p>
+                </div>
+              ))
+            : PROMOS.map((promo) => (
+                <div
+                  key={promo.title}
+                  className={`shrink-0 w-72 h-32 rounded-2xl bg-gradient-to-br ${promo.gradient} p-5 flex flex-col justify-end text-white shadow-sm`}
+                >
+                  <h3 className="font-bold text-base leading-tight">{promo.title}</h3>
+                  <p className="text-xs text-white/85 mt-1">{promo.desc}</p>
+                </div>
+              ))}
         </div>
       </section>
+
+      {/* Pedí de nuevo (solo comprador logueado con pedidos previos) */}
+      {buyer && (reorderLoading || reorderProducts.length > 0) && (
+        <section className="max-w-7xl mx-auto px-4 sm:px-6 py-4">
+          <h2 className="text-lg font-bold text-slate-900 mb-3">Pedí de nuevo</h2>
+          <div className="flex gap-3 overflow-x-auto scrollbar-hide pb-1">
+            {reorderLoading && reorderProducts.length === 0
+              ? Array.from({ length: 4 }).map((_, i) => (
+                  <div key={i} className="w-40 shrink-0">
+                    <ProductCardSkeleton />
+                  </div>
+                ))
+              : reorderProducts.map((p) => (
+                  <div key={p.id} className="w-40 shrink-0">
+                    <ProductCard product={p} added={addedId === p.id} onQuickAdd={handleQuickAdd} />
+                  </div>
+                ))}
+          </div>
+        </section>
+      )}
+
+      {/* Fabricantes mejor calificados (rating real, ver ADR-008) */}
+      {topRated.length > 0 && (
+        <section className="max-w-7xl mx-auto px-4 sm:px-6 py-4">
+          <h2 className="text-lg font-bold text-slate-900 mb-3">Mejor calificados</h2>
+          <div className="flex gap-3 overflow-x-auto scrollbar-hide pb-1">
+            {topRated.map((c) => (
+              <div key={c.id} className="w-72 shrink-0">
+                <StoreCard company={c} />
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
 
       {/* Grid de fabricantes/distribuidores */}
       <section className="max-w-7xl mx-auto px-4 sm:px-6 py-4">

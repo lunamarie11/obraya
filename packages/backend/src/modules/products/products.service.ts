@@ -13,6 +13,7 @@ import { StorageService } from './storage.service';
 import { CreateProductDto } from './dto/create-product.dto';
 import { UpdateProductDto } from './dto/update-product.dto';
 import { ProductQueryDto } from './dto/product-query.dto';
+import { SearchService, ProductSearchDoc } from '../search/search.service';
 
 @Injectable()
 export class ProductsService {
@@ -22,7 +23,52 @@ export class ProductsService {
     @InjectRepository(ProductVariant)
     private readonly variantRepo: Repository<ProductVariant>,
     private readonly storageService: StorageService,
+    private readonly searchService: SearchService,
   ) {}
+
+  private toSearchDoc(product: Product): ProductSearchDoc {
+    return {
+      id: product.id,
+      companyId: product.companyId,
+      name: product.name,
+      brand: product.brand ?? '',
+      description: product.description ?? '',
+      category: product.category ?? '',
+      subcategory: product.subcategory ?? '',
+      isActive: product.isActive,
+      createdAt: product.createdAt?.toISOString() ?? new Date().toISOString(),
+    };
+  }
+
+  // Reindexado masivo (ver ADR-007, riesgo pendiente): si Elasticsearch se levanta
+  // despues de tener productos ya cargados en Postgres, esos productos no aparecen
+  // en la busqueda hasta que se editen (unico hook de indexado era create()/update()).
+  // Pensado para uso operativo desde el panel de super-admin (ver AdminController),
+  // no expuesto a fabricantes. En batches para no cargar toda la tabla en memoria.
+  async reindexAll(): Promise<{ indexed: number }> {
+    if (!this.searchService.isAvailable()) return { indexed: 0 };
+
+    const BATCH_SIZE = 500;
+    let indexed = 0;
+    let skip = 0;
+
+    while (true) {
+      const products = await this.productRepo.find({
+        skip,
+        take: BATCH_SIZE,
+        order: { id: 'ASC' },
+      });
+      if (products.length === 0) break;
+
+      await this.searchService.bulkIndex(products.map((p) => this.toSearchDoc(p)));
+      indexed += products.length;
+      skip += BATCH_SIZE;
+
+      if (products.length < BATCH_SIZE) break;
+    }
+
+    return { indexed };
+  }
 
   async findAll(companyId: string, query: ProductQueryDto) {
     const where: FindOptionsWhere<Product> = { companyId };
@@ -68,7 +114,9 @@ export class ProductsService {
       companyId,
       variants: dto.variants?.map((v) => this.variantRepo.create(v)) || [],
     });
-    return this.productRepo.save(product);
+    const saved = await this.productRepo.save(product);
+    await this.searchService.indexProduct(this.toSearchDoc(saved));
+    return saved;
   }
 
   async update(id: string, companyId: string, dto: UpdateProductDto): Promise<Product> {
@@ -81,7 +129,9 @@ export class ProductsService {
     }
 
     Object.assign(product, dto);
-    return this.productRepo.save(product);
+    const saved = await this.productRepo.save(product);
+    await this.searchService.indexProduct(this.toSearchDoc(saved));
+    return saved;
   }
 
   async remove(id: string, companyId: string): Promise<void> {
@@ -89,6 +139,7 @@ export class ProductsService {
     // Soft delete: marcar como inactivo en lugar de borrar (mantiene historial de pedidos)
     product.isActive = false;
     await this.productRepo.save(product);
+    await this.searchService.deleteProduct(id);
   }
 
   async uploadImage(

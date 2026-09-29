@@ -1,13 +1,15 @@
 import React from 'react';
 import { TextInput, Text, TouchableOpacity, View, StyleSheet } from 'react-native';
-import { useRouter } from 'expo-router';
-import { Search, ChevronLeft, ShoppingBag } from 'lucide-react-native';
+import { useRouter, useFocusEffect } from 'expo-router';
+import { Search, ChevronLeft, ShoppingBag, Heart } from 'lucide-react-native';
 import { useCart } from '../hooks/useCart';
+import { getStoredBuyer } from '../lib/buyer-auth';
 import { colors, radius } from '../theme';
 
 // Espejo de packages/frontend/src/components/marketplace/MarketplaceHeader.tsx.
 // El botón "Ingresar/Panel" del header web se omite acá porque la tab
-// "Perfil" ya cumple ese rol en la bottom tab bar.
+// "Perfil" ya cumple ese rol en la bottom tab bar. El corazón de favoritos
+// (backlog #4) sí se replica, solo visible con sesión de Buyer.
 interface Props {
   searchValue?: string;
   onSearchChange?: (val: string) => void;
@@ -29,6 +31,13 @@ export function Header({
 }: Props) {
   const router = useRouter();
   const { count } = useCart();
+  const [hasBuyer, setHasBuyer] = React.useState(false);
+
+  useFocusEffect(
+    React.useCallback(() => {
+      getStoredBuyer().then((b) => setHasBuyer(!!b));
+    }, []),
+  );
 
   return (
     <View style={styles.header}>
@@ -63,6 +72,12 @@ export function Header({
               style={styles.searchInput}
             />
           </View>
+        )}
+
+        {hasBuyer && (
+          <TouchableOpacity style={styles.cartBtn} onPress={() => router.push('/favorites')}>
+            <Heart size={18} color={colors.slate700} />
+          </TouchableOpacity>
         )}
 
         {showCart && (

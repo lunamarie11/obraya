@@ -1,6 +1,7 @@
-import { IsArray, IsNotEmpty, IsOptional, IsString, ValidateNested, IsNumber, Min, IsObject } from 'class-validator';
+import { IsArray, IsEnum, IsNotEmpty, IsOptional, IsString, ValidateNested, IsNumber, Min, IsObject } from 'class-validator';
 import { Type } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { PaymentMethod } from '../entities/order.entity';
 
 class OrderDeliveryAddressDto {
   @ApiProperty({ description: 'Calle y número' })
@@ -103,4 +104,9 @@ export class CreateOrderDto {
   @ValidateNested()
   @Type(() => OrderDeliveryAddressDto)
   deliveryAddress: OrderDeliveryAddressDto;
+
+  @ApiPropertyOptional({ enum: PaymentMethod, description: 'Método de pago elegido. Default: Efectivo' })
+  @IsOptional()
+  @IsEnum(PaymentMethod)
+  paymentMethod?: PaymentMethod;
 }

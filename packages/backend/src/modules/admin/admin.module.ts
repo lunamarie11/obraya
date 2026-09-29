@@ -7,11 +7,13 @@ import { Product } from '../products/entities/product.entity';
 import { AdminController } from './admin.controller';
 import { AdminService } from './admin.service';
 import { UsersModule } from '../users/users.module';
+import { ProductsModule } from '../products/products.module';
 
 @Module({
   imports: [
     TypeOrmModule.forFeature([Company, CompanyUser, Order, Product]),
     UsersModule,
+    ProductsModule,
   ],
   controllers: [AdminController],
   providers: [AdminService],

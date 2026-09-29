@@ -5,6 +5,7 @@ import { Company, CompanyStatus } from '../users/entities/company.entity';
 import { CompanyUser, UserRole } from '../users/entities/company-user.entity';
 import { Order, OrderStatus } from '../orders/entities/order.entity';
 import { Product } from '../products/entities/product.entity';
+import { ProductsService } from '../products/products.service';
 
 @Injectable()
 export class AdminService {
@@ -17,6 +18,7 @@ export class AdminService {
     private readonly orderRepo: Repository<Order>,
     @InjectRepository(Product)
     private readonly productRepo: Repository<Product>,
+    private readonly productsService: ProductsService,
   ) {}
 
   async getStats() {
@@ -235,5 +237,11 @@ export class AdminService {
     const product = await this.productRepo.findOne({ where: { id } });
     if (!product) throw new NotFoundException('Producto no encontrado');
     await this.productRepo.remove(product);
+  }
+
+  // ── Búsqueda ─────────────────────────────────────────────────────────────
+
+  async reindexSearch(): Promise<{ indexed: number }> {
+    return this.productsService.reindexAll();
   }
 }

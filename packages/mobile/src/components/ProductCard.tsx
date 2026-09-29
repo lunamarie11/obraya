@@ -1,10 +1,11 @@
 import React from 'react';
 import { Image, Text, TouchableOpacity, View, StyleSheet } from 'react-native';
 import { useRouter } from 'expo-router';
-import { Plus, Check, Store, Package } from 'lucide-react-native';
+import { Plus, Check, Store, Package, Heart } from 'lucide-react-native';
 import { formatARS } from '../lib/api';
 import { CATEGORIES, CATEGORY_COLORS } from '../constants/categories';
 import { colors, radius, shadow } from '../theme';
+import { useFavorites } from '../hooks/useFavorites';
 
 // Espejo de packages/frontend/src/components/marketplace/ProductCard.tsx.
 export interface ProductCardData {
@@ -26,9 +27,19 @@ interface Props {
 
 export function ProductCard({ product, added, onQuickAdd, showStore = true }: Props) {
   const router = useRouter();
+  const { buyer, isFavorite, toggle } = useFavorites();
+  const favorited = isFavorite('product', product.id);
   const price = product.price?.finalPrice ?? product.price?.basePrice;
   const bg = CATEGORY_COLORS[product.category ?? ''] ?? CATEGORY_COLORS.default;
   const emoji = CATEGORIES.find((c) => c.key === product.category)?.emoji ?? '📦';
+
+  function handleToggleFavorite() {
+    if (!buyer) {
+      router.push('/(tabs)/profile');
+      return;
+    }
+    toggle('product', product.id);
+  }
 
   return (
     <TouchableOpacity
@@ -42,6 +53,9 @@ export function ProductCard({ product, added, onQuickAdd, showStore = true }: Pr
         ) : (
           <Text style={styles.emoji}>{emoji}</Text>
         )}
+        <TouchableOpacity style={[styles.favBtn, favorited && styles.favBtnActive]} onPress={handleToggleFavorite}>
+          <Heart size={14} color={favorited ? '#ef4444' : colors.slate400} fill={favorited ? '#ef4444' : 'none'} />
+        </TouchableOpacity>
         <TouchableOpacity
           style={[styles.addBtn, added ? styles.addBtnActive : styles.addBtnDefault]}
           onPress={() => onQuickAdd(product)}
@@ -111,6 +125,19 @@ const styles = StyleSheet.create({
   },
   addBtnDefault: { backgroundColor: colors.white },
   addBtnActive: { backgroundColor: colors.green500 },
+  favBtn: {
+    position: 'absolute',
+    top: 10,
+    left: 10,
+    width: 28,
+    height: 28,
+    borderRadius: radius.pill,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(255,255,255,0.92)',
+    ...shadow.card,
+  },
+  favBtnActive: { backgroundColor: colors.white },
   body: { padding: 12, gap: 6 },
   storeRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   storeName: { fontSize: 11, color: colors.slate400, fontWeight: '500', flexShrink: 1 },

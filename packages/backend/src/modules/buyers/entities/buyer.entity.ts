@@ -34,6 +34,10 @@ export class Buyer {
   @Column({ name: 'last_login_at', nullable: true })
   lastLoginAt: Date;
 
+  // Token FCM del dispositivo del comprador para push notifications (ver ADR-007).
+  @Column({ name: 'fcm_token', nullable: true, length: 255 })
+  fcmToken: string;
+
   @CreateDateColumn({ name: 'created_at' })
   createdAt: Date;
 

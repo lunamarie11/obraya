@@ -2,11 +2,13 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { NotFoundException } from '@nestjs/common';
 import { MarketplacePublicService } from '../marketplace-public.service';
-import { Company, CompanyStatus } from '../../users/entities/company.entity';
+import { Company, CompanyStatus, FleetType } from '../../users/entities/company.entity';
 import { Product } from '../../products/entities/product.entity';
 import { Stock } from '../../stock/entities/stock.entity';
 import { PricesService } from '../../prices/prices.service';
-import { PriceType } from '../../prices/entities/price.entity';
+import { Price, PriceType } from '../../prices/entities/price.entity';
+import { SearchService } from '../../search/search.service';
+import { ReviewsService } from '../../reviews/reviews.service';
 
 function makeCompany(overrides: Partial<Company> = {}): Company {
   const c = new Company();
@@ -16,7 +18,10 @@ function makeCompany(overrides: Partial<Company> = {}): Company {
   c.logoUrl = 'https://example.com/logo.png';
   c.city = 'CABA';
   c.province = 'Buenos Aires';
-  c.coverageZones = ['1000', '1001'];
+  c.deliveryZones = [{
+    id: 'zone-1', name: 'CABA', zipCodes: ['1000', '1001'],
+    promisedHours: 24, fleetType: FleetType.PROPIA, shippingCost: 0,
+  }];
   return Object.assign(c, overrides);
 }
 
@@ -57,8 +62,34 @@ const mockStockRepo = {
   find: jest.fn(),
 };
 
+const mockPriceQueryBuilder = {
+  innerJoinAndSelect: jest.fn().mockReturnThis(),
+  innerJoin: jest.fn().mockReturnThis(),
+  addSelect: jest.fn().mockReturnThis(),
+  where: jest.fn().mockReturnThis(),
+  andWhere: jest.fn().mockReturnThis(),
+  orderBy: jest.fn().mockReturnThis(),
+  take: jest.fn().mockReturnThis(),
+  getMany: jest.fn(),
+};
+
+const mockPriceRepo = {
+  createQueryBuilder: jest.fn(() => mockPriceQueryBuilder),
+};
+
 const mockPricesService = {
   resolve: jest.fn(),
+};
+
+const mockSearchService = {
+  isAvailable: jest.fn().mockReturnValue(false),
+  search: jest.fn(),
+};
+
+const mockReviewsService = {
+  getAggregatesForCompanies: jest.fn().mockResolvedValue(new Map()),
+  getAggregateForCompany: jest.fn().mockResolvedValue({ averageRating: 0, reviewCount: 0 }),
+  findByCompany: jest.fn(),
 };
 
 describe('MarketplacePublicService', () => {
@@ -67,13 +98,19 @@ describe('MarketplacePublicService', () => {
   beforeEach(async () => {
     jest.clearAllMocks();
     mockStockRepo.find.mockResolvedValue([]);
+    mockSearchService.isAvailable.mockReturnValue(false);
+    mockReviewsService.getAggregatesForCompanies.mockResolvedValue(new Map());
+    mockReviewsService.getAggregateForCompany.mockResolvedValue({ averageRating: 0, reviewCount: 0 });
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         MarketplacePublicService,
         { provide: getRepositoryToken(Company), useValue: mockCompanyRepo },
         { provide: getRepositoryToken(Product), useValue: mockProductRepo },
         { provide: getRepositoryToken(Stock), useValue: mockStockRepo },
+        { provide: getRepositoryToken(Price), useValue: mockPriceRepo },
         { provide: PricesService, useValue: mockPricesService },
+        { provide: SearchService, useValue: mockSearchService },
+        { provide: ReviewsService, useValue: mockReviewsService },
       ],
     }).compile();
 
@@ -97,6 +134,8 @@ describe('MarketplacePublicService', () => {
           city: 'CABA',
           province: 'Buenos Aires',
           coverageZones: ['1000', '1001'],
+          averageRating: 0,
+          reviewCount: 0,
         },
       ]);
       expect(result[0]).not.toHaveProperty('cuit');
@@ -173,6 +212,50 @@ describe('MarketplacePublicService', () => {
       });
       expect(result.data[0].companyName).toBe('Materiales SA');
       expect(result.total).toBe(1);
+    });
+  });
+
+  describe('findActivePromotions', () => {
+    it('mapea precios con descuento programado activo a banners', async () => {
+      const price = new Price();
+      price.productId = 'product-uuid-1';
+      price.basePrice = 100000;
+      price.scheduledDiscount = {
+        discountPercent: 20,
+        startDate: '2026-01-01',
+        endDate: '2026-12-31',
+        label: 'Promo Invierno',
+      };
+      (price as any).product = { ...makeProduct(), company: makeCompany() };
+      mockPriceQueryBuilder.getMany.mockResolvedValue([price]);
+
+      const result = await service.findActivePromotions();
+
+      expect(mockPriceQueryBuilder.andWhere).toHaveBeenCalledWith(
+        "(price.scheduledDiscount->>'startDate')::timestamptz <= :now",
+        expect.objectContaining({ now: expect.any(Date) }),
+      );
+      expect(result).toEqual([
+        {
+          productId: 'product-uuid-1',
+          productName: 'Cemento Portland',
+          image: undefined,
+          companyId: 'company-uuid-1',
+          companyName: 'Materiales SA',
+          label: 'Promo Invierno',
+          discountPercent: 20,
+          basePrice: 100000,
+          finalPrice: 80000,
+        },
+      ]);
+    });
+
+    it('devuelve un array vacío si no hay descuentos programados activos', async () => {
+      mockPriceQueryBuilder.getMany.mockResolvedValue([]);
+
+      const result = await service.findActivePromotions();
+
+      expect(result).toEqual([]);
     });
   });
 

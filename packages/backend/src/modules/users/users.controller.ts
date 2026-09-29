@@ -39,8 +39,8 @@ export class UsersController {
     @Body() dto: any,
     @CurrentUser() currentUser: any,
   ) {
-    const { phone, address, city, province, bankingData, coverageZones } = dto;
-    return this.usersService.updateCompany(id, { phone, address, city, province, bankingData, coverageZones });
+    const { phone, address, city, province, bankingData, deliveryZones } = dto;
+    return this.usersService.updateCompany(id, { phone, address, city, province, bankingData, deliveryZones });
   }
 
   @Get(':id/users')

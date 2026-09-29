@@ -16,6 +16,19 @@ export interface Company {
   updatedAt: Date;
 }
 
+export type FleetType = 'propia' | 'tercerizada' | 'retiro_local';
+
+// Zona de entrega configurada por el fabricante (ver ADR-012), con costo y
+// tiempo prometido de envío. Reemplaza al viejo `coverageZones: string[]`.
+export interface DeliveryZone {
+  id: string;
+  name: string;
+  zipCodes: string[];
+  promisedHours: number;
+  fleetType: FleetType;
+  shippingCost: number; // centavos de ARS
+}
+
 export interface CompanyUser {
   id: string;
   companyId: string;
@@ -81,8 +94,10 @@ export interface Product {
 
 export type OrderStatus = 'Nuevo' | 'Aceptado' | 'Preparacion' | 'Despachado' | 'Entregado' | 'Cancelado';
 
+export type PaymentMethod = 'Efectivo' | 'Transferencia' | 'MercadoPago';
+
 // Datos públicos de una empresa/fabricante, sin autenticación (ver ADR-003).
-// Solo campos que ya existen en la entidad Company del backend.
+// averageRating/reviewCount son datos reales agregados desde Review (ver ADR-008).
 export interface PublicCompany {
   id: string;
   razonSocial: string;
@@ -90,6 +105,24 @@ export interface PublicCompany {
   city?: string;
   province?: string;
   coverageZones?: string[];
+  averageRating?: number;
+  reviewCount?: number;
+}
+
+// Cotización de envío pública (ver ADR-012, GET /public/companies/:id/shipping-quote).
+export type ShippingQuote =
+  | { available: true; zoneName: string; promisedHours: number; fleetType: FleetType; shippingCost: number }
+  | { available: false };
+
+// Reseña de un comprador sobre un pedido entregado (ver ADR-008).
+export interface Review {
+  id: string;
+  buyerId: string;
+  companyId: string;
+  orderId: string;
+  rating: number;
+  comment?: string;
+  createdAt: Date;
 }
 
 // Producto tal como lo expone el catálogo público (ver ADR-003).
@@ -105,6 +138,21 @@ export interface PublicProduct {
     finalPrice: number;
     discountPercent: number;
   };
+}
+
+// Banner de promoción activa en el home, derivado de Price.scheduledDiscount
+// (ver ADR-009): no es una entidad propia, es el mismo descuento programado que
+// ya resuelve el precio final del producto.
+export interface PromotionBanner {
+  productId: string;
+  productName: string;
+  image?: string;
+  companyId: string;
+  companyName?: string;
+  label?: string;
+  discountPercent: number;
+  basePrice: number;
+  finalPrice: number;
 }
 
 export interface OrderItem {
@@ -141,6 +189,8 @@ export interface Order {
   rejectionReason?: string;
   items: OrderItem[];
   totalAmount: number;
+  shippingCost?: number;
+  shippingZoneName?: string;
   currency: string;
   notes?: string;
   deliveryAddress?: OrderDeliveryAddress;
@@ -148,4 +198,9 @@ export interface Order {
   updatedAt: Date;
   scheduledDeliveryDate?: Date;
   actualDeliveryDate?: Date;
+  paymentMethod?: PaymentMethod;
+  mpPreferenceId?: string;
+  mpPaymentId?: string;
+  paymentUrl?: string;
+  paymentStatus?: string;
 }

@@ -52,4 +52,8 @@ export class BuyersService {
   async updateLastLogin(buyerId: string): Promise<void> {
     await this.buyerRepo.update(buyerId, { lastLoginAt: new Date() });
   }
+
+  async updateFcmToken(buyerId: string, fcmToken: string): Promise<void> {
+    await this.buyerRepo.update(buyerId, { fcmToken });
+  }
 }

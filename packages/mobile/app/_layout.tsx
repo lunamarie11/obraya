@@ -7,7 +7,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 // Stack raíz: envuelve el grupo de tabs y las pantallas de detalle que se
 // apilan por encima (company/[id], product/[id], checkout,
-// order-confirmation, my-orders/[id]) — ver docs/adrs/ADR-005.
+// order-confirmation, my-orders/[id], favorites) — ver docs/adrs/ADR-005.
 const queryClient = new QueryClient();
 
 export default function RootLayout() {
@@ -23,6 +23,7 @@ export default function RootLayout() {
             <Stack.Screen name="checkout" />
             <Stack.Screen name="order-confirmation" />
             <Stack.Screen name="my-orders/[id]" />
+            <Stack.Screen name="favorites" />
           </Stack>
         </QueryClientProvider>
       </SafeAreaProvider>

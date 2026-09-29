@@ -11,7 +11,7 @@ import {
   StyleSheet,
 } from 'react-native';
 import { useFocusEffect, useRouter } from 'expo-router';
-import { Eye, EyeOff, HardHat, LogOut, Package, User as UserIcon, UserPlus } from 'lucide-react-native';
+import { Eye, EyeOff, HardHat, Heart, LogOut, Package, User as UserIcon, UserPlus } from 'lucide-react-native';
 import { buyerDemoLogin, buyerLogin, buyerLogout, buyerRegister, getStoredBuyer, type BuyerUser } from '../../src/lib/buyer-auth';
 import { colors, radius, shadow } from '../../src/theme';
 
@@ -106,6 +106,11 @@ export default function ProfileScreen() {
           <TouchableOpacity style={styles.ordersBtn} onPress={() => router.push('/(tabs)/my-orders')}>
             <Package size={16} color={colors.slate700} />
             <Text style={styles.ordersText}>Mis pedidos</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity style={styles.ordersBtn} onPress={() => router.push('/favorites')}>
+            <Heart size={16} color={colors.slate700} />
+            <Text style={styles.ordersText}>Favoritos</Text>
           </TouchableOpacity>
 
           <TouchableOpacity style={styles.logoutBtn} onPress={handleLogout}>

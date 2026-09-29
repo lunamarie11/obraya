@@ -6,7 +6,7 @@ import {
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, DataSource, Between, ILike } from 'typeorm';
-import { Order, OrderStatus, VALID_TRANSITIONS } from './entities/order.entity';
+import { Order, OrderStatus, PaymentMethod, VALID_TRANSITIONS } from './entities/order.entity';
 import { OrderItem } from './entities/order-item.entity';
 import { OrderMessage, MessageSender } from './entities/order-message.entity';
 import { CreateOrderDto } from './dto/create-order.dto';
@@ -14,8 +14,12 @@ import { UpdateOrderStatusDto } from './dto/update-order-status.dto';
 import { SendMessageDto } from './dto/send-message.dto';
 import { OrderQueryDto } from './dto/order-query.dto';
 import { StockService } from '../stock/stock.service';
+import { PaymentsService } from '../payments/payments.service';
+import { NotificationsService } from '../notifications/notifications.service';
+import { EmailService } from '../email/email.service';
+import { BuyersService } from '../buyers/buyers.service';
 import { AfipService } from '../afip/afip.service';
-import { Company } from '../users/entities/company.entity';
+import { Company, resolveDeliveryZone } from '../users/entities/company.entity';
 
 @Injectable()
 export class OrdersService {
@@ -28,8 +32,14 @@ export class OrdersService {
     private readonly itemRepo: Repository<OrderItem>,
     @InjectRepository(OrderMessage)
     private readonly messageRepo: Repository<OrderMessage>,
+    @InjectRepository(Company)
+    private readonly companyRepo: Repository<Company>,
     private readonly dataSource: DataSource,
     private readonly stockService: StockService,
+    private readonly paymentsService: PaymentsService,
+    private readonly notificationsService: NotificationsService,
+    private readonly emailService: EmailService,
+    private readonly buyersService: BuyersService,
     private readonly afipService: AfipService,
   ) {}
 
@@ -102,7 +112,15 @@ export class OrdersService {
       });
     });
 
-    const totalAmount = items.reduce((sum, item) => sum + Number(item.subtotal), 0);
+    const itemsTotal = items.reduce((sum, item) => sum + Number(item.subtotal), 0);
+
+    // Costo de envío resuelto server-side (ver ADR-012): nunca se confía en
+    // un shippingCost enviado por el cliente. Si la empresa no configuró
+    // zonas o el código postal no matchea ninguna, el envío queda en 0 y no
+    // bloquea la creación del pedido.
+    const company = await this.companyRepo.findOne({ where: { id: companyId } });
+    const zone = resolveDeliveryZone(company?.deliveryZones, dto.deliveryAddress?.postalCode);
+    const shippingCost = zone?.shippingCost ?? 0;
 
     const order = this.orderRepo.create({
       companyId,
@@ -113,13 +131,47 @@ export class OrdersService {
       orderNumber: this.generateOrderNumber(),
       status: OrderStatus.NUEVO,
       items,
-      totalAmount,
+      totalAmount: itemsTotal + shippingCost,
+      shippingCost,
+      shippingZoneName: zone?.name,
       currency: 'ARS',
       notes: dto.notes,
       deliveryAddress: dto.deliveryAddress,
+      paymentMethod: dto.paymentMethod ?? PaymentMethod.EFECTIVO,
     });
 
-    return this.orderRepo.save(order);
+    const saved = await this.orderRepo.save(order);
+
+    // Ver ADR-007: con Mercado Pago generamos la preferencia de pago recién
+    // creado el pedido y guardamos el link de pago para que el comprador lo use.
+    if (saved.paymentMethod === PaymentMethod.MERCADO_PAGO) {
+      try {
+        const preference = await this.paymentsService.createPreference({
+          id: saved.id,
+          orderNumber: saved.orderNumber,
+          items: [
+            ...saved.items.map((item) => ({
+              name: item.productName,
+              qty: item.quantity,
+              price: item.unitPrice,
+            })),
+            ...(saved.shippingCost > 0
+              ? [{ name: `Envío${saved.shippingZoneName ? ` (${saved.shippingZoneName})` : ''}`, qty: 1, price: saved.shippingCost }]
+              : []),
+          ],
+          payerEmail: saved.buyerEmail,
+        });
+        saved.mpPreferenceId = preference.preferenceId;
+        saved.paymentUrl = preference.initPoint;
+        await this.orderRepo.save(saved);
+      } catch (err) {
+        // No bloqueamos la creación del pedido si Mercado Pago falla; el fabricante
+        // y el comprador pueden coordinar el pago por otro medio.
+        this.logger.warn(`No se pudo crear la preferencia de MP para ${saved.orderNumber}: ${(err as Error).message}`);
+      }
+    }
+
+    return saved;
   }
 
   // Ver ADR-006: el comprador crea el pedido para el fabricante indicado en
@@ -248,7 +300,19 @@ export class OrdersService {
         }),
       );
 
-      return orderRepo.findOne({ where: { id }, relations: ['items', 'messages'] }) as Promise<Order>;
+      const updated = await orderRepo.findOne({ where: { id }, relations: ['items', 'messages'] }) as Order;
+
+      // Push notification + email al comprador (ver ADR-011 para el email).
+      // Best-effort: ninguno de los dos bloquea la transacción de la orden.
+      this.buyersService
+        .findById(updated.buyerId)
+        .then((buyer) => {
+          this.notificationsService.notifyOrderStatus(buyer?.fcmToken, updated.orderNumber, dto.status);
+          if (buyer?.email) this.emailService.sendOrderStatusEmail(buyer.email, updated.orderNumber, dto.status);
+        })
+        .catch((err) => this.logger.warn(`No se pudo notificar al comprador ${updated.buyerId}: ${(err as Error).message}`));
+
+      return updated;
     });
   }
 

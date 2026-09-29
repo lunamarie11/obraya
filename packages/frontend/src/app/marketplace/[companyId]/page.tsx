@@ -3,7 +3,8 @@
 import React from 'react';
 import { useParams } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
-import { getPublicCompany, getPublicCompanyProducts } from '@/lib/marketplace';
+import { Star } from 'lucide-react';
+import { getPublicCompany, getPublicCompanyProducts, getCompanyReviews } from '@/lib/marketplace';
 import { addToCart } from '@/lib/cart';
 import { MarketplaceHeader } from '@/components/marketplace/MarketplaceHeader';
 import { ProductCard, ProductCardSkeleton, type ProductCardData } from '@/components/marketplace/ProductCard';
@@ -32,6 +33,12 @@ export default function CompanyStorePage() {
   const { data, isLoading } = useQuery({
     queryKey: ['public-company-products', companyId, debouncedSearch],
     queryFn: () => getPublicCompanyProducts(companyId, { search: debouncedSearch || undefined, limit: 100 }),
+    enabled: !!companyId,
+  });
+
+  const { data: reviews } = useQuery({
+    queryKey: ['public-company-reviews', companyId],
+    queryFn: () => getCompanyReviews(companyId, { limit: 10 }),
     enabled: !!companyId,
   });
 
@@ -65,6 +72,23 @@ export default function CompanyStorePage() {
       />
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 py-6">
+        {company && (
+          <div className="mb-4 flex items-center gap-2 text-sm">
+            {company.reviewCount ? (
+              <span className="flex items-center gap-1 font-semibold text-slate-700">
+                <Star size={14} className="text-amber-400 fill-amber-400" />
+                {company.averageRating?.toFixed(1)}
+                <span className="text-slate-400 font-normal">({company.reviewCount} reseñas)</span>
+              </span>
+            ) : (
+              <span className="flex items-center gap-1 text-slate-400">
+                <Star size={14} />
+                Todavía sin reseñas
+              </span>
+            )}
+          </div>
+        )}
+
         <div className="relative mb-6">
           <input
             type="search"
@@ -104,6 +128,31 @@ export default function CompanyStorePage() {
               </section>
             ))}
           </div>
+        )}
+
+        {!!reviews?.data?.length && (
+          <section className="mt-10">
+            <h2 className="text-lg font-bold text-slate-900 mb-3">Reseñas de compradores</h2>
+            <div className="space-y-3">
+              {reviews.data.map((review) => (
+                <div key={review.id} className="card-ios p-4">
+                  <div className="flex items-center gap-1 mb-1">
+                    {Array.from({ length: 5 }).map((_, i) => (
+                      <Star
+                        key={i}
+                        size={13}
+                        className={i < review.rating ? 'text-amber-400 fill-amber-400' : 'text-slate-200'}
+                      />
+                    ))}
+                    <span className="text-xs text-slate-400 ml-2">
+                      {new Date(review.createdAt).toLocaleDateString('es-AR', { day: '2-digit', month: 'short', year: 'numeric' })}
+                    </span>
+                  </div>
+                  {review.comment && <p className="text-sm text-slate-700">{review.comment}</p>}
+                </div>
+              ))}
+            </div>
+          </section>
         )}
       </main>
 

@@ -2,13 +2,20 @@
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useState, useEffect } from 'react';
-import { api } from '@/lib/api';
+import { api, formatARS } from '@/lib/api';
 import { Header } from '@/components/layout/Header';
 import { getStoredUser } from '@/lib/auth';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { clsx } from 'clsx';
-import { UserPlus, Copy, CheckCheck, Building2, CreditCard, MapPin, Plus, X, Loader2 } from 'lucide-react';
+import { UserPlus, Copy, CheckCheck, Building2, CreditCard, MapPin, Plus, X, Loader2, Trash2 } from 'lucide-react';
+import type { DeliveryZone, FleetType } from '@obraya/shared';
+
+const FLEET_TYPES: { value: FleetType; label: string }[] = [
+  { value: 'propia', label: 'Flota propia' },
+  { value: 'tercerizada', label: 'Tercerizada' },
+  { value: 'retiro_local', label: 'Retiro local' },
+];
 
 const ROLES = [
   { value: 'Admin',        label: 'Admin',        desc: 'Acceso completo' },
@@ -248,14 +255,13 @@ function CompanyProfile({ companyId }: { companyId: string }) {
 
   const [profile, setProfile] = useState({ phone: '', address: '', city: '', province: '' });
   const [banking, setBanking] = useState({ cbu: '', alias: '', bank: '', accountHolder: '' });
-  const [zones, setZones] = useState<string[]>([]);
-  const [newZone, setNewZone] = useState('');
+  const [zones, setZones] = useState<DeliveryZone[]>([]);
 
   useEffect(() => {
     if (company) {
       setProfile({ phone: company.phone ?? '', address: company.address ?? '', city: company.city ?? '', province: company.province ?? '' });
       setBanking({ cbu: company.bankingData?.cbu ?? '', alias: company.bankingData?.alias ?? '', bank: company.bankingData?.bank ?? '', accountHolder: company.bankingData?.accountHolder ?? '' });
-      setZones(company.coverageZones ?? []);
+      setZones(company.deliveryZones ?? []);
     }
   }, [company]);
 
@@ -265,13 +271,25 @@ function CompanyProfile({ companyId }: { companyId: string }) {
   });
 
   const handleSave = () => {
-    update.mutate({ ...profile, bankingData: banking, coverageZones: zones });
+    update.mutate({ ...profile, bankingData: banking, deliveryZones: zones });
   };
 
   const addZone = () => {
-    const z = newZone.trim().replace(/\D/g, '').slice(0, 8);
-    if (z && !zones.includes(z)) { setZones([...zones, z]); setNewZone(''); }
+    setZones([...zones, {
+      id: `zone-${Date.now()}`,
+      name: '',
+      zipCodes: [],
+      promisedHours: 24,
+      fleetType: 'propia',
+      shippingCost: 0,
+    }]);
   };
+
+  const updateZone = (id: string, patch: Partial<DeliveryZone>) => {
+    setZones(zones.map((z) => (z.id === id ? { ...z, ...patch } : z)));
+  };
+
+  const removeZone = (id: string) => setZones(zones.filter((z) => z.id !== id));
 
   if (isLoading || !company) return null;
 
@@ -357,43 +375,30 @@ function CompanyProfile({ companyId }: { companyId: string }) {
         </div>
       </div>
 
-      {/* Zonas de cobertura */}
+      {/* Zonas de entrega */}
       <div className="card p-5 space-y-4">
-        <div className="flex items-center gap-2">
-          <MapPin size={16} className="text-slate-500" />
-          <h2 className="font-bold text-slate-900">Zonas de cobertura</h2>
-        </div>
-        <p className="text-xs text-slate-500">Agregá los códigos postales donde hacen entregas.</p>
-
-        <div className="flex gap-2">
-          <input
-            className="input flex-1 text-sm"
-            placeholder="Ej: 1424"
-            value={newZone}
-            onChange={(e) => setNewZone(e.target.value)}
-            onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addZone(); } }}
-          />
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <MapPin size={16} className="text-slate-500" />
+            <h2 className="font-bold text-slate-900">Zonas de entrega</h2>
+          </div>
           <button type="button" onClick={addZone} className="btn-secondary text-sm flex items-center gap-1.5">
-            <Plus size={14} /> Agregar
+            <Plus size={14} /> Nueva zona
           </button>
         </div>
-
-        {zones.length > 0 && (
-          <div className="flex flex-wrap gap-2">
-            {zones.map((z) => (
-              <span key={z} className="inline-flex items-center gap-1 bg-slate-100 text-slate-700 text-xs font-mono px-2.5 py-1 rounded-full border border-slate-200">
-                {z}
-                <button type="button" onClick={() => setZones(zones.filter((x) => x !== z))} className="text-slate-500 hover:text-red-400 ml-0.5 transition-colors">
-                  <X size={11} />
-                </button>
-              </span>
-            ))}
-          </div>
-        )}
+        <p className="text-xs text-slate-500">
+          Definí zonas por código postal con su costo de envío y tiempo estimado. Se usan para cotizar el envío en el checkout del comprador.
+        </p>
 
         {zones.length === 0 && (
-          <p className="text-xs text-slate-500 italic">Sin zonas de cobertura configuradas.</p>
+          <p className="text-xs text-slate-500 italic">Sin zonas de entrega configuradas.</p>
         )}
+
+        <div className="space-y-3">
+          {zones.map((zone) => (
+            <ZoneEditor key={zone.id} zone={zone} onChange={(patch) => updateZone(zone.id, patch)} onRemove={() => removeZone(zone.id)} />
+          ))}
+        </div>
       </div>
 
       <div className="flex justify-end">
@@ -401,6 +406,103 @@ function CompanyProfile({ companyId }: { companyId: string }) {
           {update.isPending && <Loader2 size={15} className="animate-spin" />}
           {update.isPending ? 'Guardando...' : update.isSuccess ? '¡Guardado!' : 'Guardar configuración'}
         </button>
+      </div>
+    </div>
+  );
+}
+
+function ZoneEditor({
+  zone,
+  onChange,
+  onRemove,
+}: {
+  zone: DeliveryZone;
+  onChange: (patch: Partial<DeliveryZone>) => void;
+  onRemove: () => void;
+}) {
+  const [newZip, setNewZip] = useState('');
+  const [costInput, setCostInput] = useState(String(zone.shippingCost / 100));
+
+  const addZip = () => {
+    const z = newZip.trim().replace(/\D/g, '').slice(0, 8);
+    if (z && !zone.zipCodes.includes(z)) onChange({ zipCodes: [...zone.zipCodes, z] });
+    setNewZip('');
+  };
+
+  return (
+    <div className="border border-slate-200 rounded-xl p-4 space-y-3 bg-slate-50/50">
+      <div className="flex items-start justify-between gap-2">
+        <input
+          className="input flex-1 text-sm font-semibold"
+          placeholder="Nombre de la zona (ej: CABA)"
+          value={zone.name}
+          onChange={(e) => onChange({ name: e.target.value })}
+        />
+        <button type="button" onClick={onRemove} className="text-slate-400 hover:text-red-500 transition-colors p-2" title="Eliminar zona">
+          <Trash2 size={15} />
+        </button>
+      </div>
+
+      <div className="grid grid-cols-3 gap-3">
+        <div>
+          <label className="label">Flota</label>
+          <select
+            className="input w-full text-sm"
+            value={zone.fleetType}
+            onChange={(e) => onChange({ fleetType: e.target.value as FleetType })}
+          >
+            {FLEET_TYPES.map((f) => (
+              <option key={f.value} value={f.value}>{f.label}</option>
+            ))}
+          </select>
+        </div>
+        <div>
+          <label className="label">Tiempo estimado (hs)</label>
+          <input
+            type="number" min={1} className="input w-full text-sm"
+            value={zone.promisedHours}
+            onChange={(e) => onChange({ promisedHours: Number(e.target.value) || 0 })}
+          />
+        </div>
+        <div>
+          <label className="label">Costo de envío ($)</label>
+          <input
+            type="number" min="0" step="0.01" className="input w-full text-sm"
+            value={costInput}
+            onChange={(e) => {
+              setCostInput(e.target.value);
+              onChange({ shippingCost: Math.round((parseFloat(e.target.value) || 0) * 100) });
+            }}
+          />
+        </div>
+      </div>
+
+      <div>
+        <label className="label">Códigos postales</label>
+        <div className="flex gap-2">
+          <input
+            className="input flex-1 text-sm"
+            placeholder="Ej: 1424"
+            value={newZip}
+            onChange={(e) => setNewZip(e.target.value)}
+            onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addZip(); } }}
+          />
+          <button type="button" onClick={addZip} className="btn-secondary text-sm flex items-center gap-1.5">
+            <Plus size={14} /> Agregar
+          </button>
+        </div>
+        {zone.zipCodes.length > 0 && (
+          <div className="flex flex-wrap gap-2 mt-2">
+            {zone.zipCodes.map((z) => (
+              <span key={z} className="inline-flex items-center gap-1 bg-white text-slate-700 text-xs font-mono px-2.5 py-1 rounded-full border border-slate-200">
+                {z}
+                <button type="button" onClick={() => onChange({ zipCodes: zone.zipCodes.filter((x) => x !== z) })} className="text-slate-500 hover:text-red-400 ml-0.5 transition-colors">
+                  <X size={11} />
+                </button>
+              </span>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );

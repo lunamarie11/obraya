@@ -8,18 +8,27 @@ import { api, formatARS } from '@/lib/api';
 import { clearCart, updateCartItemQuantity, getCartGroupedByCompany } from '@/lib/cart';
 import { getStoredBuyer } from '@/lib/buyer-auth';
 import { getBuyerAddresses, createBuyerAddress, deleteBuyerAddress, type BuyerAddress } from '@/lib/addresses';
+import { getShippingQuote } from '@/lib/marketplace';
 import { useCart } from '@/hooks/useCart';
 import { MarketplaceHeader } from '@/components/marketplace/MarketplaceHeader';
-import { MapPin, Package, CheckCircle2, ArrowRight, Minus, Plus, Wallet, Landmark, LogIn, Trash2 } from 'lucide-react';
+import { MapPin, Package, CheckCircle2, ArrowRight, Minus, Plus, Wallet, Landmark, CreditCard, LogIn, Trash2, Truck } from 'lucide-react';
 import { clsx } from 'clsx';
 
 const STEPS = ['Dirección', 'Método de pago', 'Resumen'] as const;
 type Step = 0 | 1 | 2;
-type PaymentMethod = 'efectivo' | 'transferencia';
+type PaymentMethod = 'efectivo' | 'transferencia' | 'mercadopago';
+
+// Mapea la opción elegida en el frontend al enum PaymentMethod real del backend (ver ADR-007).
+const PAYMENT_METHOD_DTO: Record<PaymentMethod, string> = {
+  efectivo: 'Efectivo',
+  transferencia: 'Transferencia',
+  mercadopago: 'MercadoPago',
+};
 
 const PAYMENT_OPTIONS: { value: PaymentMethod; label: string; desc: string; icon: typeof Wallet }[] = [
   { value: 'efectivo', label: 'Efectivo / contra-entrega', desc: 'Pagás cuando lo recibís en tu obra.', icon: Wallet },
   { value: 'transferencia', label: 'Transferencia bancaria', desc: 'Te compartimos los datos por chat con el vendedor.', icon: Landmark },
+  { value: 'mercadopago', label: 'Mercado Pago', desc: 'Pagá online con tarjeta, débito o dinero en cuenta.', icon: CreditCard },
 ];
 
 export default function CheckoutPage() {
@@ -80,6 +89,19 @@ export default function CheckoutPage() {
 
   const useManualForm = showAddressForm || savedAddresses.length === 0;
 
+  // Cotización de envío (ver ADR-012): informativa, una por fabricante en el
+  // carrito. El costo real que se cobra se recalcula server-side al crear
+  // cada pedido, así que si esto falla o no hay zona configurada no bloquea.
+  const cartGroups = React.useMemo(() => getCartGroupedByCompany(), [cart]);
+  const { data: shippingQuotes = [] } = useQuery({
+    queryKey: ['shipping-quotes', cartGroups.map((g) => g.companyId).join(','), address.postalCode],
+    queryFn: () => Promise.all(
+      cartGroups.map((g) => getShippingQuote(g.companyId, address.postalCode).catch(() => ({ available: false as const }))),
+    ),
+    enabled: !!address.postalCode.trim() && cartGroups.length > 0,
+  });
+  const shippingTotal = shippingQuotes.reduce((sum, q) => sum + (q.available ? q.shippingCost : 0), 0);
+
   async function handleContinueFromAddress() {
     if (useManualForm && saveNewAddress && address.street.trim() && address.city.trim()) {
       try {
@@ -117,10 +139,11 @@ export default function CheckoutPage() {
               discountPercent: 0,
             })),
             buyerName, buyerEmail, buyerPhone,
-            // Payments sigue stub en el backend (ver ADR-003): el método elegido viaja
-            // como nota legible para el vendedor, no como un campo de pago real.
-            notes: `Método de pago: ${paymentMethod === 'transferencia' ? 'Transferencia bancaria' : 'Efectivo / contra-entrega'}.${notes ? ` ${notes}` : ''}`,
+            notes: notes || undefined,
             deliveryAddress: address,
+            // Ver ADR-007: Mercado Pago genera un link de pago real (paymentUrl)
+            // al crear el pedido; efectivo/transferencia se coordinan aparte.
+            paymentMethod: PAYMENT_METHOD_DTO[paymentMethod],
           }).then((r) => r.data),
         ),
       );
@@ -128,6 +151,11 @@ export default function CheckoutPage() {
     },
     onSuccess: (orders) => {
       clearCart();
+      const paymentUrl = orders.find((o: any) => o.paymentUrl)?.paymentUrl;
+      if (paymentUrl) {
+        window.location.href = paymentUrl;
+        return;
+      }
       const orderIds = orders.map((o: any) => o.id).join(',');
       router.push(`/order-confirmation?orderIds=${orderIds}`);
     },
@@ -357,6 +385,16 @@ export default function CheckoutPage() {
                   <p className="font-semibold text-slate-800">{address.street}</p>
                   <p className="text-sm text-slate-500">{[address.city, address.province, address.postalCode].filter(Boolean).join(', ')}</p>
                   {address.notes && <p className="text-sm text-slate-400 mt-1">{address.notes}</p>}
+                  {shippingQuotes.some((q) => q.available) && (
+                    <p className="text-sm text-slate-500 mt-2 flex items-center gap-1.5">
+                      <Truck size={14} className="text-orange-500" />
+                      Envío: {formatARS(shippingTotal)}
+                      {(() => {
+                        const withEta = shippingQuotes.find((q) => q.available);
+                        return withEta?.available ? ` · llega en ~${withEta.promisedHours}hs` : '';
+                      })()}
+                    </p>
+                  )}
                 </div>
 
                 <div className="bg-slate-50 rounded-2xl p-4">
@@ -431,10 +469,18 @@ export default function CheckoutPage() {
                   </div>
                 ))}
               </div>
+              {address.postalCode.trim() && (
+                <div className="flex items-center justify-between text-sm mb-2">
+                  <span className="text-slate-600 flex items-center gap-1.5"><Truck size={14} /> Envío</span>
+                  <span className="font-semibold text-slate-800">
+                    {shippingTotal > 0 ? formatARS(shippingTotal) : 'A coordinar'}
+                  </span>
+                </div>
+              )}
               <div className="border-t border-slate-100 pt-4">
                 <div className="flex items-center justify-between">
                   <span className="text-sm font-semibold text-slate-600">{count} ítem{count !== 1 ? 's' : ''}</span>
-                  <span className="text-xl font-extrabold text-slate-900">{formatARS(total)}</span>
+                  <span className="text-xl font-extrabold text-slate-900">{formatARS(total + shippingTotal)}</span>
                 </div>
               </div>
             </div>

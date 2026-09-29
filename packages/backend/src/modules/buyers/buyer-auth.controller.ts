@@ -1,11 +1,16 @@
-import { Controller, Post, Body, HttpCode, HttpStatus, ForbiddenException, UnauthorizedException } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
+import { Controller, Post, Body, HttpCode, HttpStatus, ForbiddenException, UnauthorizedException, UseGuards } from '@nestjs/common';
+import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
+import { Throttle } from '@nestjs/throttler';
 import { ConfigService } from '@nestjs/config';
 import { BuyersService } from './buyers.service';
 import { BuyerAuthService } from './buyer-auth.service';
 import { RegisterBuyerDto } from './dto/register-buyer.dto';
 import { LoginBuyerDto } from './dto/login-buyer.dto';
+import { BuyerJwtAuthGuard } from './guards/buyer-jwt-auth.guard';
+import { CurrentUser } from '../../common/decorators/current-user.decorator';
 
+// Ver ADR-007: throttler 'auth' (5 intentos / 15 min) contra brute-force de credenciales.
+@Throttle({ auth: { limit: 5, ttl: 900000 } })
 @ApiTags('buyer-auth')
 @Controller('buyer-auth')
 export class BuyerAuthController {
@@ -62,5 +67,15 @@ export class BuyerAuthController {
     if (!buyer || !buyer.isActive) throw new UnauthorizedException('Comprador inválido o inactivo');
 
     return this.buyerAuthService.login(buyer);
+  }
+
+  @Post('fcm-token')
+  @HttpCode(HttpStatus.OK)
+  @ApiBearerAuth()
+  @UseGuards(BuyerJwtAuthGuard)
+  @ApiOperation({ summary: 'Registrar/actualizar el token FCM del dispositivo del comprador logueado' })
+  async registerFcmToken(@Body('fcmToken') fcmToken: string, @CurrentUser() buyer: any) {
+    await this.buyersService.updateFcmToken(buyer.id, fcmToken);
+    return { success: true };
   }
 }

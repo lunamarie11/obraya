@@ -1,11 +1,14 @@
 import { Controller, Post, Body, HttpCode, HttpStatus, ForbiddenException, UnauthorizedException } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
+import { Throttle } from '@nestjs/throttler';
 import { AuthService } from './auth.service';
 import { UsersService } from './users.service';
 import { LoginDto } from './dto/login.dto';
 import { RegisterCompanyDto } from './dto/register-company.dto';
 import { ConfigService } from '@nestjs/config';
 
+// Ver ADR-007: throttler 'auth' (5 intentos / 15 min) contra brute-force de credenciales.
+@Throttle({ auth: { limit: 5, ttl: 900000 } })
 @ApiTags('auth')
 @Controller('auth')
 export class AuthController {

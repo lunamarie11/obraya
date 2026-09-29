@@ -22,6 +22,12 @@ export enum OrderStatus {
   CANCELADO   = 'Cancelado',
 }
 
+export enum PaymentMethod {
+  EFECTIVO      = 'Efectivo',
+  TRANSFERENCIA = 'Transferencia',
+  MERCADO_PAGO  = 'MercadoPago',
+}
+
 // Transiciones de estado válidas (spec: Nuevo→Aceptado→Preparacion→Despachado→Entregado)
 export const VALID_TRANSITIONS: Record<OrderStatus, OrderStatus[]> = {
   [OrderStatus.NUEVO]:       [OrderStatus.ACEPTADO, OrderStatus.CANCELADO],
@@ -73,9 +79,18 @@ export class Order {
   @OneToMany(() => OrderMessage, (msg) => msg.order, { cascade: true })
   messages: OrderMessage[];
 
-  // Total en centavos de ARS
+  // Total en centavos de ARS (incluye shippingCost, ver ADR-012)
   @Column({ name: 'total_amount', type: 'bigint' })
   totalAmount: number;
+
+  // Costo de envío en centavos de ARS, resuelto server-side contra las
+  // DeliveryZone de la empresa (ver ADR-012). 0 si la empresa no tiene
+  // zonas configuradas o el código postal no matchea ninguna.
+  @Column({ name: 'shipping_cost', type: 'bigint', default: 0 })
+  shippingCost: number;
+
+  @Column({ name: 'shipping_zone_name', nullable: true, length: 100 })
+  shippingZoneName: string;
 
   @Column({ length: 3, default: 'ARS' })
   currency: string;
@@ -98,6 +113,23 @@ export class Order {
 
   @Column({ name: 'actual_delivery_date', nullable: true })
   actualDeliveryDate: Date;
+
+  @Column({ name: 'payment_method', type: 'enum', enum: PaymentMethod, default: PaymentMethod.EFECTIVO })
+  paymentMethod: PaymentMethod;
+
+  // Pago con MercadoPago (ver ADR-007). Nulos si el pedido usa efectivo/transferencia.
+  @Column({ name: 'mp_preference_id', nullable: true, length: 100 })
+  mpPreferenceId: string;
+
+  @Column({ name: 'mp_payment_id', nullable: true, length: 100 })
+  mpPaymentId: string;
+
+  @Column({ name: 'payment_url', nullable: true, type: 'text' })
+  paymentUrl: string;
+
+  // Estado crudo que informa MercadoPago (approved, rejected, pending, in_process)
+  @Column({ name: 'payment_status', nullable: true, length: 30 })
+  paymentStatus: string;
 
   // Factura electrónica AFIP (ver ADR-010). Se emite al pasar a Despachado;
   // nulos si AFIP no está configurado o el pedido aún no llegó a ese estado.

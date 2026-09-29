@@ -14,6 +14,8 @@ import { CompanyUser, UserRole } from './entities/company-user.entity';
 import { RegisterCompanyDto } from './dto/register-company.dto';
 import { InviteUserDto } from './dto/invite-user.dto';
 import { AfipService } from '../afip/afip.service';
+import { EmailService } from '../email/email.service';
+import { ConfigService } from '@nestjs/config';
 
 @Injectable()
 export class UsersService {
@@ -25,6 +27,8 @@ export class UsersService {
     @InjectRepository(CompanyUser)
     private readonly companyUserRepo: Repository<CompanyUser>,
     private readonly afipService: AfipService,
+    private readonly emailService: EmailService,
+    private readonly config: ConfigService,
   ) {}
 
   async registerCompany(dto: RegisterCompanyDto): Promise<{ company: Company; adminUser: CompanyUser }> {
@@ -103,7 +107,7 @@ export class UsersService {
     return this.companyRepo.findOne({ where: { id } });
   }
 
-  async updateCompany(id: string, dto: Partial<Pick<Company, 'phone' | 'address' | 'city' | 'province' | 'bankingData' | 'coverageZones'>>): Promise<Company> {
+  async updateCompany(id: string, dto: Partial<Pick<Company, 'phone' | 'address' | 'city' | 'province' | 'bankingData' | 'deliveryZones'>>): Promise<Company> {
     await this.companyRepo.update(id, dto);
     return this.companyRepo.findOne({ where: { id } }) as Promise<Company>;
   }
@@ -136,7 +140,17 @@ export class UsersService {
       inviteToken,
       inviteExpiresAt,
     });
-    return this.companyUserRepo.save(user);
+    const saved = await this.companyUserRepo.save(user);
+
+    // Email de invitacion (ver ADR-011). Best-effort: no bloquea la creacion
+    // de la invitacion si SES no esta configurado o falla.
+    const frontendUrl = this.config.get<string>('FRONTEND_URL') ?? 'http://localhost:3002';
+    const inviteLink = `${frontendUrl}/accept-invite?token=${inviteToken}`;
+    this.emailService
+      .sendInviteEmail(dto.email, company.razonSocial, inviteLink)
+      .catch((err) => this.logger.warn(`No se pudo enviar el email de invitacion a ${dto.email}: ${(err as Error).message}`));
+
+    return saved;
   }
 
   async acceptInvite(token: string, password: string): Promise<CompanyUser> {

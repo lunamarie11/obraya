@@ -1,5 +1,5 @@
 import { api } from './api';
-import type { PublicCompany, PublicProduct } from '@obraya/shared';
+import type { PublicCompany, PublicProduct, Review, ShippingQuote } from '@obraya/shared';
 
 // Espejo exacto de packages/frontend/src/lib/marketplace.ts — mismos endpoints
 // públicos (ver ADR-003), mismos tipos de @obraya/shared.
@@ -46,5 +46,32 @@ export async function searchPublicProducts(
   params: { page?: number; limit?: number; search?: string; category?: string } = {},
 ): Promise<PaginatedResponse<PublicProduct>> {
   const { data } = await api.get('/public/products', { params });
+  return data;
+}
+
+// Reseñas (ver ADR-008). getCompanyReviews es público; las otras dos requieren
+// sesión de comprador (ver isBuyerRoute en lib/api.ts).
+export async function getCompanyReviews(
+  companyId: string,
+  params: { page?: number; limit?: number } = {},
+): Promise<PaginatedResponse<Review>> {
+  const { data } = await api.get(`/public/companies/${companyId}/reviews`, { params });
+  return data;
+}
+
+export async function getMyReviews(): Promise<Review[]> {
+  const { data } = await api.get('/buyer-reviews/mine');
+  return data;
+}
+
+export async function createReview(payload: { orderId: string; rating: number; comment?: string }): Promise<Review> {
+  const { data } = await api.post('/buyer-reviews', payload);
+  return data;
+}
+
+// Cotización de envío (ver ADR-012). Solo informativa: el costo real que se
+// cobra siempre se recalcula server-side en OrdersService.create.
+export async function getShippingQuote(companyId: string, postalCode: string): Promise<ShippingQuote> {
+  const { data } = await api.get(`/public/companies/${companyId}/shipping-quote`, { params: { postalCode } });
   return data;
 }

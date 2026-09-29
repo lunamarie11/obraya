@@ -1,13 +1,14 @@
 import React from 'react';
-import { ActivityIndicator, ScrollView, Text, TouchableOpacity, View, StyleSheet } from 'react-native';
+import { ActivityIndicator, ScrollView, Text, TextInput, TouchableOpacity, View, StyleSheet } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useQuery } from '@tanstack/react-query';
-import { MapPin, Package, RotateCcw, ShoppingBag } from 'lucide-react-native';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { MapPin, Package, RotateCcw, ShoppingBag, Star } from 'lucide-react-native';
 import { Header } from '../../src/components/Header';
 import { StatusBadge } from '../../src/components/StatusBadge';
 import { OrderStatusStepper } from '../../src/components/OrderStatusStepper';
 import { api, formatARS } from '../../src/lib/api';
 import { addToCart } from '../../src/lib/cart';
+import { getMyReviews, createReview } from '../../src/lib/marketplace';
 import { colors, radius, shadow } from '../../src/theme';
 import type { Order } from '@obraya/shared';
 
@@ -115,6 +116,8 @@ export default function OrderDetailScreen() {
           </View>
         </View>
 
+        {order.status === 'Entregado' && <ReviewSection orderId={order.id} />}
+
         <TouchableOpacity style={styles.reorderBtn} onPress={handleReorder}>
           <RotateCcw size={18} color={colors.white} />
           <Text style={styles.reorderText}>Repetir pedido</Text>
@@ -124,6 +127,81 @@ export default function OrderDetailScreen() {
           <Text style={styles.continueText}>Seguir comprando</Text>
         </TouchableOpacity>
       </ScrollView>
+    </View>
+  );
+}
+
+// Calificar un pedido entregado (backlog #6 marketplace-comprador.md, ver
+// ADR-008). Espejo de ReviewSection en frontend/src/app/my-orders/[id]/page.tsx.
+// Un pedido admite una sola reseña: si ya existe, se muestra en modo lectura.
+function ReviewSection({ orderId }: { orderId: string }) {
+  const queryClient = useQueryClient();
+  const [rating, setRating] = React.useState(0);
+  const [comment, setComment] = React.useState('');
+  const [error, setError] = React.useState<string | null>(null);
+  const [submitting, setSubmitting] = React.useState(false);
+
+  const { data: myReviews, isLoading } = useQuery({
+    queryKey: ['buyer-reviews-mine'],
+    queryFn: getMyReviews,
+  });
+
+  const existingReview = myReviews?.find((r) => r.orderId === orderId);
+
+  async function handleSubmit() {
+    if (rating < 1) {
+      setError('Elegí una cantidad de estrellas');
+      return;
+    }
+    setError(null);
+    setSubmitting(true);
+    try {
+      await createReview({ orderId, rating, comment: comment.trim() || undefined });
+      await queryClient.invalidateQueries({ queryKey: ['buyer-reviews-mine'] });
+    } catch {
+      setError('No pudimos guardar tu reseña. Probá de nuevo en unos minutos.');
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  if (isLoading) return null;
+
+  return (
+    <View style={styles.card}>
+      <Text style={styles.label}>{existingReview ? 'Tu calificación' : 'Calificá este pedido'}</Text>
+      <View style={styles.starsRow}>
+        {Array.from({ length: 5 }).map((_, i) => {
+          const value = i + 1;
+          const filled = existingReview ? value <= existingReview.rating : value <= rating;
+          return (
+            <TouchableOpacity key={value} disabled={!!existingReview} onPress={() => setRating(value)}>
+              <Star size={26} color={filled ? '#fbbf24' : colors.slate200} fill={filled ? '#fbbf24' : 'transparent'} />
+            </TouchableOpacity>
+          );
+        })}
+      </View>
+
+      {existingReview ? (
+        existingReview.comment ? <Text style={styles.reviewComment}>{existingReview.comment}</Text> : null
+      ) : (
+        <>
+          <TextInput
+            value={comment}
+            onChangeText={setComment}
+            placeholder="Contanos cómo fue tu experiencia (opcional)"
+            placeholderTextColor={colors.slate400}
+            multiline
+            numberOfLines={3}
+            maxLength={1000}
+            style={styles.reviewInput}
+          />
+          {error && <Text style={styles.rejectionText}>{error}</Text>}
+          <TouchableOpacity disabled={submitting} style={[styles.reorderBtn, submitting && { opacity: 0.6 }]} onPress={handleSubmit}>
+            <Text style={styles.reorderText}>{submitting ? 'Enviando...' : 'Enviar calificación'}</Text>
+          </TouchableOpacity>
+        </>
+      )}
     </View>
   );
 }
@@ -144,6 +222,9 @@ const styles = StyleSheet.create({
   totalRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderTopWidth: 1, borderTopColor: colors.slate100, paddingTop: 14, marginTop: 14 },
   totalLabel: { fontSize: 14, fontWeight: '600', color: colors.slate800 },
   totalValue: { fontSize: 19, fontWeight: '800', color: colors.slate900 },
+  starsRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginBottom: 12 },
+  reviewComment: { fontSize: 13, color: colors.slate700 },
+  reviewInput: { backgroundColor: colors.slate50, borderWidth: 1, borderColor: colors.slate200, borderRadius: 12, paddingHorizontal: 12, paddingVertical: 10, fontSize: 13, color: colors.slate900, textAlignVertical: 'top', minHeight: 70 },
   reorderBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: colors.primary, paddingVertical: 16, borderRadius: radius.card },
   reorderText: { color: colors.white, fontWeight: '700', fontSize: 15 },
   continueBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 12 },

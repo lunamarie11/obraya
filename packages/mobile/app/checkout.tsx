@@ -1,26 +1,35 @@
 import React from 'react';
-import { KeyboardAvoidingView, Platform, ScrollView, Text, TextInput, TouchableOpacity, View, StyleSheet } from 'react-native';
+import { KeyboardAvoidingView, Linking, Platform, ScrollView, Text, TextInput, TouchableOpacity, View, StyleSheet } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { MapPin, Package, CheckCircle2, ArrowRight, Minus, Plus, Wallet, Landmark, LogIn, Trash2 } from 'lucide-react-native';
+import { MapPin, Package, CheckCircle2, ArrowRight, Minus, Plus, Wallet, Landmark, CreditCard, LogIn, Trash2, Truck } from 'lucide-react-native';
 import { Header } from '../src/components/Header';
 import { api, formatARS } from '../src/lib/api';
 import { clearCart, updateCartItemQuantity, getCartGroupedByCompany } from '../src/lib/cart';
 import { getStoredBuyer, type BuyerUser } from '../src/lib/buyer-auth';
 import { getBuyerAddresses, createBuyerAddress, deleteBuyerAddress, type BuyerAddress } from '../src/lib/addresses';
+import { getShippingQuote } from '../src/lib/marketplace';
 import { useCart } from '../src/hooks/useCart';
 import { colors, radius, shadow } from '../src/theme';
 
-// Espejo de packages/frontend/src/app/checkout/page.tsx (ver ADR-006): exige
-// sesión de Buyer (no CompanyUser) y crea un pedido por fabricante contra
+// Espejo de packages/frontend/src/app/checkout/page.tsx (ver ADR-006/ADR-007):
+// exige sesión de Buyer (no CompanyUser) y crea un pedido por fabricante contra
 // /buyer-orders, agrupando el carrito con getCartGroupedByCompany().
 const STEPS = ['Dirección', 'Método de pago', 'Resumen'] as const;
 type Step = 0 | 1 | 2;
-type PaymentMethod = 'efectivo' | 'transferencia';
+type PaymentMethod = 'efectivo' | 'transferencia' | 'mercadopago';
+
+// Mapea la opción elegida acá al enum PaymentMethod real del backend (ver ADR-007).
+const PAYMENT_METHOD_DTO: Record<PaymentMethod, string> = {
+  efectivo: 'Efectivo',
+  transferencia: 'Transferencia',
+  mercadopago: 'MercadoPago',
+};
 
 const PAYMENT_OPTIONS: { value: PaymentMethod; label: string; desc: string; icon: typeof Wallet }[] = [
   { value: 'efectivo', label: 'Efectivo / contra-entrega', desc: 'Pagás cuando lo recibís en tu obra.', icon: Wallet },
   { value: 'transferencia', label: 'Transferencia bancaria', desc: 'Te compartimos los datos por chat con el vendedor.', icon: Landmark },
+  { value: 'mercadopago', label: 'Mercado Pago', desc: 'Pagá online con tarjeta, débito o dinero en cuenta.', icon: CreditCard },
 ];
 
 export default function CheckoutScreen() {
@@ -89,6 +98,21 @@ export default function CheckoutScreen() {
 
   const useManualForm = showAddressForm || savedAddresses.length === 0;
 
+  // Cotización de envío (ver ADR-012): informativa, una por fabricante en el
+  // carrito. El costo real que se cobra se recalcula server-side al crear
+  // cada pedido, así que si esto falla o no hay zona configurada no bloquea.
+  const { data: shippingQuotes = [] } = useQuery({
+    queryKey: ['shipping-quotes', cart.map((i) => i.companyId).join(','), address.postalCode],
+    queryFn: async () => {
+      const groups = await getCartGroupedByCompany();
+      return Promise.all(
+        groups.map((g) => getShippingQuote(g.companyId, address.postalCode).catch(() => ({ available: false as const }))),
+      );
+    },
+    enabled: !!address.postalCode.trim() && cart.length > 0,
+  });
+  const shippingTotal = shippingQuotes.reduce((sum, q) => sum + (q.available ? q.shippingCost : 0), 0);
+
   async function handleContinueFromAddress() {
     if (useManualForm && saveNewAddress && address.street.trim() && address.city.trim()) {
       try {
@@ -129,8 +153,11 @@ export default function CheckoutScreen() {
               buyerName,
               buyerEmail,
               buyerPhone,
-              notes: `Método de pago: ${paymentMethod === 'transferencia' ? 'Transferencia bancaria' : 'Efectivo / contra-entrega'}.${notes ? ` ${notes}` : ''}`,
+              notes: notes || undefined,
               deliveryAddress: address,
+              // Ver ADR-007: Mercado Pago genera un link de pago real (paymentUrl)
+              // al crear el pedido; efectivo/transferencia se coordinan aparte.
+              paymentMethod: PAYMENT_METHOD_DTO[paymentMethod],
             })
             .then((r) => r.data),
         ),
@@ -140,6 +167,14 @@ export default function CheckoutScreen() {
     onSuccess: async (orders) => {
       await clearCart();
       const orderIds = orders.map((o: any) => o.id).join(',');
+      const paymentUrl = orders.find((o: any) => o.paymentUrl)?.paymentUrl;
+      if (paymentUrl) {
+        // El back_urls de Mercado Pago apunta al frontend web (ver ADR-007),
+        // no a un deep link de esta app, así que abrimos el pago en el
+        // navegador y dejamos al comprador en order-confirmation acá para que
+        // pueda hacerle seguimiento al pedido mientras completa el pago.
+        Linking.openURL(paymentUrl).catch(() => {});
+      }
       router.replace({ pathname: '/order-confirmation', params: { orderIds } });
     },
   });
@@ -347,6 +382,18 @@ export default function CheckoutScreen() {
               <Text style={styles.infoLabel}>Entrega en</Text>
               <Text style={styles.infoStrong}>{address.street}</Text>
               <Text style={styles.infoText}>{[address.city, address.province, address.postalCode].filter(Boolean).join(', ')}</Text>
+              {shippingQuotes.some((q) => q.available) && (
+                <View style={styles.shippingRow}>
+                  <Truck size={13} color={colors.primary} />
+                  <Text style={styles.infoText}>
+                    Envío: {formatARS(shippingTotal)}
+                    {(() => {
+                      const withEta = shippingQuotes.find((q) => q.available);
+                      return withEta?.available ? ` · llega en ~${withEta.promisedHours}hs` : '';
+                    })()}
+                  </Text>
+                </View>
+              )}
             </View>
 
             <View style={styles.infoBlock}>
@@ -400,9 +447,18 @@ export default function CheckoutScreen() {
               <Text style={styles.summaryPrice}>{item.price ? formatARS(item.price * item.quantity) : '—'}</Text>
             </View>
           ))}
+          {address.postalCode.trim() ? (
+            <View style={styles.summaryRow}>
+              <View style={styles.shippingRow}>
+                <Truck size={13} color={colors.slate500} />
+                <Text style={styles.summaryItem}>Envío</Text>
+              </View>
+              <Text style={styles.summaryPrice}>{shippingTotal > 0 ? formatARS(shippingTotal) : 'A coordinar'}</Text>
+            </View>
+          ) : null}
           <View style={styles.totalRow}>
             <Text style={styles.totalLabel}>{count} ítem{count !== 1 ? 's' : ''}</Text>
-            <Text style={styles.totalValue}>{formatARS(total)}</Text>
+            <Text style={styles.totalValue}>{formatARS(total + shippingTotal)}</Text>
           </View>
         </View>
       </ScrollView>
@@ -485,6 +541,7 @@ const styles = StyleSheet.create({
   infoLabel: { fontSize: 11, fontWeight: '600', color: colors.slate400, textTransform: 'uppercase', marginBottom: 6 },
   infoStrong: { fontWeight: '600', color: colors.slate800, fontSize: 14 },
   infoText: { fontSize: 13, color: colors.slate500, marginTop: 2 },
+  shippingRow: { flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 4 },
   orderRow: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: colors.slate50, borderRadius: 12, paddingHorizontal: 12, paddingVertical: 10 },
   orderItemName: { flex: 1, fontSize: 13, color: colors.slate700 },
   qtyRow: { flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderColor: colors.slate200, borderRadius: 999, backgroundColor: colors.white },

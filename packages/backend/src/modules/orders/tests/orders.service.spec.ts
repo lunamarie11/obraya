@@ -7,8 +7,12 @@ import { Order, OrderStatus } from '../entities/order.entity';
 import { OrderItem } from '../entities/order-item.entity';
 import { OrderMessage, MessageSender } from '../entities/order-message.entity';
 import { StockService } from '../../stock/stock.service';
+import { PaymentsService } from '../../payments/payments.service';
+import { NotificationsService } from '../../notifications/notifications.service';
+import { EmailService } from '../../email/email.service';
+import { BuyersService } from '../../buyers/buyers.service';
 import { AfipService } from '../../afip/afip.service';
-import { Company } from '../../users/entities/company.entity';
+import { Company, FleetType } from '../../users/entities/company.entity';
 
 function makeOrder(overrides: Partial<Order> = {}): Order {
   const o = new Order();
@@ -29,9 +33,13 @@ const mockOrderRepo = {
   findOne: jest.fn(),
   createQueryBuilder: jest.fn().mockReturnThis(),
   getManyAndCount: jest.fn(),
+  create: jest.fn((data) => data),
+  save: jest.fn(async (entity) => entity),
 };
 
-const mockItemRepo = {};
+const mockItemRepo = {
+  create: jest.fn((data) => data),
+};
 const mockMessageRepo = {
   create: jest.fn(),
   save: jest.fn(),
@@ -39,6 +47,23 @@ const mockMessageRepo = {
 
 const mockStockService = {
   updateStock: jest.fn(),
+};
+
+const mockPaymentsService = {
+  createPreference: jest.fn(),
+  getPaymentInfo: jest.fn(),
+};
+
+const mockNotificationsService = {
+  notifyOrderStatus: jest.fn(),
+};
+
+const mockEmailService = {
+  sendOrderStatusEmail: jest.fn(),
+};
+
+const mockBuyersService = {
+  findById: jest.fn().mockResolvedValue(null),
 };
 
 const mockAfipService = {
@@ -79,14 +104,67 @@ describe('OrdersService', () => {
         { provide: getRepositoryToken(Order), useValue: mockOrderRepo },
         { provide: getRepositoryToken(OrderItem), useValue: mockItemRepo },
         { provide: getRepositoryToken(OrderMessage), useValue: mockMessageRepo },
+        { provide: getRepositoryToken(Company), useValue: mockCompanyRepo },
         { provide: DataSource, useValue: mockDataSource },
         { provide: StockService, useValue: mockStockService },
+        { provide: PaymentsService, useValue: mockPaymentsService },
+        { provide: NotificationsService, useValue: mockNotificationsService },
+        { provide: EmailService, useValue: mockEmailService },
+        { provide: BuyersService, useValue: mockBuyersService },
         { provide: AfipService, useValue: mockAfipService },
       ],
     }).compile();
 
     service = module.get<OrdersService>(OrdersService);
     jest.clearAllMocks();
+  });
+
+  describe('create() — cálculo de envío server-side (ver ADR-012)', () => {
+    const baseDto = {
+      companyId: 'company-uuid-1',
+      items: [{ productId: 'p1', productName: 'Cemento', quantity: 2, unitPrice: 10000 }],
+      buyerName: 'Juan',
+      buyerEmail: 'juan@test.com',
+      deliveryAddress: { street: 'Calle 1', city: 'CABA', province: 'CABA', postalCode: '1000' },
+    } as any;
+
+    it('sin zonas configuradas: shippingCost 0 y totalAmount = suma de items', async () => {
+      mockCompanyRepo.findOne.mockResolvedValueOnce(null);
+
+      const order = await service.create('company-uuid-1', 'buyer-uuid-1', baseDto);
+
+      expect(order.shippingCost).toBe(0);
+      expect(order.totalAmount).toBe(20000);
+    });
+
+    it('con zona matcheando el código postal: suma shippingCost al total', async () => {
+      mockCompanyRepo.findOne.mockResolvedValueOnce({
+        deliveryZones: [{
+          id: 'zone-1', name: 'CABA', zipCodes: ['1000'],
+          promisedHours: 24, fleetType: FleetType.PROPIA, shippingCost: 5000,
+        }],
+      });
+
+      const order = await service.create('company-uuid-1', 'buyer-uuid-1', baseDto);
+
+      expect(order.shippingCost).toBe(5000);
+      expect(order.shippingZoneName).toBe('CABA');
+      expect(order.totalAmount).toBe(25000);
+    });
+
+    it('código postal fuera de zona: no bloquea, shippingCost 0', async () => {
+      mockCompanyRepo.findOne.mockResolvedValueOnce({
+        deliveryZones: [{
+          id: 'zone-1', name: 'CABA', zipCodes: ['9999'],
+          promisedHours: 24, fleetType: FleetType.PROPIA, shippingCost: 5000,
+        }],
+      });
+
+      const order = await service.create('company-uuid-1', 'buyer-uuid-1', baseDto);
+
+      expect(order.shippingCost).toBe(0);
+      expect(order.totalAmount).toBe(20000);
+    });
   });
 
   describe('updateStatus() — transiciones válidas', () => {

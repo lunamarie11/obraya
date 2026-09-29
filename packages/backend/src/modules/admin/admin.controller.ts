@@ -1,6 +1,6 @@
 import {
   Body, Controller, Delete, Get, HttpCode, Param, ParseUUIDPipe,
-  Put, Query, UseGuards,
+  Post, Put, Query, UseGuards,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { IsBoolean, IsEnum, IsOptional, IsString } from 'class-validator';
@@ -134,5 +134,13 @@ export class AdminController {
   @HttpCode(204)
   deleteProduct(@Param('id', ParseUUIDPipe) id: string) {
     return this.adminService.deleteProduct(id);
+  }
+
+  // ── Búsqueda ─────────────────────────────────────────────────────────────
+
+  @Post('search/reindex')
+  @ApiOperation({ summary: 'Reindexa todos los productos en Elasticsearch (ver ADR-007)' })
+  reindexSearch() {
+    return this.adminService.reindexSearch();
   }
 }

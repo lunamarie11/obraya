@@ -2,12 +2,13 @@ import React from 'react';
 import { ActivityIndicator, FlatList, Text, TextInput, View, StyleSheet } from 'react-native';
 import { useLocalSearchParams } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
+import { Star } from 'lucide-react-native';
 import { Header } from '../../src/components/Header';
 import { ProductCard, ProductCardSkeleton, type ProductCardData } from '../../src/components/ProductCard';
 import { CartStickyBar } from '../../src/components/CartStickyBar';
-import { getPublicCompany, getPublicCompanyProducts } from '../../src/lib/marketplace';
+import { getPublicCompany, getPublicCompanyProducts, getCompanyReviews } from '../../src/lib/marketplace';
 import { addToCart } from '../../src/lib/cart';
-import { colors } from '../../src/theme';
+import { colors, radius, shadow } from '../../src/theme';
 
 // Espejo de packages/frontend/src/app/marketplace/[companyId]/page.tsx.
 export default function CompanyStoreScreen() {
@@ -32,6 +33,12 @@ export default function CompanyStoreScreen() {
   const { data, isLoading } = useQuery({
     queryKey: ['public-company-products', companyId, debouncedSearch],
     queryFn: () => getPublicCompanyProducts(companyId, { search: debouncedSearch || undefined, limit: 100 }),
+    enabled: !!companyId,
+  });
+
+  const { data: reviews } = useQuery({
+    queryKey: ['public-company-reviews', companyId],
+    queryFn: () => getCompanyReviews(companyId, { limit: 10 }),
     enabled: !!companyId,
   });
 
@@ -63,13 +70,31 @@ export default function CompanyStoreScreen() {
         keyExtractor={([category]) => category}
         contentContainerStyle={styles.list}
         ListHeaderComponent={
-          <TextInput
-            value={search}
-            onChangeText={setSearch}
-            placeholder={`Buscar en ${company?.razonSocial ?? 'esta tienda'}...`}
-            placeholderTextColor={colors.slate400}
-            style={styles.search}
-          />
+          <>
+            {company && (
+              <View style={styles.ratingRow}>
+                {company.reviewCount ? (
+                  <>
+                    <Star size={14} color="#fbbf24" fill="#fbbf24" />
+                    <Text style={styles.ratingText}>{company.averageRating?.toFixed(1)}</Text>
+                    <Text style={styles.ratingCount}>({company.reviewCount} reseñas)</Text>
+                  </>
+                ) : (
+                  <>
+                    <Star size={14} color={colors.slate400} />
+                    <Text style={styles.ratingCount}>Todavía sin reseñas</Text>
+                  </>
+                )}
+              </View>
+            )}
+            <TextInput
+              value={search}
+              onChangeText={setSearch}
+              placeholder={`Buscar en ${company?.razonSocial ?? 'esta tienda'}...`}
+              placeholderTextColor={colors.slate400}
+              style={styles.search}
+            />
+          </>
         }
         ListEmptyComponent={
           isLoading ? (
@@ -94,6 +119,28 @@ export default function CompanyStoreScreen() {
             </View>
           </View>
         )}
+        ListFooterComponent={
+          !!reviews?.data?.length ? (
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>Reseñas de compradores</Text>
+              <View style={{ gap: 10 }}>
+                {reviews.data.map((review) => (
+                  <View key={review.id} style={styles.reviewCard}>
+                    <View style={styles.reviewStars}>
+                      {Array.from({ length: 5 }).map((_, i) => (
+                        <Star key={i} size={13} color={i < review.rating ? '#fbbf24' : colors.slate200} fill={i < review.rating ? '#fbbf24' : 'transparent'} />
+                      ))}
+                      <Text style={styles.reviewDate}>
+                        {new Date(review.createdAt).toLocaleDateString('es-AR', { day: '2-digit', month: 'short', year: 'numeric' })}
+                      </Text>
+                    </View>
+                    {review.comment && <Text style={styles.reviewComment}>{review.comment}</Text>}
+                  </View>
+                ))}
+              </View>
+            </View>
+          ) : null
+        }
       />
 
       <CartStickyBar />
@@ -104,6 +151,13 @@ export default function CompanyStoreScreen() {
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.slate50 },
   list: { padding: 16 },
+  ratingRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 12 },
+  ratingText: { fontSize: 13, fontWeight: '700', color: colors.slate700 },
+  ratingCount: { fontSize: 13, color: colors.slate400 },
+  reviewCard: { backgroundColor: colors.white, borderRadius: radius.card, padding: 14, ...shadow.card },
+  reviewStars: { flexDirection: 'row', alignItems: 'center', gap: 2, marginBottom: 4 },
+  reviewDate: { fontSize: 11, color: colors.slate400, marginLeft: 6 },
+  reviewComment: { fontSize: 13, color: colors.slate700 },
   search: {
     backgroundColor: colors.white,
     borderWidth: 1,

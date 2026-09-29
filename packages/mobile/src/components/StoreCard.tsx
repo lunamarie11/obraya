@@ -1,19 +1,15 @@
 import React from 'react';
 import { Image, Text, TouchableOpacity, View, StyleSheet } from 'react-native';
 import { useRouter } from 'expo-router';
-import { Star, Clock } from 'lucide-react-native';
+import { Star, Clock, Heart } from 'lucide-react-native';
 import type { PublicCompany } from '@obraya/shared';
 import { colors, radius, shadow } from '../theme';
+import { useFavorites } from '../hooks/useFavorites';
 
 // Espejo de packages/frontend/src/components/marketplace/StoreCard.tsx.
-// Rating/ETA siguen siendo placeholders (ver comentario original y
-// docs/adrs/ADR-003) — mismo hash determinístico para no parpadear entre renders.
-function placeholderRating(id: string): string {
-  let hash = 0;
-  for (let i = 0; i < id.length; i++) hash = (hash * 31 + id.charCodeAt(i)) >>> 0;
-  return (4 + (hash % 10) / 10).toFixed(1);
-}
-
+// El rating es un dato real agregado desde Review (ver ADR-008) — se dejó de
+// usar el hash placeholder. El ETA de entrega sigue siendo placeholder hasta
+// que exista un modelo de logística real (no expandir, ver ADR-003).
 function placeholderEta(coverageZones?: string[]): string {
   const zones = coverageZones?.length ?? 0;
   if (zones >= 5) return '30-45 min';
@@ -23,12 +19,22 @@ function placeholderEta(coverageZones?: string[]): string {
 
 export function StoreCard({ company }: { company: PublicCompany }) {
   const router = useRouter();
+  const { buyer, isFavorite, toggle } = useFavorites();
+  const favorited = isFavorite('company', company.id);
   const initials = company.razonSocial
     .split(' ')
     .slice(0, 2)
     .map((w) => w[0])
     .join('')
     .toUpperCase();
+
+  function handleToggleFavorite() {
+    if (!buyer) {
+      router.push('/(tabs)/profile');
+      return;
+    }
+    toggle('company', company.id);
+  }
 
   return (
     <TouchableOpacity style={styles.card} activeOpacity={0.85} onPress={() => router.push(`/company/${company.id}`)}>
@@ -42,10 +48,18 @@ export function StoreCard({ company }: { company: PublicCompany }) {
       <View style={styles.info}>
         <Text style={styles.name} numberOfLines={1}>{company.razonSocial}</Text>
         <View style={styles.metaRow}>
-          <View style={styles.metaItem}>
-            <Star size={12} color="#fbbf24" fill="#fbbf24" />
-            <Text style={styles.metaText}>{placeholderRating(company.id)}</Text>
-          </View>
+          {company.reviewCount ? (
+            <View style={styles.metaItem}>
+              <Star size={12} color="#fbbf24" fill="#fbbf24" />
+              <Text style={styles.metaText}>{company.averageRating?.toFixed(1)}</Text>
+              <Text style={styles.metaMuted}>({company.reviewCount})</Text>
+            </View>
+          ) : (
+            <View style={styles.metaItem}>
+              <Star size={12} color={colors.slate400} />
+              <Text style={styles.metaMuted}>Nuevo</Text>
+            </View>
+          )}
           <View style={styles.metaItem}>
             <Clock size={12} color={colors.slate500} />
             <Text style={styles.metaText}>{placeholderEta(company.coverageZones)}</Text>
@@ -57,6 +71,13 @@ export function StoreCard({ company }: { company: PublicCompany }) {
           </Text>
         )}
       </View>
+      <TouchableOpacity
+        style={[styles.favBtn, favorited && styles.favBtnActive]}
+        onPress={handleToggleFavorite}
+        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+      >
+        <Heart size={16} color={favorited ? '#ef4444' : colors.slate300} fill={favorited ? '#ef4444' : 'none'} />
+      </TouchableOpacity>
     </TouchableOpacity>
   );
 }
@@ -89,5 +110,14 @@ const styles = StyleSheet.create({
   metaRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   metaItem: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   metaText: { fontSize: 12, color: colors.slate500 },
+  metaMuted: { fontSize: 12, color: colors.slate400 },
   location: { fontSize: 11, color: colors.slate400 },
+  favBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  favBtnActive: { backgroundColor: '#fef2f2' },
 });
