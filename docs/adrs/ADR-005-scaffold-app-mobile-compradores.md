@@ -4,6 +4,22 @@
 **Fecha:** 2026-08-31
 **Decidido por:** Fundadores ObraYa
 
+> **Actualizacion 2026-09-03:** cerrada la brecha de paridad senalada en "Alcance de
+> pantallas de este pase" (favoritos, cuenta real, pagos): mobile ya tenia cuenta de
+> comprador real y libreta de direcciones al dia; se agregaron favoritos
+> (`src/lib/favorites.ts`, `src/hooks/useFavorites.ts`, `app/favorites.tsx`, boton de
+> corazon en `StoreCard`/`ProductCard`/`Header`/perfil), rating real (reemplaza el
+> placeholder de `StoreCard`, ver ADR-008) con formulario de calificacion en
+> `app/my-orders/[id].tsx` y lista de resenas en `app/company/[id].tsx`, y Mercado Pago
+> como tercer metodo de pago en `app/checkout.tsx` (ver ADR-007). Unica diferencia
+> deliberada con web: el checkout mobile abre `paymentUrl` con `Linking.openURL` en vez
+> de navegar la app entera (no hay equivalente a `window.location.href`), y como el
+> `back_urls` de Mercado Pago apunta al frontend web (no a un deep link de esta app), el
+> comprador queda en `/order-confirmation` dentro de la app mientras completa el pago en
+> el navegador. La home dinamica de ADR-008/ADR-009 (banners, "Pedi de nuevo", mejor
+> calificados) no se replico: la home de mobile (`app/(tabs)/index.tsx`) es la grilla de
+> busqueda del marketplace, no la home promocional de `packages/frontend/src/app/page.tsx`.
+
 ## Contexto
 
 `packages/mobile` existía como scaffold vacío: `package.json` con `expo`, `react-native`
@@ -56,8 +72,8 @@ Decisiones concretas de arquitectura:
   de marketplace con categorías y búsqueda, ficha de fabricante, detalle de producto,
   carrito, checkout, `/my-orders` (lista + detalle con tracking y "repetir pedido"),
   login (reusa `/auth/login` y `/auth/demo`, igual que `DemoCredentials` del frontend).
-  Favoritos, libreta de direcciones y perfil completo quedan pendientes igual que en
-  la versión web (ver `docs/specs/marketplace-comprador.md`).
+  Favoritos, libreta de direcciones y perfil completo quedaron pendientes en este pase
+  inicial; ver la actualización de 2026-09-03 arriba — ya se cerraron.
 
 ## Justificación
 

@@ -3,7 +3,7 @@
 **Modulo:** Front de usuarios / Marketplace
 **Prioridad:** Fase 2 (Sep-Nov 2026), adelantado parcialmente sobre el cierre de Fase 1
 **Estado:** En progreso
-**Ultima actualizacion:** 2026-08-31
+**Ultima actualizacion:** 2026-09-03 (paridad mobile: favoritos, reviews, Mercado Pago)
 
 ---
 
@@ -40,12 +40,12 @@ construccion.
 | # | Item | Estado | Notas |
 |---|------|--------|-------|
 | 1 | Historial de "Mis pedidos" (`/my-orders`, `/my-orders/[id]`, "repetir pedido") | **Implementado** | Ver ADR-004 (reemplazado por ADR-006). Ahora usa la entidad `Buyer` real en vez de `localStorage`. |
-| 2 | Cuenta de comprador real (registro/login propio, entidad `Buyer`) | **Implementado (frontend + backend)** | Ver ADR-006. Registro/login simple (nombre, email, password), JWT propio, checkout obligatorio con cuenta, pedidos agrupados por fabricante. Falta mirror en mobile. |
+| 2 | Cuenta de comprador real (registro/login propio, entidad `Buyer`) | **Implementado (backend + frontend + mobile)** | Ver ADR-006. Registro/login simple (nombre, email, password), JWT propio, checkout obligatorio con cuenta, pedidos agrupados por fabricante. |
 | 3 | Libreta de direcciones (guardar/reusar direcciones de entrega) | **Implementado (backend + frontend + mobile)** | Entidad `BuyerAddress` scopeada por `buyerId` (sin FK dura, mismo criterio que `Order.buyerId`), CRUD en `/buyer-addresses` guardado con `BuyerJwtAuthGuard`. Checkout permite elegir una direccion guardada, marcar predeterminada, agregar una nueva y guardarla, o borrar. |
-| 4 | Favoritos (productos/fabricantes) | **Implementado (backend + frontend)** | Entidad `BuyerFavorite` scopeada por `buyerId`, CRUD en `/buyer-favorites` guardado con `BuyerJwtAuthGuard`, pagina `/favorites`. Se descarto la version liviana con `localStorage`: la entidad `Buyer` ya existia. Falta mirror en mobile. |
-| 5 | Home mas dinamica: "Pedi de nuevo", fabricantes mejor calificados, banners dinamicos | Pendiente | Los banners de la home hoy son 3 cards estaticas. |
-| 6 | Rating y tiempo de entrega reales (hoy son placeholders derivados, ver `StoreCard.tsx`) | Pendiente | Requiere modelo de reviews/logistica real en el backend; no expandir el placeholder mientras tanto. |
-| 7 | Pagos reales via MercadoPago en checkout | Pendiente | Hoy el paso "Metodo de pago" es solo UI (ver CHANGELOG 0.4.0). |
+| 4 | Favoritos (productos/fabricantes) | **Implementado (backend + frontend + mobile)** | Entidad `BuyerFavorite` scopeada por `buyerId`, CRUD en `/buyer-favorites` guardado con `BuyerJwtAuthGuard`, pagina `/favorites` (`app/favorites.tsx` en mobile, con boton de corazon en `StoreCard`/`ProductCard`/`Header`/perfil). Se descarto la version liviana con `localStorage`: la entidad `Buyer` ya existia. |
+| 5 | Home mas dinamica: "Pedi de nuevo", fabricantes mejor calificados, banners dinamicos | **Implementado (backend + frontend)** | Ver ADR-008 y ADR-009. "Pedi de nuevo" y "Mejor calificados" listos. Banners de promos ahora salen de `Price.scheduledDiscount` real (`GET /public/promotions`); si no hay ninguna promo activa, cae a 3 banners genericos de propuesta de valor. No se replico en mobile: su home (`app/(tabs)/index.tsx`) es una grilla de busqueda, no la home promocional de `app/page.tsx` (ver ADR-005). |
+| 6 | Rating real (hoy era placeholder derivado, ver `StoreCard.tsx`) | **Implementado (backend + frontend + mobile)** | Ver ADR-008. Entidad `Review`, `averageRating`/`reviewCount` reales en `/public/companies*`, formulario de calificacion en pedidos entregados (tambien en `app/my-orders/[id].tsx` y `app/company/[id].tsx` de mobile). Tiempo de entrega sigue siendo placeholder (requiere modelo de logistica real, fuera de alcance). |
+| 7 | Pagos reales via MercadoPago en checkout | **Implementado (backend + frontend + mobile)** | Ver ADR-007. Checkout Pro real, `paymentUrl` devuelto al crear el pedido. En web hace `window.location.href`; en mobile abre el link con `Linking.openURL` y deja al comprador en `/order-confirmation` (el `back_urls` de Mercado Pago apunta al frontend web, no a un deep link de la app). |
 
 ## Decisiones documentadas
 
@@ -53,10 +53,12 @@ construccion.
 - ADR-004: historial de pedidos liviano sin entidad Buyer (reemplazado por ADR-006).
 - ADR-006: cuenta de comprador real (entidad `Buyer`, JWT propio, checkout
   multi-fabricante obligatorio con cuenta).
+- ADR-008: reseñas/rating real y home dinámica ("Pedí de nuevo", mejor calificados).
+- ADR-009: banners dinámicos del home a partir de descuentos programados reales.
 
 ## Fuera de alcance de este documento
 
 - Backoffice de fabricantes (ver `docs/specs/MVP-backoffice-fabricantes.md`).
 - App mobile (`packages/mobile`) — tiene su propia decision de arquitectura en
-  ADR-005 y replica este mismo backlog (favoritos, libreta de direcciones, etc.
-  quedan pendientes ahi tambien).
+  ADR-005 y replica este mismo backlog. Ya al dia salvo el item 5 (home dinamica),
+  fuera de alcance por diseno (ver nota en la tabla de arriba).

@@ -4,6 +4,192 @@ Cada cambio importante del proyecto se documenta aqui. Las decisiones arquitecto
 
 ---
 
+## [0.18.0] - 2026-09-23
+
+### Decisiones Tomadas
+
+- **Checklist de deploy a producción** (`docs/checklist-deploy-produccion.md`),
+  ver ADR-014. Cierra el tercer y último gap de la priorización de roadmap del
+  2026-09-23 (fix de `/health` → observabilidad con Sentry → esto).
+- **Fail-fast de configuración crítica**: la app ya no arranca en
+  `NODE_ENV=production` con `JWT_SECRET`/`JWT_REFRESH_SECRET`/`DATABASE_PASSWORD`
+  sin configurar o con el valor default de desarrollo.
+
+### Agregado
+
+- `validateProductionEnv()` (`config/validate-production-env.ts`), invocada en
+  `main.ts` antes de crear la app. Verificado manualmente: sin `.env` presente
+  (simulando un contenedor real con env vars inyectadas por el orquestador),
+  `NODE_ENV=production node dist/main.js` corta inmediatamente con el error
+  claro, sin intentar conectarse a la base de datos.
+- `docs/checklist-deploy-produccion.md`: auditoría completa del estado actual
+  (no de memoria) — secrets, integraciones externas pendientes de pasar a
+  modo producción, y dos gaps grandes encontrados en la auditoría:
+  - **No existe ninguna migration todavía** (`synchronize: true` corrió desde
+    siempre en desarrollo) — la base de producción quedaría sin tablas si se
+    despliega tal cual hoy.
+  - **`StorageService` solo soporta MinIO**, nunca implementó S3 real pese a
+    que `.env.example` sugería `AWS_S3_BUCKET`/`AWS_S3_REGION` como si fuera
+    un toggle ya cableado.
+  - Documentado también que no existe infraestructura de deploy (CI/CD,
+    `docker-compose.prod.yml`, Dockerfile de frontend, SSL) — no asumir que
+    solo falta completar variables de entorno.
+- Test: `validate-production-env.spec.ts`.
+
+### Corregido
+
+- `migration:generate` en `packages/backend/package.json` no tenía el flag
+  `-d` (nunca se había usado realmente, dado que no hay migrations todavía).
+
+### Verificado
+
+- `tsc --noEmit` limpio, `npx jest` 72/72 tests OK.
+
+---
+
+## [0.17.0] - 2026-09-23
+
+### Decisiones Tomadas
+
+- **Observabilidad mínima con Sentry**, ver ADR-013. Cierra el segundo gap
+  identificado en la priorización de roadmap del 2026-09-23 (el primero fue el
+  fix del health check en `[0.16.1]`): hasta ahora no había forma de enterarse
+  de un error en producción sin revisar los logs de Winston a mano.
+
+### Agregado
+
+- `ErrorTrackingService` (`common/error-tracking/`): wrapper best-effort sobre
+  `@sentry/node`, mismo patrón que `AfipService`/`EmailService` — si falta
+  `SENTRY_DSN` queda deshabilitado silenciosamente y no bloquea nada.
+- `AllExceptionsFilter`: filtro global de excepciones (`APP_FILTER`) que loguea
+  todo error no controlado en Winston y reporta a Sentry solo los que son
+  status `>= 500` o no son `HttpException` (los 400/404 de negocio no son
+  incidentes).
+- `process.on('uncaughtException'/'unhandledRejection')` en `main.ts` como red
+  de seguridad para errores fuera del ciclo request/response. El primero
+  cierra el proceso (`process.exit(1)`), el segundo solo loguea/reporta.
+- `SENTRY_DSN`, `SENTRY_ENVIRONMENT`, `SENTRY_TRACES_SAMPLE_RATE` en
+  `.env.example`.
+- Tests: `error-tracking.service.spec.ts`, `all-exceptions.filter.spec.ts`.
+
+### Verificado
+
+- `tsc --noEmit` limpio, `npx jest` 67/67 tests OK.
+- Levantado el server localmente: sin `SENTRY_DSN` arranca con el warning
+  esperado y `/api/v1/health` sigue respondiendo `200`; una ruta inexistente
+  sigue devolviendo el 404 estándar de Nest a través del nuevo filtro.
+
+---
+
+## [0.16.1] - 2026-09-23
+
+### Corregido
+
+- **Bug en `/health`**: `MonitoringService.checkDatabase()` usaba el `AppDataSource`
+  standalone de `database/data-source.ts` (pensado solo para el CLI de migrations),
+  que nunca se inicializa en runtime. Esto hacía que `/api/v1/health` reportara
+  `database.ok: false` (y `status: degraded`) permanentemente aunque la app
+  funcionara bien — riesgo real si un orquestador (k8s/ECS) usa ese endpoint para
+  liveness/readiness: reiniciaría contenedores sanos en un loop.
+- Ahora usa el `DataSource` real de Nest/TypeORM vía `@InjectDataSource()`
+  (disponible globalmente porque `TypeOrmCoreModule` es `@Global()`, no hace
+  falta importar `TypeOrmModule` en `MonitoringModule`).
+- Verificado manualmente: `/api/v1/health` contra la DB local ahora responde
+  `database.ok: true`.
+
+---
+
+## [0.16.0] - 2026-09-23
+
+### Decisiones Tomadas
+
+- **Configuración logística por zona**, ver ADR-012. Reemplaza el viejo
+  `Company.coverageZones: string[]` (solo códigos postales, usado como
+  heurística de ETA en `StoreCard.tsx`) por `deliveryZones: DeliveryZone[]`,
+  con costo de envío, tiempo estimado y tipo de flota por zona. El costo que
+  se cobra siempre se calcula server-side en `OrdersService.create()`, nunca
+  se confía en lo que informe el cliente; la cotización pública es solo
+  informativa para mostrarla antes de confirmar el pedido.
+
+### Agregado
+
+- `DeliveryZone`/`FleetType`/`resolveDeliveryZone()` en `Company` entity
+  (match exacto por código postal, sin geocoding). `coverageZones` queda como
+  getter derivado para no romper `StoreCard.tsx`.
+- `GET /public/companies/:id/shipping-quote?postalCode=X` (sin JWT, ver ADR-003).
+- `Order.shippingCost`/`shippingZoneName`, sumados al `totalAmount` y a la
+  preferencia de Mercado Pago cuando corresponde (ver ADR-007).
+- Backoffice (`settings/page.tsx`): editor de zonas de entrega completo
+  (nombre, flota, tiempo estimado, costo, códigos postales).
+- Checkout (frontend + mobile, paridad completa): cotiza el envío por
+  fabricante en el carrito al ingresar el código postal y lo suma al total.
+- Tipos compartidos en `packages/shared`: `DeliveryZone`, `FleetType`,
+  `ShippingQuote`, `Order.shippingCost`/`shippingZoneName`.
+
+### Verificado
+
+- `npx tsc --noEmit` sin errores en backend, frontend y mobile.
+- Suite completa de Jest: 60 tests pasando (+3 nuevos para el cálculo de
+  envío en `OrdersService.create()`: sin zona, con zona matcheando, y código
+  postal fuera de zona).
+
+---
+
+## [0.15.0] - 2026-09-19
+
+### Decisiones Tomadas
+
+- **Reindexado masivo de Elasticsearch**: resuelve el riesgo pendiente anotado en
+  ADR-007 (productos cargados con ES caído no aparecían en la búsqueda hasta editarse).
+  Se expuso como acción manual de super-admin en vez de un job automático porque es un
+  caso operativo puntual (ES se cayó y volvió a levantar), no algo que deba correr
+  solo/periódicamente.
+
+### Agregado
+
+- `ProductsService.reindexAll()`: relee todos los productos de Postgres en batches de
+  500 y los reindexa via `SearchService.bulkIndex()`. No hace nada si Elasticsearch no
+  está disponible (`isAvailable()`).
+- `POST /admin/search/reindex` (`AdminController`, protegido por `SuperAdminGuard`).
+- Botón "Reindexar búsqueda" en `/superadmin/products` del frontend.
+
+### Verificado
+
+- `npx tsc --noEmit` sin errores en backend y frontend.
+- Suite completa de Jest: 57 tests pasando (sin nuevos, no se agregó lógica de negocio
+  con ramas condicionales más allá del guard de `isAvailable()` ya cubierto
+  implícitamente por el resto de tests de `SearchService`).
+
+---
+
+## [0.14.0] - 2026-09-19
+
+### Decisiones Tomadas
+
+- **Email transaccional con AWS SES**, ver ADR-011. Se eligió SES sobre SendGrid porque
+  el proyecto ya usa AWS para S3 y sa-east-1 como cloud target; reutiliza las mismas
+  credenciales (`AWS_ACCESS_KEY_ID`/`AWS_SECRET_ACCESS_KEY`). Mismo patrón best-effort
+  que `NotificationsService`/`AfipService`: sin credenciales, el envío queda
+  deshabilitado sin bloquear el flujo principal.
+
+### Agregado
+
+- `packages/backend/src/modules/email/` (`EmailModule`/`EmailService`): envío genérico
+  de HTML por SES, más dos casos de uso concretos:
+  - `UsersService.inviteUser()` ahora envía el link de invitación
+    (`${FRONTEND_URL}/accept-invite?token=...`) al email invitado — antes generaba el
+    token pero nadie lo recibía.
+  - `OrdersService.updateStatus()` envía un email al comprador en paralelo al push de
+    FCM existente (mismos estados: Aceptado/Preparación/Despachado/Entregado/Cancelado).
+- Variables de entorno: `AWS_SES_REGION`, `EMAIL_FROM`.
+
+### Verificado
+
+- `npx tsc --noEmit` sin errores en `packages/backend`.
+- Suite de Jest actualizada (mock de `EmailService` en `orders.service.spec.ts`).
+
+---
+
 ## [0.13.0] - 2026-09-03
 
 ### Decisiones Tomadas
@@ -50,6 +236,147 @@ Cada cambio importante del proyecto se documenta aqui. Las decisiones arquitecto
 
 ---
 
+## [0.12.0] - 2026-09-03
+
+### Decisiones Tomadas
+
+- **Cierre de paridad mobile vs. frontend**: `packages/mobile` ya tenía cuenta de
+  comprador real y libreta de direcciones al día; faltaban favoritos, rating
+  real/reseñas y Mercado Pago en checkout. Se replicaron los tres siguiendo el patrón
+  ya establecido ("espejo" del frontend, mismos endpoints y tipos de `@obraya/shared`).
+  Se descartó replicar la home dinámica de ADR-008/ADR-009 en mobile: su home
+  (`app/(tabs)/index.tsx`) es la grilla de búsqueda del marketplace, arquitectónicamente
+  distinta de la home promocional de `packages/frontend/src/app/page.tsx` (ver ADR-005).
+  Ver addendum en ADR-005.
+
+### Agregado
+
+- **Favoritos en mobile**: `src/lib/favorites.ts`, `src/hooks/useFavorites.ts`,
+  `app/favorites.tsx`, botón de corazón en `StoreCard`, `ProductCard`, `Header` y en el
+  perfil logueado. Registrado en el stack raíz (`app/_layout.tsx`).
+- **Rating real en mobile**: `StoreCard` reemplaza el placeholder de rating por
+  `averageRating`/`reviewCount` reales; formulario de calificación (estrellas +
+  comentario opcional, modo lectura si ya existe reseña) en `app/my-orders/[id].tsx`
+  cuando el pedido está `Entregado`; badge de rating + lista de reseñas de compradores
+  en `app/company/[id].tsx`.
+- **Mercado Pago en checkout mobile**: tercera opción de pago en `app/checkout.tsx`
+  (antes solo efectivo/transferencia); el método viaja como campo real `paymentMethod`
+  al crear el pedido (antes viajaba como texto libre embebido en `notes`). Si el pedido
+  devuelve `paymentUrl`, se abre con `Linking.openURL` (equivalente mobile de
+  `window.location.href` en web) y el comprador queda en `/order-confirmation` dentro
+  de la app.
+
+### Verificado
+
+- Mobile: `npx tsc --noEmit` sin errores.
+- Frontend: `npx tsc --noEmit` sin errores (sin cambios funcionales, solo verificación
+  de que no se rompió nada en este pase).
+
+---
+
+## [0.11.0] - 2026-09-03
+
+### Decisiones Tomadas
+
+- **Banners de promos reutilizando `Price.scheduledDiscount`**: en vez de crear una
+  entidad/CMS de banners administrable, se detectó que ya existía un dato real de
+  "producto en oferta ahora" (`scheduledDiscount`, usado desde el MVP de precios para
+  resolver el precio final) que ningún fabricante estaba comunicando en el home
+  todavía. Ver ADR-009.
+
+### Agregado
+
+- **`GET /public/promotions`**: productos con `scheduledDiscount` activo ahora
+  (dentro de su rango `startDate`/`endDate`), de empresas activas.
+  `MarketplacePublicService.findActivePromotions()`.
+- **Carrusel de promos dinámico** en el home (`app/page.tsx`): muestra ofertas reales
+  con precio final/tachado y navega al producto al hacer click; si no hay ninguna
+  promo activa, cae a los 3 banners genéricos de propuesta de valor que ya existían
+  (no se oculta la sección para no dejar el hero vacío).
+- Nuevo tipo compartido `PromotionBanner` en `packages/shared`.
+
+### Verificado
+
+- Backend: `npx tsc --noEmit` sin errores. `npx jest` — 44/44 tests OK (4 suites).
+- Frontend: `npx tsc --noEmit` sin errores.
+
+---
+
+## [0.10.0] - 2026-09-03
+
+### Decisiones Tomadas
+
+- **Rating real antes que home dinámica**: `docs/specs/marketplace-comprador.md`
+  marcaba "Home más dinámica" (#5, incluye "fabricantes mejor calificados") y
+  "Rating y tiempo de entrega reales" (#6) como pendientes. Se resolvió primero #6
+  porque #5 depende de tener un rating real para poder ordenar por calificación. Ver
+  ADR-008 para el detalle completo.
+
+### Agregado
+
+- **Módulo de reseñas** (`packages/backend/src/modules/reviews/`): entidad `Review`
+  (un pedido admite una sola reseña, solo calificable en estado `Entregado` y por su
+  propio comprador), `POST /buyer-reviews`, `GET /buyer-reviews/mine`,
+  `GET /public/companies/:id/reviews`.
+- **Rating real en el marketplace público**: `GET /public/companies` y
+  `GET /public/companies/:id` devuelven `averageRating`/`reviewCount` agregados desde
+  `Review` (antes eran un placeholder determinístico en el frontend). `StoreCard.tsx`
+  y la ficha de fabricante muestran el rating real ("Nuevo" si todavía no tiene
+  reseñas); nueva sección de reseñas en la ficha de fabricante.
+- **Calificar pedido**: en `/my-orders/:id`, si el pedido está `Entregado`, formulario
+  de estrellas + comentario opcional; si ya fue calificado, se muestra en modo lectura.
+- **Home dinámica**: sección "Pedí de nuevo" (productos de pedidos previos del
+  comprador logueado, re-resueltos contra el catálogo actual para precio/imagen
+  vigentes) y sección "Mejor calificados" (top 6 empresas por `averageRating`, ambas
+  ocultas si no hay datos para mostrar).
+
+### Verificado
+
+- Backend: `npx tsc --noEmit` sin errores. `npx jest` — 42/42 tests OK (4 suites).
+- Frontend: `npx tsc --noEmit` sin errores.
+
+---
+
+## [0.9.0] - 2026-09-02
+
+### Decisiones Tomadas
+
+- **Consolidacion de dos historias de git independientes sobre el mismo remoto**
+  (`lunamarie11/obraya`): se detecto que existia una segunda codebase (Prisma,
+  sin logica de negocio de Fase 1 ni mobile) con integraciones reales de pagos,
+  notificaciones, busqueda y seguridad que esta codebase (TypeORM, con toda la
+  logica de negocio y tests) no tenia. Se decidio consolidar sobre esta
+  codebase como linea principal y portar manualmente esas piezas desde la otra
+  (preservada integra en la rama `legacy/prisma-v1`). Ver ADR-007 para el
+  detalle completo de cada pieza portada y las decisiones de diseno.
+
+### Agregado
+
+- **Mercado Pago real** (Checkout Pro): `PaymentsService`/`PaymentsController`
+  (`packages/backend/src/modules/payments/`), webhook `POST /payments/webhook`.
+  `Order` gana `paymentMethod`, `mpPreferenceId`, `mpPaymentId`, `paymentUrl`,
+  `paymentStatus`. Checkout del frontend agrega Mercado Pago como tercera
+  opcion real de pago y redirige a `paymentUrl` cuando corresponde.
+- **Push notifications con Firebase FCM**: `NotificationsService`
+  (`packages/backend/src/modules/notifications/`), hook en
+  `OrdersService.updateStatus()`. `Buyer` gana `fcmToken`; nuevo endpoint
+  `POST /buyer-auth/fcm-token`.
+- **Busqueda con Elasticsearch**: `SearchService`
+  (`packages/backend/src/modules/search/`), indexado en
+  `ProductsService.create/update/remove`, usado por
+  `MarketplacePublicService.findAllProducts()` cuando hay termino de busqueda
+  y Elasticsearch esta disponible (con fallback automatico a `ILIKE` sobre
+  Postgres si no lo esta).
+- **Seguridad de produccion**: `SecureValidationPipe` + `InputSanitizerService`
+  + `SanitizeMiddleware` (sanitizacion contra XSS/inyeccion), `CorsConfig` por
+  entorno, `ThrottlingModule` (rate limiting por endpoint, `auth` aplicado a
+  login de empresas y compradores), logging con Winston (rotacion de
+  archivos), `helmet()`.
+
+### Verificado
+
+- Backend: `npx tsc --noEmit` sin errores. `npx jest` — 34/34 tests OK.
+- Frontend: `npx tsc --noEmit` sin errores.
 
 ## [0.8.0] - 2026-08-31
 

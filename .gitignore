@@ -8,6 +8,7 @@ build/
 .next/
 out/
 *.tsbuildinfo
+.expo/
 
 # Environment
 .env
