@@ -4,6 +4,50 @@ Cada cambio importante del proyecto se documenta aqui. Las decisiones arquitecto
 
 ---
 
+## [0.21.0] - 2026-09-29
+
+### Decisiones Tomadas
+
+- **`StorageService` soporta S3 real**, cierra el último gap de código real
+  (no solo de configuración) del checklist de deploy a producción
+  (`docs/checklist-deploy-produccion.md`, sección 3). Antes solo sabía
+  hablar con MinIO aunque `.env.example` sugería `AWS_S3_BUCKET`/
+  `AWS_S3_REGION` como si fuera un toggle ya cableado.
+- El modo se elige solo por configuración: si `AWS_S3_BUCKET`/
+  `AWS_S3_REGION` están seteados usa S3 (via `@aws-sdk/client-s3`); si no,
+  sigue usando MinIO como en dev — mismo patrón best-effort que
+  `EmailService`/`NotificationsService`/`AfipService`. No requiere
+  `AWS_ACCESS_KEY_ID`/`SECRET` explícitos: en producción (ECS Fargate, ver
+  ADR-015) las credenciales las provee el IAM role de la task.
+- URL devuelta: usa `AWS_CLOUDFRONT_DOMAIN` si está configurado, si no la
+  URL directa de S3 (`https://<bucket>.s3.<region>.amazonaws.com/<key>`).
+
+### Modificado
+
+- `packages/backend/src/modules/products/storage.service.ts`: agrega el
+  modo S3 (`PutObjectCommand`/`DeleteObjectCommand`) sin cambiar el
+  contrato público (`uploadProductImage`/`uploadTechnicalSheet`/
+  `deleteObject`) que ya usa `ProductsService`.
+- `packages/backend/src/config/app.config.ts`: `storageConfig` agrega
+  `s3Bucket`/`s3Region`/`cloudfrontDomain`.
+- `packages/backend/.env.example`: descomenta y documenta las variables de
+  S3/CloudFront de producción.
+- `packages/backend/package.json`: agrega `@aws-sdk/client-s3`.
+
+### Agregado
+
+- `packages/backend/src/modules/products/tests/storage.service.spec.ts`: 6
+  tests (modo MinIO por defecto, modo S3 con las env vars, URL de
+  CloudFront, `deleteObject` en ambos modos, best-effort si MinIO no
+  responde al iniciar).
+
+### Verificado
+
+- `npx tsc --noEmit` y `nest build` sin errores.
+- Jest: 78/78 tests OK (72 previos + 6 nuevos de `StorageService`).
+
+---
+
 ## [0.20.0] - 2026-09-29
 
 ### Decisiones Tomadas

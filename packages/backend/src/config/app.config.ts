@@ -27,4 +27,10 @@ export const storageConfig = registerAs('storage', () => ({
   accessKey: process.env.STORAGE_ACCESS_KEY || 'minioadmin',
   secretKey: process.env.STORAGE_SECRET_KEY || 'minioadmin',
   bucket: process.env.STORAGE_BUCKET || 'obraya-dev',
+  // S3 real (ver ADR-015): si estan seteados, StorageService usa S3 en vez
+  // de MinIO. Sin AWS_ACCESS_KEY_ID/SECRET explicitos: en produccion se
+  // espera credenciales via IAM role de la task de ECS Fargate, no env vars.
+  s3Bucket: process.env.AWS_S3_BUCKET,
+  s3Region: process.env.AWS_S3_REGION,
+  cloudfrontDomain: process.env.AWS_CLOUDFRONT_DOMAIN,
 }));
