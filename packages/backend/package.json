@@ -11,26 +11,34 @@
     "lint": "eslint \"{src,test}/**/*.ts\"",
     "test": "jest",
     "test:e2e": "jest --config ./test/jest-e2e.json",
-    "migration:generate": "typeorm migration:generate",
+    "migration:generate": "typeorm migration:generate -d dist/database/data-source.js",
     "migration:run": "typeorm migration:run -d dist/database/data-source.js",
     "migration:revert": "typeorm migration:revert -d dist/database/data-source.js",
-    "seed:test-users": "rm -rf dist && npx tsc --project . --outDir dist && node dist/scripts/seed-users.js"
-    ,"seed:mock-data": "rm -rf dist && npx tsc --project . --outDir dist && node dist/scripts/seed-mock-data.js"
+    "seed:test-users": "rm -rf dist && npx tsc --project . --outDir dist && node dist/scripts/seed-users.js",
+    "seed:mock-data": "rm -rf dist && npx tsc --project . --outDir dist && node dist/scripts/seed-mock-data.js"
   },
   "dependencies": {
     "@afipsdk/afip.js": "^1.2.3",
+    "@aws-sdk/client-ses": "^3.1136.0",
+    "@elastic/elasticsearch": "^9.4.3",
     "@nestjs/common": "^11.0.0",
     "@nestjs/config": "^4.0.0",
     "@nestjs/core": "^11.0.0",
+    "@nestjs/elasticsearch": "^11.1.0",
     "@nestjs/jwt": "^11.0.0",
     "@nestjs/passport": "^11.0.0",
     "@nestjs/platform-express": "^11.0.0",
     "@nestjs/swagger": "^11.0.0",
+    "@nestjs/throttler": "^6.5.0",
     "@nestjs/typeorm": "^11.0.0",
+    "@sentry/node": "^11.0.0",
     "bcrypt": "^5.1.1",
     "class-transformer": "^0.5.0",
     "class-validator": "^0.14.0",
     "csv-parse": "^5.5.6",
+    "firebase-admin": "^13.10.0",
+    "helmet": "^8.3.0",
+    "mercadopago": "^3.6.0",
     "minio": "^8.0.0",
     "multer": "^1.4.5-lts.1",
     "passport": "^0.7.0",
@@ -40,7 +48,9 @@
     "reflect-metadata": "^0.2.0",
     "rxjs": "^7.8.0",
     "typeorm": "^0.3.0",
-    "uuid": "^11.0.0"
+    "uuid": "^11.0.0",
+    "winston": "^3.19.0",
+    "winston-daily-rotate-file": "^5.0.0"
   },
   "devDependencies": {
     "@nestjs/cli": "^11.0.0",
