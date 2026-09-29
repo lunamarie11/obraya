@@ -1,22 +1,9 @@
 import { Module } from '@nestjs/common';
-import { TypeOrmModule } from '@nestjs/typeorm';
+import { NotificationsService } from './notifications.service';
 
-// MVP: Email + push via Firebase FCM. Nuevo pedido, stock critico, pedido cancelado
-
+// Ver ADR-007: push notifications al comprador via Firebase Cloud Messaging.
 @Module({
-  imports: [
-    // TypeOrmModule.forFeature([Notification, NotificationTemplate, NotificationPreference]),
-  ],
-  controllers: [
-    // NotificationController,
-  ],
-  providers: [
-    // NotificationService,
-    // EmailService,
-    // FirebaseService (FCM),
-  ],
-  exports: [
-    // NotificationService,
-  ],
+  providers: [NotificationsService],
+  exports: [NotificationsService],
 })
 export class NotificationsModule {}
