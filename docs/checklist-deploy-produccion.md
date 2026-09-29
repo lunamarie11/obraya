@@ -88,33 +88,42 @@ razonables por defecto (100 req/15min general, 5 req/15min en auth, etc.) y
 no depende de configuración adicional — no hay acción pendiente acá, solo
 queda validado como ya cubierto.
 
-## 6. Infraestructura de deploy — gap grande, no asumir que existe
+## 6. Infraestructura de deploy — en progreso (ver ADR-015)
 
-Auditado directamente en `infra/`: hoy solo existe
-`infra/docker/docker-compose.yml` (para desarrollo local) y
-`infra/docker/Dockerfile.backend`. **No existe:**
+**RESUELTO (2026-09-29): decisión de infraestructura + groundwork sin costo.**
+ADR-015 fija AWS ECS Fargate (`sa-east-1`) como orquestador, con
+RDS/ElastiCache/OpenSearch managed reemplazando los contenedores
+self-hosted de `docker-compose.yml`, y GitHub Actions (sin ArgoCD) como
+CI/CD. Ya construido y verificado:
 
-- `docker-compose.prod.yml` (ni ningún otro compose de producción).
-- Dockerfile para el frontend (Next.js) ni para el mobile.
-- Ningún workflow de CI/CD (`.github/workflows/` no existe).
-- Ninguna configuración de reverse proxy/SSL (nginx, Caddy, certbot).
+- `infra/docker/Dockerfile.frontend` — multi-stage, usa el build
+  `standalone` de Next.js (`next.config.js`). Verificado end-to-end: build
+  de Docker exitoso, contenedor arranca y responde HTTP 200.
+- `.github/workflows/ci.yml` — build + test de backend (jest, 72 tests),
+  build de frontend y typecheck de mobile en cada PR y push a `main`.
 
-Esto es trabajo de infraestructura que todavía no se hizo — no es un simple
-"completar variables de entorno" como el resto de este checklist. Antes de
-poder desplegar hace falta decidir y construir:
+**Sigue pendiente** (todo lo que implica costo real o acceso a la cuenta de
+AWS, fuera del alcance de ADR-015 — requiere aprobación explícita antes de
+crear recursos):
 
-1. Dónde corre esto (VPS propio con Docker Compose, ECS, un PaaS tipo
-   Railway/Render, etc.) — no hay una decisión tomada todavía, no hay ADR al
-   respecto.
-2. Dockerfile del frontend (Next.js build + start).
-3. Pipeline de CI (al menos: build + test en cada PR — hoy no hay ningún
-   workflow corriendo `npm test` automáticamente).
-4. Pipeline/script de deploy (build de imágenes, push a un registry, deploy
-   al servidor, correr migrations antes de levantar la nueva versión).
+1. Provisionar la infraestructura de AWS en sí (cluster ECS, task
+   definitions, RDS, ElastiCache, OpenSearch, ALB, ECR) — probablemente
+   como Terraform (`infra/` y `.gitignore` ya anticipan `*.tfstate`).
+2. Extender el workflow de CI para hacer build+push a ECR y
+   `aws ecs update-service` en merge a `main` (hoy el workflow solo valida,
+   no despliega — no hay nada a lo que desplegar todavía).
+3. `docker-compose.prod.yml` no aplica bajo este ADR (Fargate reemplaza
+   Compose en producción); no hace falta escribirlo.
+
+**Gap menor encontrado de paso:** ningún package (`backend`, `frontend`,
+`shared`) tiene configuración de ESLint — `npm run lint` falla localmente
+en los tres (ESLint no encuentra config). Por eso el workflow de CI no
+incluye lint todavía. No es bloqueante para el deploy, pero conviene
+resolverlo en algún momento.
 
 ## 7. Orden sugerido antes del primer deploy
 
-1. Decidir la infraestructura de destino (sección 6) — bloquea todo lo demás.
+1. ~~Decidir la infraestructura de destino (sección 6)~~ — **hecho, ADR-015**.
 2. ~~Generar y verificar la migration inicial (sección 2)~~ — **hecho**.
 3. Generar `JWT_SECRET`/`JWT_REFRESH_SECRET` nuevos y configurar
    `DATABASE_PASSWORD` real (sección 1) — sin esto el backend no arranca.
@@ -122,7 +131,8 @@ poder desplegar hace falta decidir y construir:
    (sección 3) — la app arranca sin esto, pero con funcionalidad de negocio
    apagada.
 5. DNS + dominios reales en `cors.config.ts` (sección 4).
-6. Armar Dockerfile de frontend + compose/pipeline de producción (sección 6).
+6. Provisionar la infraestructura de AWS (sección 6) — requiere aprobación
+   explícita porque genera costo.
 7. Deploy, correr `migration:run` (sección 2), smoke test de `/api/v1/health`
    y de un flujo de compra end-to-end contra las integraciones reales
    (MercadoPago/AFIP en modo producción suelen comportarse distinto que en

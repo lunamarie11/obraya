@@ -4,6 +4,53 @@ Cada cambio importante del proyecto se documenta aqui. Las decisiones arquitecto
 
 ---
 
+## [0.20.0] - 2026-09-29
+
+### Decisiones Tomadas
+
+- **ADR-015: AWS ECS Fargate como infraestructura de deploy**, no
+  EKS/Kubernetes/ArgoCD como sugería ADR-001. Cierra el gap #4 del checklist
+  de deploy (`docs/checklist-deploy-produccion.md`, sección 6): no existía
+  ninguna decisión de dónde corre la app en producción. Mismo criterio de
+  "empezar simple, escalar cuando el volumen lo justifique" que ya se usó
+  para elegir Bull sobre Kafka en el MVP (ADR-001).
+- RDS PostgreSQL, ElastiCache Redis, Amazon OpenSearch y S3+CloudFront
+  reemplazan en producción a los contenedores self-hosted de
+  `docker-compose.yml` (Postgres, Redis, Elasticsearch, MinIO). GitHub
+  Actions reemplaza a ArgoCD como CI/CD (no aplica sin un cluster EKS).
+- Provisionar los recursos de AWS en sí queda **fuera del alcance de este
+  ADR** — tiene costo real y requiere acceso a la cuenta de AWS del
+  proyecto, así que es un paso posterior que necesita aprobación explícita.
+
+### Agregado
+
+- `docs/adrs/ADR-015-infraestructura-deploy.md`.
+- `infra/docker/Dockerfile.frontend`: build multi-stage para Next.js, sigue
+  el mismo patrón que `Dockerfile.backend`.
+- `packages/frontend/next.config.js`: `output: 'standalone'`, requerido por
+  el Dockerfile para copiar solo lo mínimo a runtime.
+- `.github/workflows/ci.yml`: build + test de backend, build de frontend y
+  typecheck de mobile en cada PR y push a `main`. No incluye deploy (todavía
+  no hay ECR/ECS a los que apuntar) ni lint (ningún package tiene config de
+  ESLint, gap preexistente detectado de paso).
+
+### Verificado
+
+- Build de Next.js standalone genera `packages/frontend/.next/standalone`
+  con `server.js` y su propio `node_modules` mínimo, como espera el
+  Dockerfile.
+- `docker build` de `Dockerfile.frontend` exitoso; contenedor levantado con
+  `docker run` responde `HTTP 200` (con `PORT=3001`/`HOSTNAME=0.0.0.0`
+  fijados explícitamente — el server standalone de Next.js escucha en el
+  puerto 3000 por defecto si no se fija `PORT`, lo cual no coincidía con el
+  `EXPOSE 3001` original).
+- `.github/workflows/ci.yml` validado como YAML bien formado; los comandos
+  que ejecuta (`npm run build`/`test` por workspace) se corrieron
+  manualmente con éxito, incluyendo los 72 tests de backend sin `.env`
+  presente (confirma que no dependen de configuración real).
+
+---
+
 ## [0.19.0] - 2026-09-29
 
 ### Decisiones Tomadas
