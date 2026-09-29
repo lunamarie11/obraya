@@ -4,6 +4,63 @@ Cada cambio importante del proyecto se documenta aqui. Las decisiones arquitecto
 
 ---
 
+## [0.24.0] - 2026-09-29
+
+### Decisiones Tomadas
+
+- **Corrección de `docs/roadmap-estado-actual.md`**: el doc tenía varias
+  entradas desactualizadas marcando como pendiente trabajo que ya estaba
+  resuelto. Se corrige la sección de deuda técnica: el reindexado masivo
+  de Elasticsearch ya está implementado (`ProductsService.reindexAll()` +
+  `POST /admin/search/reindex`, `SuperAdminGuard`, botón en
+  `/superadmin/products`, ver ADR-007) — no era un gap real.
+- **ESLint funcional en los 4 packages**: `backend`, `frontend`, `shared`
+  y `mobile` no tenían configuración de ESLint utilizable (`npm run lint`
+  fallaba o requería setup interactivo). Se agrega config legacy
+  (`.eslintrc.js`/`.eslintrc.json`, formato compatible con ESLint 8.x) a
+  los 4 packages. Cierra el gap anotado en
+  `docs/checklist-deploy-produccion.md`.
+
+### Agregado
+
+- `packages/backend/src/modules/search/tests/search.service.spec.ts`: 14
+  tests para `SearchService` (no existía ningún test — cubre creación de
+  índice en `onModuleInit`, `indexProduct`, `deleteProduct`, `bulkIndex`,
+  `search`, y comportamiento best-effort cuando Elasticsearch no está
+  disponible).
+- `.eslintrc.js` en `packages/backend`, `packages/shared`, `packages/mobile`;
+  `.eslintrc.json` en `packages/frontend`.
+- Script `lint` en `packages/mobile/package.json` (no existía).
+- Dependencias `eslint`/`@typescript-eslint/*` (y `eslint-plugin-react`,
+  `eslint-plugin-react-hooks@^5.2.0` en mobile) declaradas explícitamente
+  como devDependencies en los packages donde solo estaban hoisteadas de
+  forma implícita.
+
+### Modificado
+
+- `packages/shared/package.json`: script `lint` corregido a
+  `eslint src --ext .ts` (sin el flag, ESLint 8 solo matcheaba `.js`).
+- Correcciones mínimas para que el lint pase sin errores (sin cambios de
+  comportamiento): `input-sanitizer.service.ts` (disable puntual de
+  `no-control-regex`, regex de rango intencional), `afip.service.ts`
+  (disable actualizado con el nombre de regla nuevo
+  `no-require-imports`), `products.service.ts` (disable de
+  `no-constant-condition` en el `while(true)` de paginación de
+  `reindexAll`), `packages/mobile/app/company/[id].tsx` (se quitó un
+  `!!` redundante dentro de un ternario que ya coacciona a boolean).
+- `docs/roadmap-estado-actual.md` y `docs/checklist-deploy-produccion.md`:
+  actualizados para reflejar que ambos gaps ya están resueltos.
+
+### Verificado
+
+- Jest backend: 100/100 tests OK (86 previos + 14 nuevos de `SearchService`).
+- `nest build`, `next build` y `tsc --noEmit` (mobile) sin errores.
+- `npm run lint` sin errores (0) en los 4 packages — solo warnings
+  preexistentes y no bloqueantes (imports sin usar, `<img>` vs
+  `next/image`, algún `exhaustive-deps`), dejados sin tocar a propósito.
+
+---
+
 ## [0.23.0] - 2026-09-29
 
 ### Decisiones Tomadas

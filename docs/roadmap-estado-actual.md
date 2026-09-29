@@ -63,7 +63,11 @@ Fase 2 está funcionalmente **cerrada**. Lo único fuera de alcance por diseño:
 | Seguridad de producción (CORS por entorno, rate limiting, sanitización XSS, Winston, helmet) | Implementado |
 
 **Deuda técnica anotada:**
-- Elasticsearch: falta endpoint/script de **reindexado masivo** (`reindexAll`). Si ES se levanta después de tener productos ya cargados, no aparecen en la búsqueda hasta que se editen.
+- ~~Elasticsearch: falta endpoint/script de reindexado masivo (`reindexAll`).~~
+  Resuelto: `ProductsService.reindexAll()` (batches de 500) + `POST
+  /admin/search/reindex` (`SuperAdminGuard`), con botón en
+  `/superadmin/products` (ver ADR-007). Este doc quedó desactualizado —
+  ya estaba resuelto desde antes del snapshot de 2026-09-19.
 - Pin de `@nestjs/elasticsearch@11.1.0` (v12 es ESM-only, rompe el build CJS) — revisar al actualizar dependencias.
 
 ---

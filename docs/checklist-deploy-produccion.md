@@ -115,11 +115,11 @@ crear recursos):
 3. `docker-compose.prod.yml` no aplica bajo este ADR (Fargate reemplaza
    Compose en producción); no hace falta escribirlo.
 
-**Gap menor encontrado de paso:** ningún package (`backend`, `frontend`,
-`shared`) tiene configuración de ESLint — `npm run lint` falla localmente
-en los tres (ESLint no encuentra config). Por eso el workflow de CI no
-incluye lint todavía. No es bloqueante para el deploy, pero conviene
-resolverlo en algún momento.
+**Gap menor encontrado de paso — resuelto:** los 4 packages (`backend`,
+`frontend`, `shared`, `mobile`) ya tienen configuración de ESLint
+funcional (`.eslintrc.js`/`.eslintrc.json`) y `npm run lint` corre limpio
+(0 errores) en todos. El workflow de CI todavía no incluye un step de
+lint — sigue pendiente agregarlo, pero ya no hay nada bloqueando hacerlo.
 
 ## 7. Orden sugerido antes del primer deploy
 

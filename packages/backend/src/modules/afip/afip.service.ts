@@ -4,7 +4,7 @@ import * as fs from 'fs';
 // La librería no trae tipos completos para las opciones de instanciación
 // (marca access_token como obligatorio aunque en runtime es opcional, ver
 // ADR-010), por eso se importa sin tipar estrictamente el constructor.
-// eslint-disable-next-line @typescript-eslint/no-var-requires
+// eslint-disable-next-line @typescript-eslint/no-var-requires, @typescript-eslint/no-require-imports
 const Afip = require('@afipsdk/afip.js');
 import { Company, CompanyIvaCondition } from '../users/entities/company.entity';
 import { Order } from '../orders/entities/order.entity';

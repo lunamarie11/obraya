@@ -31,7 +31,8 @@ export class InputSanitizerService {
       throw new BadRequestException('Input must be a string');
     }
 
-    // Remover caracteres de control
+    // Remover caracteres de control (rango intencional, no es un typo)
+    // eslint-disable-next-line no-control-regex
     let sanitized = input.replace(/[\x00-\x1F\x7F-\x9F]/g, '');
 
     // Verificar patrones maliciosos

@@ -52,6 +52,7 @@ export class ProductsService {
     let indexed = 0;
     let skip = 0;
 
+    // eslint-disable-next-line no-constant-condition
     while (true) {
       const products = await this.productRepo.find({
         skip,

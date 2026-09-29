@@ -120,7 +120,7 @@ export default function CompanyStoreScreen() {
           </View>
         )}
         ListFooterComponent={
-          !!reviews?.data?.length ? (
+          reviews?.data?.length ? (
             <View style={styles.section}>
               <Text style={styles.sectionTitle}>Reseñas de compradores</Text>
               <View style={{ gap: 10 }}>

@@ -6,10 +6,12 @@
   "types": "src/index.ts",
   "scripts": {
     "build": "tsc",
-    "lint": "eslint src"
+    "lint": "eslint src --ext .ts"
   },
   "devDependencies": {
     "typescript": "^5.0.0",
-    "eslint": "^8.0.0"
+    "eslint": "^8.0.0",
+    "@typescript-eslint/eslint-plugin": "^8.0.0",
+    "@typescript-eslint/parser": "^8.0.0"
   }
 }
