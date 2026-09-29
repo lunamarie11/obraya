@@ -22,7 +22,7 @@ Ver `docs/specs/MVP-backoffice-fabricantes.md`.
 | Facturación electrónica (Factura B/C) | Implementado (ADR-010), **Factura A no soportada** (limitación de modelo, no bug) |
 | Dashboard de ventas + KPIs | Implementado |
 | Reportes (ventas, stock) exportables | Implementado |
-| Roles y permisos (Admin/Vendedor/Logística/Contabilidad) | Implementado a nivel de rol (`RolesGuard`); permisos granulares por sección no verificados a fondo |
+| Roles y permisos (Admin/Vendedor/Logística/Contabilidad) | Implementado a nivel de rol (`RolesGuard`), con permisos granulares por sección donde la spec lo requiere: Logística puede configurar zonas de entrega sin acceso a datos bancarios/perfil, que son Admin-only (ver ADR-016, 2026-09-29) |
 | Invitación de usuarios por email | **Parcial**: genera token de invitación pero no hay envío real de email (sin SES/SendGrid conectado) |
 | Configuración logística (zonas, tiempos, costo de envío) | **Parcial**: `Company.coverageZones` es un array simple (jsonb), no hay polígonos en mapa, tiempos por zona ni costo por peso/volumen |
 

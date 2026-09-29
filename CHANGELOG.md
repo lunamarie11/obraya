@@ -4,6 +4,48 @@ Cada cambio importante del proyecto se documenta aqui. Las decisiones arquitecto
 
 ---
 
+## [0.23.0] - 2026-09-29
+
+### Decisiones Tomadas
+
+- **Permisos granulares por sección** (ver ADR-016): Logística ahora puede
+  configurar zonas de entrega sin acceso a datos bancarios/perfil de la
+  empresa, que siguen siendo Admin-only. Cierra el punto pendiente anotado
+  en `docs/roadmap-estado-actual.md` ("permisos granulares por sección no
+  verificados a fondo").
+- `PUT /companies/:id` se divide en dos endpoints con DTOs validados
+  (antes usaba `@Body() dto: any`, sin `class-validator`).
+
+### Modificado
+
+- `packages/backend/src/modules/users/users.controller.ts`: `PUT
+  /companies/:id` (Admin, perfil+bancario) y nuevo `PUT
+  /companies/:id/delivery-zones` (Admin o Logistica).
+- `packages/backend/src/modules/users/users.service.ts`: `updateCompany` →
+  `updateCompanyProfile` + `updateDeliveryZones`.
+- `packages/frontend/src/app/(backoffice)/settings/page.tsx`: tarjetas de
+  perfil/bancario visibles solo para Admin; tarjeta de zonas de entrega
+  visible para Admin y Logistica, con guardado propio contra el nuevo
+  endpoint; sección de usuarios oculta para no-Admin.
+- `packages/frontend/src/components/layout/Sidebar.tsx`: nuevo link
+  "Zonas de entrega" en el nav de Logistica.
+
+### Agregado
+
+- `packages/backend/src/modules/users/dto/update-company.dto.ts` y
+  `update-delivery-zones.dto.ts`.
+- `packages/backend/src/modules/users/guards/tests/roles.guard.spec.ts`
+  (no existía ningún test de `RolesGuard`).
+- `packages/backend/src/modules/users/tests/users.service.spec.ts`.
+- `docs/adrs/ADR-016-permisos-granulares-zonas-entrega.md`.
+
+### Verificado
+
+- `nest build` y `next build` sin errores.
+- Jest backend: 86/86 tests OK (80 previos + 6 nuevos).
+
+---
+
 ## [0.22.0] - 2026-09-29
 
 ### Decisiones Tomadas

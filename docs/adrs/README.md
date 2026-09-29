@@ -19,6 +19,7 @@ Registro de decisiones arquitectonicas del proyecto ObraYa.
 | 013 | Observabilidad mínima — reporte de errores con Sentry | Aceptado | 2026-09-23 |
 | 014 | Fail-fast de configuración crítica en producción | Aceptado | 2026-09-23 |
 | 015 | Infraestructura de deploy (ECS Fargate, no EKS/ArgoCD por ahora) | Aceptado | 2026-09-29 |
+| 016 | Permisos granulares — Logística puede configurar zonas de entrega | Aceptado | 2026-09-29 |
 
 ## Como agregar un ADR
 

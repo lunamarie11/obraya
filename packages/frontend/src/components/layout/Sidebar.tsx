@@ -5,7 +5,7 @@ import { usePathname } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import {
   LayoutDashboard, Package, Warehouse, ShoppingCart,
-  BarChart2, Settings, LogOut, Truck, History, HardHat,
+  BarChart2, Settings, LogOut, Truck, History, HardHat, MapPin,
 } from 'lucide-react';
 import { clsx } from 'clsx';
 import { logout, getStoredUser } from '@/lib/auth';
@@ -20,8 +20,9 @@ const MAIN_NAV = [
 ];
 
 const DELIVERY_NAV = [
-  { href: '/delivery',         label: 'Mis Entregas', icon: Truck },
-  { href: '/delivery/history', label: 'Historial',    icon: History },
+  { href: '/delivery',         label: 'Mis Entregas',     icon: Truck },
+  { href: '/delivery/history', label: 'Historial',        icon: History },
+  { href: '/settings',         label: 'Zonas de entrega', icon: MapPin },
 ];
 
 export function Sidebar() {

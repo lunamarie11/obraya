@@ -12,6 +12,8 @@ import {
 import { ApiTags, ApiOperation, ApiBearerAuth, ApiResponse } from '@nestjs/swagger';
 import { UsersService } from './users.service';
 import { InviteUserDto } from './dto/invite-user.dto';
+import { UpdateCompanyDto } from './dto/update-company.dto';
+import { UpdateDeliveryZonesDto } from './dto/update-delivery-zones.dto';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { RolesGuard } from './guards/roles.guard';
 import { Roles } from '../../common/decorators/roles.decorator';
@@ -32,15 +34,23 @@ export class UsersController {
   }
 
   @Put(':id')
-  @ApiOperation({ summary: 'Actualizar datos de la empresa' })
+  @ApiOperation({ summary: 'Actualizar datos de perfil y bancarios de la empresa (solo Admin)' })
   @Roles(UserRole.ADMIN)
   async updateCompany(
     @Param('id') id: string,
-    @Body() dto: any,
-    @CurrentUser() currentUser: any,
+    @Body() dto: UpdateCompanyDto,
   ) {
-    const { phone, address, city, province, bankingData, deliveryZones } = dto;
-    return this.usersService.updateCompany(id, { phone, address, city, province, bankingData, deliveryZones });
+    return this.usersService.updateCompanyProfile(id, dto);
+  }
+
+  @Put(':id/delivery-zones')
+  @ApiOperation({ summary: 'Actualizar zonas de entrega (Admin o Logistica)' })
+  @Roles(UserRole.ADMIN, UserRole.LOGISTICA)
+  async updateDeliveryZones(
+    @Param('id') id: string,
+    @Body() dto: UpdateDeliveryZonesDto,
+  ) {
+    return this.usersService.updateDeliveryZones(id, dto.deliveryZones);
   }
 
   @Get(':id/users')

@@ -34,6 +34,7 @@ const ROLE_COLORS: Record<string, string> = {
 export default function SettingsPage() {
   const qc = useQueryClient();
   const [companyId, setCompanyId] = useState('');
+  const [role, setRole] = useState('');
   const [showInvite, setShowInvite] = useState(false);
   const [inviteToken, setInviteToken] = useState('');
   const [copied, setCopied] = useState(false);
@@ -44,13 +45,18 @@ export default function SettingsPage() {
 
   useEffect(() => {
     const user = getStoredUser();
-    if (user) setCompanyId(user.companyId);
+    if (user) {
+      setCompanyId(user.companyId);
+      setRole(user.role ?? '');
+    }
   }, []);
+
+  const isAdmin = role === 'Admin';
 
   const { data: users = [], isLoading } = useQuery({
     queryKey: ['company-users', companyId],
     queryFn: () => api.get(`/companies/${companyId}/users`).then((r) => r.data),
-    enabled: !!companyId,
+    enabled: !!companyId && isAdmin,
   });
 
   const invite = useMutation({
@@ -75,7 +81,8 @@ export default function SettingsPage() {
       <Header title="Configuración" />
       <div className="p-6 max-w-3xl space-y-6">
 
-        {/* Usuarios */}
+        {/* Usuarios (solo Admin: invitar y ver usuarios es Admin-only en el backend) */}
+        {isAdmin && (
         <div className="card overflow-hidden">
           <div className="px-5 py-4 border-b border-slate-200 flex items-center justify-between">
             <div>
@@ -237,15 +244,21 @@ export default function SettingsPage() {
             </table>
           )}
         </div>
+        )}
 
-        <CompanyProfile companyId={companyId} />
+        <CompanyProfile companyId={companyId} role={role} />
       </div>
     </div>
   );
 }
 
-function CompanyProfile({ companyId }: { companyId: string }) {
+function CompanyProfile({ companyId, role }: { companyId: string; role: string }) {
   const qc = useQueryClient();
+  // Datos bancarios/perfil son Admin-only en el backend (PUT /companies/:id).
+  // Zonas de entrega las puede configurar Admin o Logistica (PUT
+  // /companies/:id/delivery-zones), ver ADR-016.
+  const canEditProfile = role === 'Admin';
+  const canEditZones = role === 'Admin' || role === 'Logistica';
 
   const { data: company, isLoading } = useQuery({
     queryKey: ['company', companyId],
@@ -265,13 +278,22 @@ function CompanyProfile({ companyId }: { companyId: string }) {
     }
   }, [company]);
 
-  const update = useMutation({
+  const updateProfile = useMutation({
     mutationFn: (data: any) => api.put(`/companies/${companyId}`, data),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['company', companyId] }),
   });
 
-  const handleSave = () => {
-    update.mutate({ ...profile, bankingData: banking, deliveryZones: zones });
+  const updateZones = useMutation({
+    mutationFn: (deliveryZones: DeliveryZone[]) => api.put(`/companies/${companyId}/delivery-zones`, { deliveryZones }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['company', companyId] }),
+  });
+
+  const handleSaveProfile = () => {
+    updateProfile.mutate({ ...profile, bankingData: banking });
+  };
+
+  const handleSaveZones = () => {
+    updateZones.mutate(zones);
   };
 
   const addZone = () => {
@@ -296,6 +318,8 @@ function CompanyProfile({ companyId }: { companyId: string }) {
   return (
     <div className="space-y-5">
 
+      {canEditProfile && (
+      <>
       {/* Datos empresa */}
       <div className="card p-5 space-y-4">
         <div className="flex items-center gap-2">
@@ -375,7 +399,18 @@ function CompanyProfile({ companyId }: { companyId: string }) {
         </div>
       </div>
 
-      {/* Zonas de entrega */}
+      <div className="flex justify-end">
+        <button onClick={handleSaveProfile} disabled={updateProfile.isPending} className="btn-primary flex items-center gap-2 disabled:opacity-60">
+          {updateProfile.isPending && <Loader2 size={15} className="animate-spin" />}
+          {updateProfile.isPending ? 'Guardando...' : updateProfile.isSuccess ? '¡Guardado!' : 'Guardar datos de empresa'}
+        </button>
+      </div>
+      </>
+      )}
+
+      {/* Zonas de entrega (Admin o Logistica) */}
+      {canEditZones && (
+      <>
       <div className="card p-5 space-y-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
@@ -402,11 +437,13 @@ function CompanyProfile({ companyId }: { companyId: string }) {
       </div>
 
       <div className="flex justify-end">
-        <button onClick={handleSave} disabled={update.isPending} className="btn-primary flex items-center gap-2 disabled:opacity-60">
-          {update.isPending && <Loader2 size={15} className="animate-spin" />}
-          {update.isPending ? 'Guardando...' : update.isSuccess ? '¡Guardado!' : 'Guardar configuración'}
+        <button onClick={handleSaveZones} disabled={updateZones.isPending} className="btn-primary flex items-center gap-2 disabled:opacity-60">
+          {updateZones.isPending && <Loader2 size={15} className="animate-spin" />}
+          {updateZones.isPending ? 'Guardando...' : updateZones.isSuccess ? '¡Guardado!' : 'Guardar zonas de entrega'}
         </button>
       </div>
+      </>
+      )}
     </div>
   );
 }

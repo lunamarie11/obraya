@@ -107,8 +107,18 @@ export class UsersService {
     return this.companyRepo.findOne({ where: { id } });
   }
 
-  async updateCompany(id: string, dto: Partial<Pick<Company, 'phone' | 'address' | 'city' | 'province' | 'bankingData' | 'deliveryZones'>>): Promise<Company> {
+  // Perfil y datos bancarios (solo Admin, ver ADR-016). No incluye
+  // deliveryZones: eso se gestiona por updateDeliveryZones con permisos
+  // distintos (Admin o Logistica).
+  async updateCompanyProfile(id: string, dto: Partial<Pick<Company, 'phone' | 'address' | 'city' | 'province' | 'bankingData'>>): Promise<Company> {
     await this.companyRepo.update(id, dto);
+    return this.companyRepo.findOne({ where: { id } }) as Promise<Company>;
+  }
+
+  // Zonas de entrega: separado de updateCompanyProfile para que Logistica
+  // pueda configurar entregas sin acceso a datos bancarios (ver ADR-016).
+  async updateDeliveryZones(id: string, deliveryZones: Company['deliveryZones']): Promise<Company> {
+    await this.companyRepo.update(id, { deliveryZones });
     return this.companyRepo.findOne({ where: { id } }) as Promise<Company>;
   }
 
