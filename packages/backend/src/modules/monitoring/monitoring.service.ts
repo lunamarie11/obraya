@@ -1,15 +1,23 @@
 import { Injectable } from '@nestjs/common';
-import { AppDataSource } from '../../database/data-source';
+import { InjectDataSource } from '@nestjs/typeorm';
+import { DataSource } from 'typeorm';
 // use global fetch (Node 18+). Use globalThis.fetch to avoid needing node-fetch types
 import { AdminService } from '../admin/admin.service';
 
 @Injectable()
 export class MonitoringService {
-  constructor(private readonly adminService: AdminService) {}
+  constructor(
+    private readonly adminService: AdminService,
+    // Ver docs/adrs (bug corregido): antes usaba el AppDataSource standalone de
+    // database/data-source.ts (pensado solo para el CLI de migrations), que
+    // nunca se inicializa en runtime y hacía que /health reportara la DB caída
+    // aunque la app funcionara bien. Este es el DataSource real de Nest/TypeORM.
+    @InjectDataSource() private readonly dataSource: DataSource,
+  ) {}
 
   async checkDatabase() {
     try {
-      await AppDataSource.query('SELECT 1');
+      await this.dataSource.query('SELECT 1');
       return { ok: true };
     } catch (err: any) {
       return { ok: false, error: err?.message ?? String(err) };
