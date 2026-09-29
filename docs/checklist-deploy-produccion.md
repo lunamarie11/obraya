@@ -118,8 +118,10 @@ crear recursos):
 **Gap menor encontrado de paso — resuelto:** los 4 packages (`backend`,
 `frontend`, `shared`, `mobile`) ya tienen configuración de ESLint
 funcional (`.eslintrc.js`/`.eslintrc.json`) y `npm run lint` corre limpio
-(0 errores) en todos. El workflow de CI todavía no incluye un step de
-lint — sigue pendiente agregarlo, pero ya no hay nada bloqueando hacerlo.
+(0 errores) en todos. El workflow de CI ya incluye un step de lint por
+job (`.github/workflows/ci.yml`). Pendiente menor: `packages/shared` no
+tiene `tsconfig.json` propio, así que su `build` (`tsc`) no corre en CI
+todavía — solo el lint.
 
 ## 7. Orden sugerido antes del primer deploy
 

@@ -18,6 +18,7 @@ jobs:
           node-version: 20
           cache: npm
       - run: npm ci
+      - run: npm run lint --workspace=packages/backend
       - run: npm run build --workspace=packages/backend
       - run: npm run test --workspace=packages/backend
 
@@ -30,6 +31,7 @@ jobs:
           node-version: 20
           cache: npm
       - run: npm ci
+      - run: npm run lint --workspace=packages/frontend
       - run: npm run build --workspace=packages/frontend
 
   mobile:
@@ -41,4 +43,19 @@ jobs:
           node-version: 20
           cache: npm
       - run: npm ci
+      - run: npm run lint --workspace=packages/mobile
       - run: npm run typecheck:mobile
+
+  shared:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: npm run lint --workspace=packages/shared
+      # `npm run build --workspace=packages/shared` (tsc) no funciona hoy:
+      # el package no tiene tsconfig.json propio (gap preexistente, no
+      # relacionado con lint). Se agrega cuando se resuelva eso.

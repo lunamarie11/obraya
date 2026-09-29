@@ -4,6 +4,31 @@ Cada cambio importante del proyecto se documenta aqui. Las decisiones arquitecto
 
 ---
 
+## [0.24.1] - 2026-09-29
+
+### Decisiones Tomadas
+
+- **Step de lint en CI**: ahora que los 4 packages lintan limpio (ver
+  `0.24.0`), se agrega `npm run lint --workspace=packages/X` a cada job
+  de `.github/workflows/ci.yml`. Se agrega también un job `shared` nuevo
+  (antes no tenía ningún job en CI) con solo el step de lint — su `build`
+  (`tsc`) no se agrega porque el package no tiene `tsconfig.json` propio
+  (gap preexistente, sin relación con lint, no resuelto en este cambio).
+
+### Modificado
+
+- `.github/workflows/ci.yml`: step de lint en los jobs `backend`,
+  `frontend` y `mobile`; nuevo job `shared` (solo lint).
+- `docs/checklist-deploy-produccion.md`: actualizado, CI ya incluye lint.
+
+### Verificado
+
+- `npm run lint --workspace=packages/X` con exit 0 en los 4 packages
+  (mismos comandos que corre el workflow), corrido localmente antes de
+  commitear.
+
+---
+
 ## [0.24.0] - 2026-09-29
 
 ### Decisiones Tomadas
