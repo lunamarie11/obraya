@@ -5,7 +5,7 @@ import { usePathname } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import {
   LayoutDashboard, Package, Warehouse, ShoppingCart,
-  BarChart2, Settings, LogOut, Truck, History, HardHat, MapPin,
+  BarChart2, Settings, LogOut, Truck, History, HardHat, MapPin, Map,
 } from 'lucide-react';
 import { clsx } from 'clsx';
 import { logout, getStoredUser } from '@/lib/auth';
@@ -16,12 +16,16 @@ const MAIN_NAV = [
   { href: '/products',  label: 'Productos',       icon: Package },
   { href: '/stock',     label: 'Stock',           icon: Warehouse },
   { href: '/reports',   label: 'Reportes',        icon: BarChart2 },
+  // Ver ADR-018 (Fase 4b): mapa de repartidores en ruta.
+  { href: '/delivery/map', label: 'Repartidores', icon: Map },
   { href: '/settings',  label: 'Configuración',   icon: Settings },
 ];
 
 const DELIVERY_NAV = [
   { href: '/delivery',         label: 'Mis Entregas',     icon: Truck },
   { href: '/delivery/history', label: 'Historial',        icon: History },
+  // Ver ADR-018 (Fase 4b): mapa de repartidores en ruta.
+  { href: '/delivery/map',     label: 'Mapa',              icon: Map },
   { href: '/settings',         label: 'Zonas de entrega', icon: MapPin },
 ];
 

@@ -1,7 +1,7 @@
 'use client';
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { api, formatARS } from '@/lib/api';
 import { getStoredUser } from '@/lib/auth';
@@ -101,6 +101,40 @@ export default function DeliveryPage() {
     if (activeOrder && deliveryStep === 'available') setDeliveryStep('heading');
     if (!activeOrder && deliveryStep !== 'available') setDeliveryStep('available');
   }, [activeOrder, deliveryStep]);
+
+  // Ver ADR-018: mientras hay un pedido activo asignado, reporto mi posición
+  // con la Geolocation API del navegador (throttle de ~15s entre envíos).
+  // Best-effort: si el permiso se niega o falla, no bloquea el resto del flujo.
+  const lastSentAtRef = useRef(0);
+  const watchIdRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    if (!activeOrder || typeof navigator === 'undefined' || !navigator.geolocation) return;
+
+    watchIdRef.current = navigator.geolocation.watchPosition(
+      (position) => {
+        const now = Date.now();
+        if (now - lastSentAtRef.current < 15_000) return;
+        lastSentAtRef.current = now;
+
+        api.put('/logistics/location', {
+          lat: position.coords.latitude,
+          lng: position.coords.longitude,
+          accuracy: position.coords.accuracy,
+          recordedAt: new Date(position.timestamp).toISOString(),
+        }).catch(() => {});
+      },
+      () => {
+        // Permiso denegado o error de geolocalización: no se manda nada.
+      },
+      { enableHighAccuracy: true, maximumAge: 10_000 },
+    );
+
+    return () => {
+      if (watchIdRef.current != null) navigator.geolocation.clearWatch(watchIdRef.current);
+      watchIdRef.current = null;
+    };
+  }, [activeOrder?.id]);
 
   const todayStr = new Date().toDateString();
   const todayDeliveries = historyOrders.filter(o =>

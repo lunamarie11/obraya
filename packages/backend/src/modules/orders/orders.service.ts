@@ -232,6 +232,21 @@ export class OrdersService {
     return this.orderRepo.findOne({ where: { id, companyId }, relations: ['items'] }) as Promise<Order>;
   }
 
+  // Ver ADR-018: usado por LogisticsService para saber que repartidores
+  // tienen un pedido activo asignado en este momento, sin que el modulo de
+  // logistica acceda directamente al repositorio de Order (comunicacion
+  // entre modulos via inyeccion de dependencias, ver CLAUDE.md).
+  async findActiveAssignments(
+    companyId: string,
+  ): Promise<{ orderId: string; orderNumber: string; assignedDriverId: string }[]> {
+    const orders = await this.orderRepo.find({
+      where: { companyId, status: OrderStatus.DESPACHADO },
+    });
+    return orders
+      .filter((o) => !!o.assignedDriverId)
+      .map((o) => ({ orderId: o.id, orderNumber: o.orderNumber, assignedDriverId: o.assignedDriverId as string }));
+  }
+
   // Libera un pedido asignado sin cambiar su status. Logistica solo puede
   // liberar los suyos; Admin puede destrabar cualquiera (override manual).
   async unassignOrder(id: string, companyId: string, userId: string, userRole: UserRole): Promise<Order> {

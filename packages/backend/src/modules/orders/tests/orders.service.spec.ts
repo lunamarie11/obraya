@@ -32,6 +32,7 @@ function makeOrder(overrides: Partial<Order> = {}): Order {
 
 const mockOrderRepo = {
   findOne: jest.fn(),
+  find: jest.fn(),
   createQueryBuilder: jest.fn().mockReturnThis(),
   getManyAndCount: jest.fn(),
   create: jest.fn((data) => data),
@@ -459,6 +460,22 @@ describe('OrdersService', () => {
       );
       expect(msg.content).toBe('Hola');
       expect(msg.sender).toBe(MessageSender.COMPANY);
+    });
+  });
+
+  describe('findActiveAssignments() — ver ADR-018, usado por LogisticsService', () => {
+    it('devuelve solo los Despachado con assignedDriverId asignado', async () => {
+      mockOrderRepo.find.mockResolvedValueOnce([
+        makeOrder({ id: 'o1', orderNumber: 'OBY-001', assignedDriverId: 'driver-1' }),
+        makeOrder({ id: 'o2', orderNumber: 'OBY-002', assignedDriverId: null }),
+      ]);
+
+      const result = await service.findActiveAssignments('company-uuid-1');
+
+      expect(result).toEqual([{ orderId: 'o1', orderNumber: 'OBY-001', assignedDriverId: 'driver-1' }]);
+      expect(mockOrderRepo.find).toHaveBeenCalledWith({
+        where: { companyId: 'company-uuid-1', status: OrderStatus.DESPACHADO },
+      });
     });
   });
 });

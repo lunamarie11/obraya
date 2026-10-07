@@ -21,6 +21,7 @@ Registro de decisiones arquitectonicas del proyecto ObraYa.
 | 015 | Infraestructura de deploy (ECS Fargate, no EKS/ArgoCD por ahora) | Aceptado | 2026-09-29 |
 | 016 | Permisos granulares — Logística puede configurar zonas de entrega | Aceptado | 2026-09-29 |
 | 017 | Asignación de pedidos a repartidores vía claim atómico | Aceptado | 2026-09-29 |
+| 018 | Tracking en vivo de repartidores (polling + Leaflet, sin WebSockets ni Google Maps) | Aceptado | 2026-10-07 |
 
 ## Como agregar un ADR
 

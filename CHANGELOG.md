@@ -4,6 +4,88 @@ Cada cambio importante del proyecto se documenta aqui. Las decisiones arquitecto
 
 ---
 
+## [0.26.0] - 2026-10-07
+
+### Decisiones Tomadas
+
+- **Fase 4b: tracking en vivo de repartidores** (ver
+  `docs/specs/fase4b-tracking-repartidores.md` y ADR-018). Fase 4a dejó
+  explícitamente fuera de alcance la geolocalización del repartidor; hoy
+  `Admin`/`Logistica` ya pueden ver dónde está un repartidor con pedido
+  activo asignado.
+- Origen del dato de posición: **Geolocation API del navegador**, reusando
+  la pestaña de `/delivery` que el repartidor ya tiene abierta — no se
+  construye una app mobile de repartidor nueva (no existía ninguna, y no
+  se justifica el desarrollo sin validar primero si el dato aporta valor).
+- **Un solo registro por repartidor (upsert sobre `companyUserId`), sin
+  tabla de historial** — mismo criterio que el claim atómico de ADR-017
+  (no construir especulativamente sin caso de uso real hoy).
+- **Polling REST (15s), no WebSockets** — mismo patrón que ya usa
+  `/delivery` (`refetchInterval`); evita sumar infraestructura nueva
+  (Socket.io + adapter Redis) sin volumen de tráfico que lo justifique.
+- **Leaflet + OpenStreetMap, no Google Maps** — gratis, sin necesitar dar
+  de alta facturación de Google Cloud en pre-seed. Google Maps sigue
+  siendo la opción planeada para ruteo optimizado (Fase 4d).
+- `GET /logistics/locations` cruza `DriverLocation` con pedidos `Despachado`
+  activos en el momento de la consulta (vía `OrdersService.findActiveAssignments`,
+  nuevo método de lectura), en vez de limpiar la fila al completar la
+  entrega — evita mostrar la posición "vieja" de un repartidor que ya
+  terminó de repartir.
+- Visible solo para `Admin`/`Logistica` en el backoffice; fuera de alcance
+  el tracking para el comprador (`/my-orders`).
+
+### Agregado
+
+- Migration `CreateDriverLocations`: tabla `driver_locations`
+  (`company_user_id` PK, FK a `company_users.id` `ON DELETE CASCADE`,
+  `company_id` indexado, `lat`/`lng`/`accuracy`/`recorded_at`).
+- Módulo `logistics` (hasta ahora un stub vacío) con `DriverLocation`
+  entity, `LogisticsService` (`upsertLocation`, `getActiveDriverLocations`)
+  y `LogisticsController`.
+- `PUT /logistics/location` (roles `Admin`, `Logistica`): reporta la
+  posición propia.
+- `GET /logistics/locations` (roles `Admin`, `Logistica`): devuelve
+  repartidores con pedido activo asignado y su última posición reportada.
+- `OrdersService.findActiveAssignments()`: nuevo método de lectura para que
+  `LogisticsService` cruce posiciones con pedidos activos sin acceder
+  directamente al repositorio de `Order` (comunicación entre módulos vía
+  inyección de dependencias, ver `CLAUDE.md`).
+- Frontend: `/delivery` reporta posición con `navigator.geolocation.watchPosition`
+  (throttle ~15s) mientras hay un pedido activo asignado; best-effort, no
+  bloquea el flujo si el permiso es denegado.
+- Frontend: nueva pantalla `/delivery/map` (Admin/Logística) con componente
+  `DriverMap` (Leaflet + OpenStreetMap, marcador custom), polling cada 15s.
+  Nuevo ítem de navegación "Repartidores"/"Mapa" en el `Sidebar`.
+- 9 tests nuevos en `logistics.service.spec.ts` (`upsertLocation`,
+  `getActiveDriverLocations`) y 2 tests nuevos en `orders.service.spec.ts`
+  (`findActiveAssignments`).
+- ADR-018 (`docs/adrs/ADR-018-tracking-repartidores.md`).
+
+### Modificado
+
+- `packages/frontend/package.json`: nuevas dependencias `leaflet`,
+  `react-leaflet@^4.2.1` (pineado por incompatibilidad de peer deps con
+  React 18 — `react-leaflet@5` requiere React 19) y `@types/leaflet`.
+- `packages/backend/src/app.module.ts`: `LogisticsModule` descomentado y
+  registrado.
+- `docs/roadmap-estado-actual.md`: sección Fase 4 actualizada para
+  reflejar que el tracking en vivo ya está implementado (Fase 4b); quedan
+  pendientes integración con transportistas y ruteo optimizado (Fase
+  4c/4d).
+
+### Verificado
+
+- `npm run test --workspace=packages/backend`: 118/118 tests, 14 suites.
+- `npm run lint --workspace=packages/backend`: 0 errores (13 warnings
+  preexistentes, sin relación con este cambio).
+- `npm run lint --workspace=packages/frontend`: 0 errores (warnings
+  preexistentes, sin relación con este cambio).
+- `npm run build --workspace=packages/backend`: build limpio.
+- `npm run build --workspace=packages/frontend`: build limpio, 32 rutas
+  generadas sin errores (incluye `/delivery/map` nueva).
+
+---
+
 ## [0.25.0] - 2026-09-29
 
 ### Decisiones Tomadas

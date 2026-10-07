@@ -110,6 +110,21 @@ entidad `Driver` separada (se sigue usando el rol `Logistica` como
 repartidor), no hay tracking en vivo ni geolocalización, y no hay
 integración con transportistas externos — eso queda para Fase 4b/c/d.
 
+**Fase 4b (2026-10-07, ver ADR-018 y `docs/specs/fase4b-tracking-repartidores.md`):**
+implementado tracking en vivo de repartidores. Mientras un repartidor tiene
+un pedido `Despachado` asignado, `/delivery` reporta su posición (Geolocation
+API del navegador, sin app mobile nueva) vía `PUT /logistics/location` cada
+~15s; `GET /logistics/locations` devuelve solo repartidores con pedido activo
+en este momento (cruce con `OrdersService.findActiveAssignments`, no solo la
+última fila de `DriverLocation`). Nueva pantalla `/delivery/map` (Admin y
+Logística) muestra las posiciones en un mapa Leaflet + OpenStreetMap, con
+polling de 15s (mismo patrón que el resto de `/delivery`). Sin WebSockets, sin
+tabla de historial (upsert de una sola fila por repartidor), sin Google Maps.
+**Limitaciones que siguen pendientes:** no cubre pantalla bloqueada/pestaña
+cerrada, no hay recorrido/replay de la entrega, no hay tracking para el
+comprador, y sigue sin existir integración con transportistas externos ni
+ruteo optimizado — eso queda para Fase 4c/4d.
+
 ---
 
 ## Resumen ejecutivo

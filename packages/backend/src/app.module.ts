@@ -28,7 +28,7 @@ import { SearchModule } from './modules/search/search.module';
 import { ReviewsModule } from './modules/reviews/reviews.module';
 
 // Módulos de negocio - Fase 4+
-// import { LogisticsModule } from './modules/logistics/logistics.module';
+import { LogisticsModule } from './modules/logistics/logistics.module';
 // import { AnalyticsModule } from './modules/analytics/analytics.module';
 
 @Module({
@@ -57,6 +57,7 @@ import { ReviewsModule } from './modules/reviews/reviews.module';
     NotificationsModule,
     SearchModule,
     ReviewsModule,
+    LogisticsModule,
   ],
 })
 export class AppModule {
