@@ -12,6 +12,9 @@ export interface Company {
   province?: string;
   country?: string;
   logo?: string;
+  // Comision del repartidor sobre el shippingCost, en porcentaje entero
+  // (0-100), default 8. Ver ADR-017.
+  driverCommissionPercent?: number;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -192,6 +195,9 @@ export interface Order {
   orderNumber: string;
   status: OrderStatus;
   rejectionReason?: string;
+  // Repartidor que reclamó el pedido (ver ADR-017). Null/undefined = disponible.
+  assignedDriverId?: string | null;
+  assignedAt?: Date | null;
   items: OrderItem[];
   totalAmount: number;
   shippingCost?: number;

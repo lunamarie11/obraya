@@ -31,7 +31,7 @@ export class OrdersController {
   @Get()
   @ApiOperation({ summary: 'Listar pedidos con filtros' })
   async findAll(@CurrentUser() user: any, @Query() query: OrderQueryDto) {
-    return this.ordersService.findAll(user.companyId, query);
+    return this.ordersService.findAll(user.companyId, query, user.id);
   }
 
   @Get(':id')
@@ -54,7 +54,22 @@ export class OrdersController {
       dto,
       user.id,
       `${user.firstName ?? ''} ${user.lastName ?? ''}`.trim(),
+      user.role,
     );
+  }
+
+  @Post(':id/claim')
+  @ApiOperation({ summary: 'Reclamar un pedido Despachado sin repartidor asignado (ver ADR-017)' })
+  @Roles(UserRole.ADMIN, UserRole.LOGISTICA)
+  async claim(@Param('id', ParseUUIDPipe) id: string, @CurrentUser() user: any) {
+    return this.ordersService.claimOrder(id, user.companyId, user.id);
+  }
+
+  @Put(':id/unassign')
+  @ApiOperation({ summary: 'Liberar un pedido asignado sin cambiar su estado' })
+  @Roles(UserRole.ADMIN, UserRole.LOGISTICA)
+  async unassign(@Param('id', ParseUUIDPipe) id: string, @CurrentUser() user: any) {
+    return this.ordersService.unassignOrder(id, user.companyId, user.id, user.role);
   }
 
   @Post(':id/messages')

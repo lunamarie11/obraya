@@ -1,9 +1,10 @@
 'use client';
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { api, formatARS } from '@/lib/api';
+import { getStoredUser } from '@/lib/auth';
 import {
   Truck, MapPin, CheckCircle2, Clock, Package,
   ChevronRight, Zap, DollarSign, Navigation, AlertCircle,
@@ -11,9 +12,6 @@ import {
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { clsx } from 'clsx';
-
-const COMMISSION = 0.08;
-const earn = (cents: number) => Math.round(Number(cents) * COMMISSION);
 
 // Estado local del flow de entrega (la API solo tiene Despachado → Entregado)
 type DeliveryStep = 'available' | 'heading' | 'arrived' | 'picked' | 'delivering' | 'done';
@@ -29,14 +27,37 @@ export default function DeliveryPage() {
   const router = useRouter();
   const qc = useQueryClient();
 
-  // Pedido activo local (solo persiste en esta sesión)
-  const [activeOrderId, setActiveOrderId] = useState<string | null>(null);
+  const [companyId, setCompanyId] = useState<string | null>(null);
   const [deliveryStep, setDeliveryStep] = useState<DeliveryStep>('available');
   const [isOnline, setIsOnline] = useState(true);
+  const [claimError, setClaimError] = useState<string | null>(null);
 
-  const { data: pendingData, isLoading } = useQuery({
-    queryKey: ['delivery-pending'],
-    queryFn: () => api.get('/orders', { params: { status: 'Despachado', limit: 50 } }).then(r => r.data),
+  useEffect(() => {
+    const user = getStoredUser();
+    if (user) setCompanyId(user.companyId);
+  }, []);
+
+  const { data: company } = useQuery({
+    queryKey: ['delivery-company', companyId],
+    queryFn: () => api.get(`/companies/${companyId}`).then(r => r.data),
+    enabled: !!companyId,
+  });
+  // Ver ADR-017: reemplaza el COMMISSION = 0.08 hardcodeado.
+  const commission = (company?.driverCommissionPercent ?? 8) / 100;
+  const earn = (cents: number) => Math.round(Number(cents) * commission);
+
+  // Disponibles: Despachado y sin repartidor asignado (ver ADR-017).
+  const { data: availableData, isLoading } = useQuery({
+    queryKey: ['delivery-available'],
+    queryFn: () => api.get('/orders', { params: { status: 'Despachado', unassigned: true, limit: 50 } }).then(r => r.data),
+    refetchInterval: 30_000,
+    enabled: isOnline,
+  });
+
+  // Mis pedidos: Despachado y asignados a mí.
+  const { data: mineData } = useQuery({
+    queryKey: ['delivery-mine'],
+    queryFn: () => api.get('/orders', { params: { status: 'Despachado', assignedToMe: true, limit: 50 } }).then(r => r.data),
     refetchInterval: 30_000,
     enabled: isOnline,
   });
@@ -46,19 +67,40 @@ export default function DeliveryPage() {
     queryFn: () => api.get('/orders', { params: { status: 'Entregado', limit: 200 } }).then(r => r.data),
   });
 
+  const claimOrder = useMutation({
+    mutationFn: (id: string) => api.post(`/orders/${id}/claim`),
+    onSuccess: () => {
+      setClaimError(null);
+      setDeliveryStep('heading');
+      qc.invalidateQueries({ queryKey: ['delivery-available'] });
+      qc.invalidateQueries({ queryKey: ['delivery-mine'] });
+    },
+    onError: (err: any) => {
+      setClaimError(err?.response?.data?.message ?? 'Este pedido ya fue tomado por otro repartidor');
+      qc.invalidateQueries({ queryKey: ['delivery-available'] });
+    },
+  });
+
   const markDelivered = useMutation({
     mutationFn: (id: string) => api.put(`/orders/${id}/status`, { status: 'Entregado' }),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['delivery-pending'] });
+      qc.invalidateQueries({ queryKey: ['delivery-available'] });
+      qc.invalidateQueries({ queryKey: ['delivery-mine'] });
       qc.invalidateQueries({ queryKey: ['delivery-history'] });
-      setActiveOrderId(null);
       setDeliveryStep('available');
     },
   });
 
-  const pendingOrders: any[] = (pendingData?.data ?? []).filter((o: any) => o.id !== activeOrderId);
+  const availableOrders: any[] = availableData?.data ?? [];
   const historyOrders: any[] = historyData?.data ?? [];
-  const activeOrder = activeOrderId ? (pendingData?.data ?? []).find((o: any) => o.id === activeOrderId) : null;
+  const activeOrder = mineData?.data?.[0] ?? null;
+
+  // Si ya tengo un pedido asignado (ej. al recargar la página), arranco el
+  // timeline cosmético en "heading" en vez de "available".
+  useEffect(() => {
+    if (activeOrder && deliveryStep === 'available') setDeliveryStep('heading');
+    if (!activeOrder && deliveryStep !== 'available') setDeliveryStep('available');
+  }, [activeOrder, deliveryStep]);
 
   const todayStr = new Date().toDateString();
   const todayDeliveries = historyOrders.filter(o =>
@@ -72,13 +114,12 @@ export default function DeliveryPage() {
     else if (deliveryStep === 'arrived')    setDeliveryStep('picked');
     else if (deliveryStep === 'picked')     setDeliveryStep('delivering');
     else if (deliveryStep === 'delivering') {
-      if (activeOrderId) markDelivered.mutate(activeOrderId);
+      if (activeOrder) markDelivered.mutate(activeOrder.id);
     }
   }
 
   function takeOrder(order: any) {
-    setActiveOrderId(order.id);
-    setDeliveryStep('heading');
+    claimOrder.mutate(order.id);
   }
 
   const currentStepIndex = STEPS.findIndex(s => s.key === deliveryStep);
@@ -125,6 +166,13 @@ export default function DeliveryPage() {
             </div>
           ))}
         </div>
+
+        {claimError && (
+          <div className="bg-red-50 border border-red-200 rounded-xl p-3 flex items-center gap-2 text-red-600 text-sm">
+            <AlertCircle size={16} />
+            {claimError}
+          </div>
+        )}
 
         {/* Entrega activa */}
         {activeOrder && (
@@ -204,7 +252,7 @@ export default function DeliveryPage() {
 
                 {/* Ver detalle */}
                 <button
-                  onClick={() => router.push(`/delivery/${activeOrderId}`)}
+                  onClick={() => router.push(`/delivery/${activeOrder.id}`)}
                   className="w-full py-2.5 text-slate-500 text-xs font-medium hover:text-slate-900 transition-colors flex items-center justify-center gap-1"
                 >
                   Ver detalle completo <ChevronRight size={12} />
@@ -233,7 +281,7 @@ export default function DeliveryPage() {
               {isLoading && <span className="text-xs text-slate-400 animate-pulse">Actualizando...</span>}
             </div>
 
-            {pendingOrders.length === 0 ? (
+            {availableOrders.length === 0 ? (
               <div className="bg-white border border-slate-200 rounded-2xl p-8 text-center shadow-sm">
                 <Clock size={32} className="text-slate-300 mx-auto mb-3" />
                 <p className="text-slate-600 font-medium">Sin pedidos disponibles</p>
@@ -241,18 +289,18 @@ export default function DeliveryPage() {
               </div>
             ) : (
               <div className="space-y-3">
-                {pendingOrders.map((order: any) => (
-                  <OrderCard key={order.id} order={order} onTake={() => takeOrder(order)} />
+                {availableOrders.map((order: any) => (
+                  <OrderCard key={order.id} order={order} earn={earn} onTake={() => takeOrder(order)} taking={claimOrder.isPending} />
                 ))}
               </div>
             )}
           </section>
         )}
 
-        {isOnline && activeOrder && pendingOrders.length > 0 && (
+        {isOnline && activeOrder && availableOrders.length > 0 && (
           <section>
             <h2 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2 px-1">
-              Más pedidos ({pendingOrders.length})
+              Más pedidos ({availableOrders.length})
             </h2>
             <p className="text-xs text-slate-500 text-center py-4">Terminá la entrega actual primero.</p>
           </section>
@@ -263,7 +311,7 @@ export default function DeliveryPage() {
   );
 }
 
-function OrderCard({ order, onTake }: { order: any; onTake: () => void }) {
+function OrderCard({ order, earn, onTake, taking }: { order: any; earn: (cents: number) => number; onTake: () => void; taking: boolean }) {
   const earnings = earn(order.totalAmount);
   const itemCount = order.items?.length ?? 0;
   const createdAt = order.createdAt ? new Date(order.createdAt) : null;
@@ -310,9 +358,10 @@ function OrderCard({ order, onTake }: { order: any; onTake: () => void }) {
 
         <button
           onClick={onTake}
-          className="w-full py-3 bg-orange-500 hover:bg-orange-600 text-white font-bold rounded-xl text-sm transition-colors"
+          disabled={taking}
+          className="w-full py-3 bg-orange-500 hover:bg-orange-600 disabled:opacity-60 text-white font-bold rounded-xl text-sm transition-colors"
         >
-          Tomar pedido
+          {taking ? 'Tomando...' : 'Tomar pedido'}
         </button>
       </div>
     </div>

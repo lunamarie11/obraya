@@ -3,6 +3,8 @@ import {
   Logger,
   NotFoundException,
   BadRequestException,
+  ConflictException,
+  ForbiddenException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, DataSource, Between, ILike } from 'typeorm';
@@ -20,6 +22,7 @@ import { EmailService } from '../email/email.service';
 import { BuyersService } from '../buyers/buyers.service';
 import { AfipService } from '../afip/afip.service';
 import { Company, resolveDeliveryZone } from '../users/entities/company.entity';
+import { UserRole } from '../users/entities/company-user.entity';
 
 @Injectable()
 export class OrdersService {
@@ -49,13 +52,19 @@ export class OrdersService {
     return `OBY-${ts}-${rand}`;
   }
 
-  async findAll(companyId: string, query: OrderQueryDto) {
+  async findAll(companyId: string, query: OrderQueryDto, currentUserId?: string) {
     const qb = this.orderRepo
       .createQueryBuilder('order')
       .leftJoinAndSelect('order.items', 'items')
       .where('order.companyId = :companyId', { companyId });
 
     if (query.status) qb.andWhere('order.status = :status', { status: query.status });
+
+    // Ver ADR-017: cola de reparto separada en "disponibles" vs "mis pedidos".
+    // assignedToMe se resuelve siempre contra el usuario autenticado, nunca
+    // contra un id arbitrario recibido por query string.
+    if (query.unassigned) qb.andWhere('order.assignedDriverId IS NULL');
+    if (query.assignedToMe) qb.andWhere('order.assignedDriverId = :currentUserId', { currentUserId });
 
     if (query.search) {
       qb.andWhere(
@@ -198,12 +207,53 @@ export class OrdersService {
     return order;
   }
 
+  // Ver ADR-017: reclama un pedido Despachado sin repartidor asignado. Update
+  // atómico y condicional (no read-then-write) para que dos repartidores que
+  // intenten tomar el mismo pedido a la vez no puedan asignárselo ambos: solo
+  // uno de los dos UPDATE afecta una fila, el otro recibe affected = 0.
+  async claimOrder(id: string, companyId: string, userId: string): Promise<Order> {
+    const result = await this.orderRepo
+      .createQueryBuilder()
+      .update(Order)
+      .set({ assignedDriverId: userId, assignedAt: () => 'now()' })
+      .where('id = :id AND company_id = :companyId AND status = :status AND assigned_driver_id IS NULL', {
+        id,
+        companyId,
+        status: OrderStatus.DESPACHADO,
+      })
+      .execute();
+
+    if (!result.affected) {
+      const exists = await this.orderRepo.findOne({ where: { id, companyId } });
+      if (!exists) throw new NotFoundException('Pedido no encontrado');
+      throw new ConflictException('Este pedido ya fue tomado por otro repartidor');
+    }
+
+    return this.orderRepo.findOne({ where: { id, companyId }, relations: ['items'] }) as Promise<Order>;
+  }
+
+  // Libera un pedido asignado sin cambiar su status. Logistica solo puede
+  // liberar los suyos; Admin puede destrabar cualquiera (override manual).
+  async unassignOrder(id: string, companyId: string, userId: string, userRole: UserRole): Promise<Order> {
+    const order = await this.orderRepo.findOne({ where: { id, companyId } });
+    if (!order) throw new NotFoundException('Pedido no encontrado');
+
+    if (userRole === UserRole.LOGISTICA && order.assignedDriverId !== userId) {
+      throw new ForbiddenException('Este pedido esta asignado a otro repartidor');
+    }
+
+    order.assignedDriverId = null;
+    order.assignedAt = null;
+    return this.orderRepo.save(order);
+  }
+
   async updateStatus(
     id: string,
     companyId: string,
     dto: UpdateOrderStatusDto,
     userId: string,
     userName: string,
+    userRole?: UserRole,
   ): Promise<Order> {
     return this.dataSource.transaction(async (manager) => {
       const orderRepo = manager.getRepository(Order);
@@ -214,6 +264,18 @@ export class OrdersService {
         relations: ['items'],
       });
       if (!order) throw new NotFoundException('Pedido no encontrado');
+
+      // Ver ADR-017: un repartidor (Logistica) solo puede marcar como
+      // entregado un pedido que el mismo reclamó. Admin/Vendedor mantienen
+      // el comportamiento previo (override), no participan del flujo de
+      // asignación.
+      if (
+        dto.status === OrderStatus.ENTREGADO &&
+        userRole === UserRole.LOGISTICA &&
+        order.assignedDriverId !== userId
+      ) {
+        throw new ForbiddenException('Este pedido esta asignado a otro repartidor');
+      }
 
       // Validar transición
       const validNext = VALID_TRANSITIONS[order.status];

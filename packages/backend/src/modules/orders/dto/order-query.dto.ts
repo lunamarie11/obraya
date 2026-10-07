@@ -1,4 +1,4 @@
-import { IsOptional, IsEnum, IsString, IsInt, Min, Max, IsDateString } from 'class-validator';
+import { IsOptional, IsEnum, IsString, IsInt, Min, Max, IsDateString, IsBoolean } from 'class-validator';
 import { Type, Transform } from 'class-transformer';
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { OrderStatus } from '../entities/order.entity';
@@ -38,4 +38,17 @@ export class OrderQueryDto {
   @IsOptional()
   @IsDateString()
   dateTo?: string;
+
+  // Ver ADR-017: cola de reparto separada en "disponibles" vs "mis pedidos".
+  @ApiPropertyOptional({ description: 'Solo pedidos Despachado sin repartidor asignado' })
+  @IsOptional()
+  @Type(() => Boolean)
+  @IsBoolean()
+  unassigned?: boolean;
+
+  @ApiPropertyOptional({ description: 'Solo pedidos asignados al repartidor autenticado' })
+  @IsOptional()
+  @Type(() => Boolean)
+  @IsBoolean()
+  assignedToMe?: boolean;
 }

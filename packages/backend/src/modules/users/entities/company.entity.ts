@@ -128,6 +128,12 @@ export class Company {
   @Column({ name: 'approved_by', nullable: true, length: 100 })
   approvedBy: string;
 
+  // Comisión del repartidor sobre el shippingCost del pedido, en porcentaje
+  // entero (0-100). Reemplaza el `COMMISSION = 0.08` hardcodeado del frontend
+  // de reparto (ver ADR-017).
+  @Column({ name: 'driver_commission_percent', type: 'int', default: 8 })
+  driverCommissionPercent: number;
+
   @OneToMany(() => CompanyUser, (user) => user.company)
   users: CompanyUser[];
 

@@ -4,6 +4,78 @@ Cada cambio importante del proyecto se documenta aqui. Las decisiones arquitecto
 
 ---
 
+## [0.25.0] - 2026-09-29
+
+### Decisiones Tomadas
+
+- **Fase 4a: asignación de pedidos a repartidores** (ver
+  `docs/specs/fase4a-repartidores-asignacion.md` y ADR-017). El flujo
+  previo de reparto (rol `Logistica`, rutas `/delivery`) no tenía
+  asignación: cualquier usuario `Logistica` de la empresa veía y podía
+  marcar como entregado cualquier pedido `Despachado`. Se agrega una capa
+  de "claim": un pedido pasa a estar asignado a un repartidor específico,
+  y solo ese repartidor (o un `Admin`) puede marcarlo `Entregado`.
+- Se decide **no** crear una entidad `Driver` separada — se sigue usando
+  el rol `Logistica` existente como concepto de repartidor (ver ADR-017,
+  sección Decisión). Simplifica el modelo para el MVP; se puede revisar en
+  fases posteriores si se necesita más metadata de repartidor.
+- El "claim" se implementa como un `UPDATE` SQL condicional atómico
+  (`WHERE assigned_driver_id IS NULL`), no como lectura-y-escritura ni
+  lock explícito de fila — evita la carrera entre dos repartidores
+  tomando el mismo pedido al mismo tiempo (ver ADR-017, Justificación).
+- La comisión del repartidor (antes `COMMISSION = 0.08` hardcodeada en
+  tres pantallas del frontend) pasa a ser configurable por empresa vía
+  `Company.driverCommissionPercent` (default 8%, ver ADR-017).
+
+### Agregado
+
+- Migration `AddDriverAssignmentToOrders`: `orders.assigned_driver_id`
+  (uuid, nullable, FK a `company_users.id`, `ON DELETE SET NULL`),
+  `orders.assigned_at` (timestamp, nullable), `companies.driver_commission_percent`
+  (int, default 8).
+- `POST /orders/:id/claim` (roles `Admin`, `Logistica`): asigna el pedido
+  al usuario autenticado si no tiene repartidor asignado; `409 Conflict`
+  si ya fue tomado por otro.
+- `PUT /orders/:id/unassign` (roles `Admin`, `Logistica`): libera la
+  asignación. `Logistica` solo puede liberar sus propios pedidos tomados;
+  `Admin` puede liberar cualquiera.
+- `GET /orders` acepta nuevos filtros opcionales `unassigned` y
+  `assignedToMe` (`OrderQueryDto`).
+- Chequeo de propiedad en `PUT /orders/:id/status`: si el usuario es
+  `Logistica` y el pedido está asignado a otro repartidor, se rechaza la
+  transición a `Entregado` con `403 Forbidden`.
+- 11 tests nuevos en `orders.service.spec.ts` cubriendo `claimOrder`,
+  `unassignOrder` y el chequeo de propiedad en `updateStatus`.
+- ADR-017 (`docs/adrs/ADR-017-asignacion-repartidores-claim-atomico.md`).
+
+### Modificado
+
+- `packages/shared/src/types/index.ts`: `Order.assignedDriverId`,
+  `Order.assignedAt`, `Company.driverCommissionPercent`.
+- Frontend: `/delivery`, `/delivery/[id]` y `/delivery/history` ahora usan
+  el estado de asignación real del backend (queries separadas
+  `unassigned`/`assignedToMe`, mutación de `claim` con manejo de
+  conflicto 409) en vez de un botón "tomar pedido" que no persistía nada
+  server-side; la comisión se lee de `Company.driverCommissionPercent` en
+  las tres pantallas, ya no hardcodeada.
+- `docs/roadmap-estado-actual.md`: sección Fase 4 actualizada para
+  reflejar que la asignación y la comisión configurable ya están
+  implementadas; quedan pendientes entidad `Driver`, tracking en vivo e
+  integración con transportistas (Fase 4b/c/d).
+
+### Verificado
+
+- `npm run test --workspace=packages/backend`: 111/111 tests, 13 suites.
+- `npm run lint --workspace=packages/backend`: 0 errores (14 warnings
+  preexistentes, sin relación con este cambio).
+- `npm run lint --workspace=packages/shared`: 0 problemas.
+- `npm run lint --workspace=packages/mobile`: 0 errores (3 warnings
+  preexistentes, sin relación con este cambio).
+- `npm run build --workspace=packages/frontend`: build limpio, 31 rutas
+  generadas sin errores.
+
+---
+
 ## [0.24.1] - 2026-09-29
 
 ### Decisiones Tomadas

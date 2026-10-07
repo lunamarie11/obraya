@@ -3,16 +3,14 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useParams, useRouter } from 'next/navigation';
 import { api, formatARS } from '@/lib/api';
+import { getStoredUser } from '@/lib/auth';
 import {
   ArrowLeft, MapPin, Package, Phone, User, Clock,
-  CheckCircle2, Truck, Navigation, AlertTriangle,
+  CheckCircle2, Truck, Navigation, AlertTriangle, Lock,
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { clsx } from 'clsx';
-
-const COMMISSION = 0.08;
-const earn = (cents: number) => Math.round(Number(cents) * COMMISSION);
 
 const STATUS_CONFIG: Record<string, { label: string; color: string; bg: string }> = {
   Despachado: { label: 'Listo para retirar', color: 'text-purple-600', bg: 'bg-purple-50 border-purple-200' },
@@ -35,17 +33,38 @@ export default function DeliveryOrderDetail() {
   const router = useRouter();
   const qc = useQueryClient();
 
+  const currentUser = getStoredUser();
+
   const { data: order, isLoading } = useQuery({
     queryKey: ['order-detail', id],
     queryFn: () => api.get(`/orders/${id}`).then(r => r.data),
     enabled: !!id,
   });
 
+  const { data: company } = useQuery({
+    queryKey: ['delivery-company', currentUser?.companyId],
+    queryFn: () => api.get(`/companies/${currentUser?.companyId}`).then(r => r.data),
+    enabled: !!currentUser?.companyId,
+  });
+  // Ver ADR-017: reemplaza el COMMISSION = 0.08 hardcodeado.
+  const commission = (company?.driverCommissionPercent ?? 8) / 100;
+  const earn = (cents: number) => Math.round(Number(cents) * commission);
+
+  const claimOrder = useMutation({
+    mutationFn: () => api.post(`/orders/${id}/claim`),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['order-detail', id] });
+      qc.invalidateQueries({ queryKey: ['delivery-available'] });
+      qc.invalidateQueries({ queryKey: ['delivery-mine'] });
+    },
+  });
+
   const markDelivered = useMutation({
     mutationFn: () => api.put(`/orders/${id}/status`, { status: 'Entregado' }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['order-detail', id] });
-      qc.invalidateQueries({ queryKey: ['delivery-pending'] });
+      qc.invalidateQueries({ queryKey: ['delivery-available'] });
+      qc.invalidateQueries({ queryKey: ['delivery-mine'] });
       qc.invalidateQueries({ queryKey: ['delivery-history'] });
     },
   });
@@ -73,8 +92,10 @@ export default function DeliveryOrderDetail() {
   const statusCfg = STATUS_CONFIG[order.status] ?? { label: order.status, color: 'text-slate-600', bg: 'bg-slate-100 border-slate-200' };
   const currentStatusIdx = STATUS_ORDER.indexOf(order.status);
   const earnings = earn(order.totalAmount);
-  const isDeliverable = order.status === 'Despachado';
   const isDelivered = order.status === 'Entregado';
+  const isUnassigned = order.status === 'Despachado' && !order.assignedDriverId;
+  const isMine = order.status === 'Despachado' && order.assignedDriverId === currentUser?.id;
+  const isTakenByOther = order.status === 'Despachado' && !!order.assignedDriverId && !isMine;
 
   return (
     <div className="min-h-screen bg-slate-50">
@@ -107,7 +128,7 @@ export default function DeliveryOrderDetail() {
             <p className={clsx('text-2xl font-extrabold', isDelivered ? 'text-green-600' : 'text-orange-500')}>
               {formatARS(earnings)}
             </p>
-            <p className="text-xs text-slate-500">{((COMMISSION)*100).toFixed(0)}% de {formatARS(order.totalAmount)}</p>
+            <p className="text-xs text-slate-500">{(commission*100).toFixed(0)}% de {formatARS(order.totalAmount)}</p>
           </div>
           <div className={clsx('w-14 h-14 rounded-2xl flex items-center justify-center', isDelivered ? 'bg-green-100' : 'bg-orange-100')}>
             {isDelivered ? <CheckCircle2 size={28} className="text-green-600" /> : <Truck size={28} className="text-orange-500" />}
@@ -220,8 +241,19 @@ export default function DeliveryOrderDetail() {
           </div>
         </div>
 
-        {/* CTA */}
-        {isDeliverable && (
+        {/* CTA: ver ADR-017, solo el repartidor que reclamó el pedido puede
+            confirmar la entrega; si está sin asignar puede tomarlo acá mismo. */}
+        {isUnassigned && (
+          <button
+            onClick={() => claimOrder.mutate()}
+            disabled={claimOrder.isPending}
+            className="w-full py-4 bg-orange-500 hover:bg-orange-600 disabled:opacity-60 text-white font-bold rounded-2xl text-base transition-colors shadow-lg shadow-orange-500/20"
+          >
+            {claimOrder.isPending ? 'Tomando...' : 'Tomar pedido'}
+          </button>
+        )}
+
+        {isMine && (
           <button
             onClick={() => markDelivered.mutate()}
             disabled={markDelivered.isPending}
@@ -229,6 +261,13 @@ export default function DeliveryOrderDetail() {
           >
             {markDelivered.isPending ? 'Confirmando...' : '✓ Confirmar entrega'}
           </button>
+        )}
+
+        {isTakenByOther && (
+          <div className="bg-slate-100 border border-slate-200 rounded-2xl p-4 text-center flex flex-col items-center gap-2">
+            <Lock size={20} className="text-slate-400" />
+            <p className="text-slate-600 text-sm font-medium">Este pedido ya fue tomado por otro repartidor</p>
+          </div>
         )}
 
         {isDelivered && order.actualDeliveryDate && (

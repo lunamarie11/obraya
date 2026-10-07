@@ -73,6 +73,14 @@ export class Order {
   @Column({ name: 'rejection_reason', nullable: true, length: 500 })
   rejectionReason: string;
 
+  // Repartidor (CompanyUser con rol Logistica) que reclamó este pedido, ver
+  // ADR-017 y docs/specs/fase4a-repartidores-asignacion.md. Null = disponible.
+  @Column({ name: 'assigned_driver_id', type: 'uuid', nullable: true })
+  assignedDriverId: string | null;
+
+  @Column({ name: 'assigned_at', nullable: true })
+  assignedAt: Date | null;
+
   @OneToMany(() => OrderItem, (item) => item.order, { cascade: true })
   items: OrderItem[];
 

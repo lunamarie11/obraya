@@ -1,7 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { DataSource } from 'typeorm';
-import { BadRequestException, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, ForbiddenException, NotFoundException } from '@nestjs/common';
 import { OrdersService } from '../orders.service';
 import { Order, OrderStatus } from '../entities/order.entity';
 import { OrderItem } from '../entities/order-item.entity';
@@ -13,6 +13,7 @@ import { EmailService } from '../../email/email.service';
 import { BuyersService } from '../../buyers/buyers.service';
 import { AfipService } from '../../afip/afip.service';
 import { Company, FleetType } from '../../users/entities/company.entity';
+import { UserRole } from '../../users/entities/company-user.entity';
 
 function makeOrder(overrides: Partial<Order> = {}): Order {
   const o = new Order();
@@ -35,6 +36,11 @@ const mockOrderRepo = {
   getManyAndCount: jest.fn(),
   create: jest.fn((data) => data),
   save: jest.fn(async (entity) => entity),
+  // Ver ADR-017: claimOrder() usa un UPDATE atómico vía query builder.
+  update: jest.fn().mockReturnThis(),
+  set: jest.fn().mockReturnThis(),
+  where: jest.fn().mockReturnThis(),
+  execute: jest.fn(),
 };
 
 const mockItemRepo = {
@@ -287,6 +293,139 @@ describe('OrdersService', () => {
 
       await expect(
         service.updateStatus('no-existe', 'company-uuid-1', { status: OrderStatus.ACEPTADO }, 'u1', 'Admin'),
+      ).rejects.toThrow(NotFoundException);
+    });
+  });
+
+  describe('updateStatus() — chequeo de propiedad para Logistica (ver ADR-017)', () => {
+    it('Logistica marca Entregado su propio pedido asignado: transición válida', async () => {
+      mockOrderRepo.findOne.mockResolvedValueOnce(
+        makeOrder({ status: OrderStatus.DESPACHADO, assignedDriverId: 'driver-1' }),
+      );
+      mockOrderRepo.findOne.mockResolvedValueOnce(
+        makeOrder({ status: OrderStatus.ENTREGADO, assignedDriverId: 'driver-1' }),
+      );
+
+      const result = await service.updateStatus(
+        'order-uuid-1', 'company-uuid-1',
+        { status: OrderStatus.ENTREGADO },
+        'driver-1', 'Repartidor Uno', UserRole.LOGISTICA,
+      );
+      expect(result.status).toBe(OrderStatus.ENTREGADO);
+    });
+
+    it('Logistica intenta marcar Entregado un pedido asignado a otro repartidor: ForbiddenException', async () => {
+      mockOrderRepo.findOne.mockResolvedValue(
+        makeOrder({ status: OrderStatus.DESPACHADO, assignedDriverId: 'driver-2' }),
+      );
+
+      await expect(
+        service.updateStatus(
+          'order-uuid-1', 'company-uuid-1',
+          { status: OrderStatus.ENTREGADO },
+          'driver-1', 'Repartidor Uno', UserRole.LOGISTICA,
+        ),
+      ).rejects.toThrow(ForbiddenException);
+    });
+
+    it('Logistica intenta marcar Entregado un pedido sin asignar: ForbiddenException', async () => {
+      mockOrderRepo.findOne.mockResolvedValue(
+        makeOrder({ status: OrderStatus.DESPACHADO, assignedDriverId: null }),
+      );
+
+      await expect(
+        service.updateStatus(
+          'order-uuid-1', 'company-uuid-1',
+          { status: OrderStatus.ENTREGADO },
+          'driver-1', 'Repartidor Uno', UserRole.LOGISTICA,
+        ),
+      ).rejects.toThrow(ForbiddenException);
+    });
+
+    it('Admin marca Entregado un pedido asignado a otro repartidor: override permitido', async () => {
+      mockOrderRepo.findOne.mockResolvedValueOnce(
+        makeOrder({ status: OrderStatus.DESPACHADO, assignedDriverId: 'driver-2' }),
+      );
+      mockOrderRepo.findOne.mockResolvedValueOnce(
+        makeOrder({ status: OrderStatus.ENTREGADO, assignedDriverId: 'driver-2' }),
+      );
+
+      const result = await service.updateStatus(
+        'order-uuid-1', 'company-uuid-1',
+        { status: OrderStatus.ENTREGADO },
+        'admin-1', 'Admin ObraYa', UserRole.ADMIN,
+      );
+      expect(result.status).toBe(OrderStatus.ENTREGADO);
+    });
+  });
+
+  describe('claimOrder() — reclamo atómico de un pedido (ver ADR-017)', () => {
+    it('reclama un pedido Despachado sin asignar', async () => {
+      mockOrderRepo.execute.mockResolvedValueOnce({ affected: 1 });
+      mockOrderRepo.findOne.mockResolvedValueOnce(
+        makeOrder({ status: OrderStatus.DESPACHADO, assignedDriverId: 'driver-1' }),
+      );
+
+      const result = await service.claimOrder('order-uuid-1', 'company-uuid-1', 'driver-1');
+      expect(result.assignedDriverId).toBe('driver-1');
+    });
+
+    it('el UPDATE no afecta filas porque ya lo tomó otro: ConflictException', async () => {
+      mockOrderRepo.execute.mockResolvedValueOnce({ affected: 0 });
+      mockOrderRepo.findOne.mockResolvedValueOnce(
+        makeOrder({ status: OrderStatus.DESPACHADO, assignedDriverId: 'driver-2' }),
+      );
+
+      await expect(
+        service.claimOrder('order-uuid-1', 'company-uuid-1', 'driver-1'),
+      ).rejects.toThrow(ConflictException);
+    });
+
+    it('el pedido no existe: NotFoundException', async () => {
+      mockOrderRepo.execute.mockResolvedValueOnce({ affected: 0 });
+      mockOrderRepo.findOne.mockResolvedValueOnce(null);
+
+      await expect(
+        service.claimOrder('no-existe', 'company-uuid-1', 'driver-1'),
+      ).rejects.toThrow(NotFoundException);
+    });
+  });
+
+  describe('unassignOrder() — liberar un pedido asignado (ver ADR-017)', () => {
+    it('Logistica libera su propio pedido', async () => {
+      mockOrderRepo.findOne.mockResolvedValueOnce(
+        makeOrder({ status: OrderStatus.DESPACHADO, assignedDriverId: 'driver-1' }),
+      );
+
+      const result = await service.unassignOrder('order-uuid-1', 'company-uuid-1', 'driver-1', UserRole.LOGISTICA);
+      expect(result.assignedDriverId).toBeNull();
+      expect(result.assignedAt).toBeNull();
+    });
+
+    it('Logistica intenta liberar el pedido de otro repartidor: ForbiddenException', async () => {
+      mockOrderRepo.findOne.mockResolvedValueOnce(
+        makeOrder({ status: OrderStatus.DESPACHADO, assignedDriverId: 'driver-2' }),
+      );
+
+      await expect(
+        service.unassignOrder('order-uuid-1', 'company-uuid-1', 'driver-1', UserRole.LOGISTICA),
+      ).rejects.toThrow(ForbiddenException);
+    });
+
+    it('Admin libera el pedido de cualquier repartidor', async () => {
+      mockOrderRepo.findOne.mockResolvedValueOnce(
+        makeOrder({ status: OrderStatus.DESPACHADO, assignedDriverId: 'driver-2' }),
+      );
+
+      const result = await service.unassignOrder('order-uuid-1', 'company-uuid-1', 'admin-1', UserRole.ADMIN);
+      expect(result.assignedDriverId).toBeNull();
+    });
+
+    it('pedido no encontrado: NotFoundException', async () => {
+      mockOrderRepo.findOne.mockResolvedValueOnce(null);
+
+      await expect(
+        service.unassignOrder('no-existe', 'company-uuid-1', 'driver-1', UserRole.LOGISTICA),
       ).rejects.toThrow(NotFoundException);
     });
   });

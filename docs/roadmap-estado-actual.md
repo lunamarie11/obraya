@@ -88,9 +88,27 @@ Para llegar a un lanzamiento real en AMBA faltaría definir:
 ## Fase 4 - Logística real (post-lanzamiento)
 
 `packages/backend/src/modules/logistics/logistics.module.ts` es **enteramente un stub**
-(comentado): sin entidades, sin controllers, sin services. Todo lo de fleet management,
-integración con transportistas (Andreani, OCA), ruteo con Google Maps y app de choferes
-está sin empezar. Es coherente con el plan (Fase 4, post-validación).
+(comentado): sin entidades, sin controllers, sin services. Fleet management,
+integración con transportistas (Andreani, OCA), ruteo con Google Maps e
+integración con transportistas siguen sin empezar. Es coherente con el plan
+(Fase 4, post-validación).
+
+**Corrección (2026-09-29):** ya existe un flujo básico de repartidor: rol
+`Logistica` con rutas `/delivery`, `/delivery/[id]` y `/delivery/history`
+en el frontend (backoffice), que lista pedidos en estado `Despachado` y
+permite marcarlos como `Entregado` (`PUT /orders/:id/status`).
+
+**Fase 4a (2026-09-29, ver ADR-017 y `docs/specs/fase4a-repartidores-asignacion.md`):**
+implementada la asignación real de pedidos: `POST /orders/:id/claim`
+(claim atómico, evita que dos repartidores tomen el mismo pedido) y
+`PUT /orders/:id/unassign`; `GET /orders` soporta filtros `unassigned` y
+`assignedToMe`; solo el repartidor que tiene el pedido asignado (o un
+`Admin`) puede marcarlo `Entregado`. La comisión ahora es configurable por
+empresa (`Company.driverCommissionPercent`, default 8%), ya no está
+hardcodeada en el frontend. **Limitaciones que siguen pendientes:** no hay
+entidad `Driver` separada (se sigue usando el rol `Logistica` como
+repartidor), no hay tracking en vivo ni geolocalización, y no hay
+integración con transportistas externos — eso queda para Fase 4b/c/d.
 
 ---
 

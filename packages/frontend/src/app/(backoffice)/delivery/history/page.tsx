@@ -1,9 +1,10 @@
 'use client';
 
 import { useQuery } from '@tanstack/react-query';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { api, formatARS } from '@/lib/api';
+import { getStoredUser } from '@/lib/auth';
 import {
   History, DollarSign, CheckCircle2, MapPin,
   ChevronRight, TrendingUp, Package, Search,
@@ -12,9 +13,6 @@ import { format, startOfWeek, isAfter } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { clsx } from 'clsx';
 
-const COMMISSION = 0.08;
-const earn = (cents: number) => Math.round(Number(cents) * COMMISSION);
-
 type Period = 'hoy' | 'semana' | 'mes' | 'todo';
 const PERIOD_LABELS: Record<Period, string> = { hoy: 'Hoy', semana: 'Esta semana', mes: 'Este mes', todo: 'Todo' };
 
@@ -22,6 +20,21 @@ export default function DeliveryHistoryPage() {
   const router = useRouter();
   const [period, setPeriod] = useState<Period>('semana');
   const [search, setSearch] = useState('');
+  const [companyId, setCompanyId] = useState<string | null>(null);
+
+  useEffect(() => {
+    const user = getStoredUser();
+    if (user) setCompanyId(user.companyId);
+  }, []);
+
+  const { data: company } = useQuery({
+    queryKey: ['delivery-company', companyId],
+    queryFn: () => api.get(`/companies/${companyId}`).then(r => r.data),
+    enabled: !!companyId,
+  });
+  // Ver ADR-017: reemplaza el COMMISSION = 0.08 hardcodeado.
+  const commission = (company?.driverCommissionPercent ?? 8) / 100;
+  const earn = (cents: number) => Math.round(Number(cents) * commission);
 
   const { data, isLoading } = useQuery({
     queryKey: ['delivery-history'],
