@@ -1,4 +1,6 @@
 import {
+  Inject,
+  forwardRef,
   Injectable,
   Logger,
   NotFoundException,
@@ -21,6 +23,7 @@ import { NotificationsService } from '../notifications/notifications.service';
 import { EmailService } from '../email/email.service';
 import { BuyersService } from '../buyers/buyers.service';
 import { AfipService } from '../afip/afip.service';
+import { DriversService } from '../logistics/drivers.service';
 import { Company, resolveDeliveryZone } from '../users/entities/company.entity';
 import { UserRole } from '../users/entities/company-user.entity';
 
@@ -44,6 +47,8 @@ export class OrdersService {
     private readonly emailService: EmailService,
     private readonly buyersService: BuyersService,
     private readonly afipService: AfipService,
+    @Inject(forwardRef(() => DriversService))
+    private readonly driversService: DriversService,
   ) {}
 
   private generateOrderNumber(): string {
@@ -212,6 +217,13 @@ export class OrdersService {
   // intenten tomar el mismo pedido a la vez no puedan asignárselo ambos: solo
   // uno de los dos UPDATE afecta una fila, el otro recibe affected = 0.
   async claimOrder(id: string, companyId: string, userId: string): Promise<Order> {
+    // Ver fase4c-entidad-driver.md: un repartidor que se marcó no disponible
+    // no puede reclamar pedidos nuevos (sí puede seguir liberando/entregando
+    // los que ya tenía, eso no se chequea acá).
+    if (!(await this.driversService.isAvailable(userId))) {
+      throw new ForbiddenException('Marcate disponible para tomar pedidos antes de reclamar uno');
+    }
+
     const result = await this.orderRepo
       .createQueryBuilder()
       .update(Order)

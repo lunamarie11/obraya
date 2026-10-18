@@ -106,9 +106,9 @@ implementada la asignación real de pedidos: `POST /orders/:id/claim`
 `Admin`) puede marcarlo `Entregado`. La comisión ahora es configurable por
 empresa (`Company.driverCommissionPercent`, default 8%), ya no está
 hardcodeada en el frontend. **Limitaciones que siguen pendientes:** no hay
-entidad `Driver` separada (se sigue usando el rol `Logistica` como
-repartidor), no hay tracking en vivo ni geolocalización, y no hay
-integración con transportistas externos — eso queda para Fase 4b/c/d.
+tracking en vivo ni geolocalización, y no hay integración con
+transportistas externos — eso queda para Fase 4b/d (ver entidad `Driver`,
+resuelta en Fase 4c).
 
 **Fase 4b (2026-10-07, ver ADR-018 y `docs/specs/fase4b-tracking-repartidores.md`):**
 implementado tracking en vivo de repartidores. Mientras un repartidor tiene
@@ -123,7 +123,20 @@ tabla de historial (upsert de una sola fila por repartidor), sin Google Maps.
 **Limitaciones que siguen pendientes:** no cubre pantalla bloqueada/pestaña
 cerrada, no hay recorrido/replay de la entrega, no hay tracking para el
 comprador, y sigue sin existir integración con transportistas externos ni
-ruteo optimizado — eso queda para Fase 4c/4d.
+ruteo optimizado — eso queda para Fase 4d.
+
+**Fase 4c (2026-10-18, ver ADR-019 y `docs/specs/fase4c-entidad-driver.md`):**
+agregada la entidad `Driver`, un perfil 1:1 que extiende `CompanyUser`
+(no una identidad nueva) con los primeros atributos propios de
+repartidor: tipo de vehículo, patente, teléfono y disponibilidad
+("Disponible para recibir pedidos"). `OrdersService.claimOrder()` ahora
+bloquea con `403` si el repartidor se marcó no disponible. `/delivery`
+expone el switch de disponibilidad y un formulario de perfil; `/settings`
+(Admin) agrega columnas `Vehículo`/`Patente`/`Disponible` a la tabla de
+usuarios existente. Creación perezosa (lazy/upsert), sin historial de
+disponibilidad — mismo criterio que Fase 4a/4b. **Limitaciones que siguen
+pendientes:** sin integración con transportistas externos ni ruteo
+optimizado — eso queda para Fase 4d.
 
 ---
 

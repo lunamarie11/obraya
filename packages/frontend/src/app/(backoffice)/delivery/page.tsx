@@ -7,7 +7,7 @@ import { api, formatARS } from '@/lib/api';
 import { getStoredUser } from '@/lib/auth';
 import {
   Truck, MapPin, CheckCircle2, Clock, Package,
-  ChevronRight, Zap, DollarSign, Navigation, AlertCircle,
+  ChevronRight, Zap, DollarSign, Navigation, AlertCircle, Bike,
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -29,8 +29,8 @@ export default function DeliveryPage() {
 
   const [companyId, setCompanyId] = useState<string | null>(null);
   const [deliveryStep, setDeliveryStep] = useState<DeliveryStep>('available');
-  const [isOnline, setIsOnline] = useState(true);
   const [claimError, setClaimError] = useState<string | null>(null);
+  const [showProfile, setShowProfile] = useState(false);
 
   useEffect(() => {
     const user = getStoredUser();
@@ -45,6 +45,20 @@ export default function DeliveryPage() {
   // Ver ADR-017: reemplaza el COMMISSION = 0.08 hardcodeado.
   const commission = (company?.driverCommissionPercent ?? 8) / 100;
   const earn = (cents: number) => Math.round(Number(cents) * commission);
+
+  // Ver docs/specs/fase4c-entidad-driver.md: "En línea" pasó de ser un
+  // toggle puramente local a reflejar la disponibilidad real (Driver.isAvailable),
+  // que ahora también bloquea POST /orders/:id/claim del lado del backend.
+  const { data: profile } = useQuery({
+    queryKey: ['driver-profile'],
+    queryFn: () => api.get('/logistics/drivers/me').then(r => r.data),
+  });
+  const isOnline = profile?.isAvailable ?? true;
+
+  const toggleAvailability = useMutation({
+    mutationFn: (next: boolean) => api.put('/logistics/drivers/me/availability', { isAvailable: next }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['driver-profile'] }),
+  });
 
   // Disponibles: Despachado y sin repartidor asignado (ver ADR-017).
   const { data: availableData, isLoading } = useQuery({
@@ -169,20 +183,36 @@ export default function DeliveryPage() {
           </div>
           <span className="font-bold text-slate-900">Mis Entregas</span>
         </div>
-        {/* Online toggle */}
-        <button
-          onClick={() => setIsOnline(v => !v)}
-          className={clsx(
-            'flex items-center gap-2 px-4 py-1.5 rounded-full text-xs font-bold transition-all',
-            isOnline
-              ? 'bg-green-50 text-green-600 border border-green-200'
-              : 'bg-slate-100 text-slate-500 border border-slate-300',
-          )}
-        >
-          <span className={clsx('w-2 h-2 rounded-full', isOnline ? 'bg-green-500 animate-pulse' : 'bg-slate-400')} />
-          {isOnline ? 'En línea' : 'Sin conexión'}
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setShowProfile(v => !v)}
+            className="w-8 h-8 rounded-full flex items-center justify-center text-slate-500 hover:bg-slate-100 transition-colors"
+            title="Mi perfil de repartidor"
+          >
+            <Bike size={16} />
+          </button>
+          {/* Online toggle: ahora persiste en Driver.isAvailable (ver fase4c-entidad-driver.md) */}
+          <button
+            onClick={() => toggleAvailability.mutate(!isOnline)}
+            disabled={toggleAvailability.isPending}
+            className={clsx(
+              'flex items-center gap-2 px-4 py-1.5 rounded-full text-xs font-bold transition-all disabled:opacity-60',
+              isOnline
+                ? 'bg-green-50 text-green-600 border border-green-200'
+                : 'bg-slate-100 text-slate-500 border border-slate-300',
+            )}
+          >
+            <span className={clsx('w-2 h-2 rounded-full', isOnline ? 'bg-green-500 animate-pulse' : 'bg-slate-400')} />
+            {isOnline ? 'En línea' : 'Sin conexión'}
+          </button>
+        </div>
       </header>
+
+      {showProfile && (
+        <div className="max-w-2xl mx-auto p-4 pb-0">
+          <DriverProfileForm profile={profile} onSaved={() => setShowProfile(false)} />
+        </div>
+      )}
 
       <div className="p-4 space-y-4 max-w-2xl mx-auto">
 
@@ -398,6 +428,89 @@ function OrderCard({ order, earn, onTake, taking }: { order: any; earn: (cents: 
           {taking ? 'Tomando...' : 'Tomar pedido'}
         </button>
       </div>
+    </div>
+  );
+}
+
+const VEHICLE_TYPES = [
+  { value: 'Moto', label: 'Moto' },
+  { value: 'Auto', label: 'Auto' },
+  { value: 'Camioneta', label: 'Camioneta' },
+  { value: 'Bicicleta', label: 'Bicicleta' },
+  { value: 'APie', label: 'A pie' },
+];
+
+// Ver docs/specs/fase4c-entidad-driver.md: vehículo/patente/teléfono del
+// repartidor, separado del toggle de disponibilidad (endpoint propio).
+function DriverProfileForm({ profile, onSaved }: { profile: any; onSaved: () => void }) {
+  const qc = useQueryClient();
+  const [form, setForm] = useState({ vehicleType: '', licensePlate: '', phone: '' });
+
+  useEffect(() => {
+    if (profile) {
+      setForm({
+        vehicleType: profile.vehicleType ?? '',
+        licensePlate: profile.licensePlate ?? '',
+        phone: profile.phone ?? '',
+      });
+    }
+  }, [profile]);
+
+  const save = useMutation({
+    mutationFn: () => api.put('/logistics/drivers/me', {
+      ...(form.vehicleType && { vehicleType: form.vehicleType }),
+      licensePlate: form.licensePlate || undefined,
+      phone: form.phone || undefined,
+    }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['driver-profile'] });
+      onSaved();
+    },
+  });
+
+  return (
+    <div className="bg-white border border-slate-200 rounded-2xl p-4 space-y-3 shadow-sm">
+      <h2 className="text-xs font-bold text-slate-500 uppercase tracking-wider">Mi perfil de repartidor</h2>
+      <div className="grid grid-cols-2 gap-3">
+        <div>
+          <label className="block text-xs text-slate-600 mb-1">Vehículo</label>
+          <select
+            className="input w-full text-sm"
+            value={form.vehicleType}
+            onChange={(e) => setForm({ ...form, vehicleType: e.target.value })}
+          >
+            <option value="">Sin especificar</option>
+            {VEHICLE_TYPES.map((v) => (
+              <option key={v.value} value={v.value}>{v.label}</option>
+            ))}
+          </select>
+        </div>
+        <div>
+          <label className="block text-xs text-slate-600 mb-1">Patente</label>
+          <input
+            className="input w-full text-sm"
+            placeholder="AB123CD"
+            value={form.licensePlate}
+            onChange={(e) => setForm({ ...form, licensePlate: e.target.value })}
+          />
+        </div>
+      </div>
+      <div>
+        <label className="block text-xs text-slate-600 mb-1">Teléfono de contacto</label>
+        <input
+          className="input w-full text-sm"
+          placeholder="+54 9 11 1234-5678"
+          value={form.phone}
+          onChange={(e) => setForm({ ...form, phone: e.target.value })}
+        />
+      </div>
+      <button
+        onClick={() => save.mutate()}
+        disabled={save.isPending}
+        className="w-full py-2.5 bg-orange-500 hover:bg-orange-600 disabled:opacity-60 text-white font-bold rounded-xl text-sm transition-colors"
+      >
+        {save.isPending ? 'Guardando...' : 'Guardar perfil'}
+      </button>
     </div>
   );
 }

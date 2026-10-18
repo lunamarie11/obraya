@@ -59,6 +59,16 @@ export default function SettingsPage() {
     enabled: !!companyId && isAdmin,
   });
 
+  // Ver docs/specs/fase4c-entidad-driver.md: vehículo/patente/disponibilidad
+  // de los usuarios con rol Logistica, cruzado por companyUserId con la
+  // tabla de arriba (no es una pantalla nueva).
+  const { data: drivers = [] } = useQuery({
+    queryKey: ['logistics-drivers', companyId],
+    queryFn: () => api.get('/logistics/drivers').then((r) => r.data),
+    enabled: !!companyId && isAdmin,
+  });
+  const driverByUserId = new Map<string, any>(drivers.map((d: any) => [d.companyUserId, d]));
+
   const invite = useMutation({
     mutationFn: (data: typeof form) =>
       api.post(`/companies/${companyId}/users/invite`, data).then((r) => r.data),
@@ -208,11 +218,16 @@ export default function SettingsPage() {
                   <th className="text-left px-5 py-3 text-xs font-medium text-slate-500 uppercase tracking-wide">Usuario</th>
                   <th className="text-left px-4 py-3 text-xs font-medium text-slate-500 uppercase tracking-wide">Rol</th>
                   <th className="text-left px-4 py-3 text-xs font-medium text-slate-500 uppercase tracking-wide">Estado</th>
+                  <th className="text-left px-4 py-3 text-xs font-medium text-slate-500 uppercase tracking-wide">Vehículo</th>
+                  <th className="text-left px-4 py-3 text-xs font-medium text-slate-500 uppercase tracking-wide">Patente</th>
+                  <th className="text-left px-4 py-3 text-xs font-medium text-slate-500 uppercase tracking-wide">Disponible</th>
                   <th className="text-left px-4 py-3 text-xs font-medium text-slate-500 uppercase tracking-wide">Último acceso</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {users.map((u: any) => (
+                {users.map((u: any) => {
+                  const driver = u.role === 'Logistica' ? driverByUserId.get(u.id) : null;
+                  return (
                   <tr key={u.id} className="hover:bg-orange-50/50 transition-colors">
                     <td className="px-5 py-3">
                       <p className="font-semibold text-slate-900">{u.firstName} {u.lastName}</p>
@@ -233,13 +248,28 @@ export default function SettingsPage() {
                         {u.isActive ? 'Activo' : u.inviteToken ? 'Pendiente' : 'Inactivo'}
                       </span>
                     </td>
+                    <td className="px-4 py-3 text-xs text-slate-600">{driver ? (driver.vehicleType ?? '—') : '—'}</td>
+                    <td className="px-4 py-3 text-xs text-slate-600 font-mono">{driver ? (driver.licensePlate ?? '—') : '—'}</td>
+                    <td className="px-4 py-3">
+                      {driver ? (
+                        <span className={clsx(
+                          'inline-flex px-2 py-0.5 rounded-full text-xs font-semibold border',
+                          driver.isAvailable
+                            ? 'bg-green-50 text-green-600 border-green-200'
+                            : 'bg-slate-100 text-slate-500 border-slate-200',
+                        )}>
+                          {driver.isAvailable ? 'Sí' : 'No'}
+                        </span>
+                      ) : '—'}
+                    </td>
                     <td className="px-4 py-3 text-xs text-slate-500">
                       {u.lastLoginAt
                         ? format(new Date(u.lastLoginAt), "d MMM yyyy 'a las' HH:mm", { locale: es })
                         : '—'}
                     </td>
                   </tr>
-                ))}
+                  );
+                })}
               </tbody>
             </table>
           )}

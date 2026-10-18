@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { forwardRef, Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { Order } from './entities/order.entity';
 import { OrderItem } from './entities/order-item.entity';
@@ -13,6 +13,7 @@ import { NotificationsModule } from '../notifications/notifications.module';
 import { AfipModule } from '../afip/afip.module';
 import { EmailModule } from '../email/email.module';
 import { Company } from '../users/entities/company.entity';
+import { LogisticsModule } from '../logistics/logistics.module';
 
 @Module({
   imports: [
@@ -23,6 +24,11 @@ import { Company } from '../users/entities/company.entity';
     NotificationsModule,
     AfipModule,
     EmailModule,
+    // Ver fase4c-entidad-driver.md: OrdersService necesita DriversService
+    // para bloquear el claim de repartidores no disponibles. LogisticsModule
+    // ya depende de OrdersModule (ADR-018) -> dependencia circular resuelta
+    // con forwardRef en ambos lados.
+    forwardRef(() => LogisticsModule),
   ],
   controllers: [OrdersController, BuyerOrdersController],
   providers: [OrdersService],
