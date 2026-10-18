@@ -122,6 +122,8 @@ export class AfipService implements OnModuleInit {
       Concepto: 1, // Productos
       DocTipo: 99, // Consumidor final, sin identificar
       DocNro: 0,
+      // parche: 5 = Consumidor Final (DocTipo 99, sin identificar)
+      CondicionIVAReceptorId: 5,
       CbteFch: cbteFch,
       ImpTotal: impTotal,
       ImpTotConc: 0,
