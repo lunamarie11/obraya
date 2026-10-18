@@ -12,6 +12,7 @@ import { NotificationsService } from '../../notifications/notifications.service'
 import { EmailService } from '../../email/email.service';
 import { BuyersService } from '../../buyers/buyers.service';
 import { AfipService } from '../../afip/afip.service';
+import { DriversService } from '../../logistics/drivers.service';
 import { Company, FleetType } from '../../users/entities/company.entity';
 import { UserRole } from '../../users/entities/company-user.entity';
 
@@ -78,6 +79,12 @@ const mockAfipService = {
   getTaxpayerDetails: jest.fn().mockResolvedValue(null),
 };
 
+// Ver fase4c-entidad-driver.md: por default disponible, igual criterio que
+// DriversService.isAvailable() sin fila en la tabla drivers.
+const mockDriversService = {
+  isAvailable: jest.fn().mockResolvedValue(true),
+};
+
 const mockCompanyRepo = {
   findOne: jest.fn().mockResolvedValue(null),
 };
@@ -119,6 +126,7 @@ describe('OrdersService', () => {
         { provide: EmailService, useValue: mockEmailService },
         { provide: BuyersService, useValue: mockBuyersService },
         { provide: AfipService, useValue: mockAfipService },
+        { provide: DriversService, useValue: mockDriversService },
       ],
     }).compile();
 
@@ -389,6 +397,15 @@ describe('OrdersService', () => {
       await expect(
         service.claimOrder('no-existe', 'company-uuid-1', 'driver-1'),
       ).rejects.toThrow(NotFoundException);
+    });
+
+    it('repartidor marcado no disponible: ForbiddenException, no llega a intentar el UPDATE (ver fase4c-entidad-driver.md)', async () => {
+      mockDriversService.isAvailable.mockResolvedValueOnce(false);
+
+      await expect(
+        service.claimOrder('order-uuid-1', 'company-uuid-1', 'driver-1'),
+      ).rejects.toThrow(ForbiddenException);
+      expect(mockOrderRepo.execute).not.toHaveBeenCalled();
     });
   });
 

@@ -4,6 +4,72 @@ Cada cambio importante del proyecto se documenta aqui. Las decisiones arquitecto
 
 ---
 
+## [0.27.0] - 2026-10-18
+
+### Decisiones Tomadas
+
+- **Fase 4c: entidad `Driver`** (ver `docs/specs/fase4c-entidad-driver.md`
+  y ADR-019). Resuelve la limitación anotada en ADR-017: *"no hay entidad
+  `Driver` separada, se sigue usando el rol `Logistica` como repartidor"*.
+- **`Driver` es un perfil 1:1 que extiende `CompanyUser`** (PK =
+  `companyUserId`, mismo patrón que `DriverLocation`/ADR-018), no una
+  identidad nueva con login propio — se descartó esa alternativa porque no
+  hay caso de uso hoy de repartidor sin cuenta de `CompanyUser`, y los
+  transportistas externos futuros (Fase 4d) se integran contra una API
+  externa, no contra un login de ObraYa.
+- **Creación perezosa (lazy/upsert), sin historial de disponibilidad** —
+  mismo criterio que ADR-017/018 de no construir especulativamente sin
+  caso de uso real hoy.
+- **La disponibilidad bloquea `claim`, no `unassign`/`Entregado`**:
+  `OrdersService.claimOrder()` rechaza con `403` si el repartidor se marcó
+  no disponible; sin fila en `Driver` se trata como disponible (default).
+
+### Agregado
+
+- Migration `CreateDrivers`: tabla `drivers` (`company_user_id` PK, FK a
+  `company_users.id` `ON DELETE CASCADE`, `company_id` indexado,
+  `vehicle_type` enum nullable, `license_plate`/`phone` nullables,
+  `is_available` default `true`).
+- `Driver` entity y `DriversService` (`getProfile`, `updateProfile`,
+  `setAvailability`, `isAvailable`, `listForCompany`) en el módulo
+  `logistics`.
+- `GET/PUT /logistics/drivers/me`, `PUT /logistics/drivers/me/availability`
+  (roles `Logistica`), `GET /logistics/drivers` (rol `Admin`, lista de
+  repartidores de la empresa con su perfil).
+- `OrdersService.claimOrder()` ahora valida `DriversService.isAvailable()`
+  antes del `UPDATE` atómico existente (ADR-017).
+- Frontend `/delivery`: switch de disponibilidad y formulario colapsable
+  de perfil (vehículo/patente/teléfono), reemplaza el toggle "En línea"
+  que antes era solo estado local.
+- Frontend `/settings` (Admin): tabla de usuarios existente agrega columnas
+  `Vehículo`/`Patente`/`Disponible` para filas con rol `Logistica` (resto
+  de roles muestra `—`). No es pantalla nueva, mismo criterio que ADR-016.
+- Tests nuevos en `drivers.service.spec.ts` (`getProfile`, `updateProfile`,
+  `setAvailability`, `isAvailable`, `listForCompany`) y 1 test nuevo en
+  `orders.service.spec.ts` (bloqueo de `claimOrder` por no disponibilidad).
+- ADR-019 (`docs/adrs/ADR-019-entidad-driver-perfil.md`).
+
+### Modificado
+
+- `packages/backend/src/modules/logistics/logistics.module.ts` y
+  `packages/backend/src/modules/orders/orders.module.ts`: dependencia
+  circular resuelta con `forwardRef()` en ambos sentidos (`OrdersService`
+  necesita `DriversService`, que ya dependía de `OrdersModule` desde
+  ADR-018).
+- `docs/roadmap-estado-actual.md`: sección Fase 4 actualizada — "entidad
+  `Driver` separada" ya no es un gap pendiente.
+
+### Verificado
+
+- `npm run test --workspace=packages/backend` (scoped a `logistics` +
+  `orders`): 45/45 tests.
+- `npx tsc --noEmit` limpio en `packages/backend` y
+  `packages/frontend`.
+- `npx eslint` sobre `/delivery` y `/settings`: 0 errores (1 warning
+  preexistente sin relación con este cambio).
+
+---
+
 ## [0.26.0] - 2026-10-07
 
 ### Decisiones Tomadas
