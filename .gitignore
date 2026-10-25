@@ -36,6 +36,8 @@ coverage/
 .terraform/
 *.tfstate
 *.tfstate.backup
+terraform.tfvars
+*.tfplan
 
 # Local Claude worktrees
 .claude/

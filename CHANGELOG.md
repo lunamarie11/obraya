@@ -4,6 +4,72 @@ Cada cambio importante del proyecto se documenta aqui. Las decisiones arquitecto
 
 ---
 
+## [0.28.0] - 2026-10-25
+
+### Decisiones Tomadas
+
+- **Dominio real confirmado: `obraya.com.ar`** (no `.com`). Se corrige la
+  inconsistencia que habia entre `cors.config.ts` (`app.obraya.com`) y
+  `.env.example`/SES (`obraya.com.ar`).
+- Groundwork completo de Terraform para la infraestructura de ADR-015
+  (ECS Fargate, RDS, ElastiCache, S3/CloudFront, ALB, ECR, Secrets Manager,
+  IAM) en `infra/terraform/`. **No se corrio `terraform apply` todavia** —
+  sigue pendiente la aprobacion de costo y las credenciales de AWS reales
+  (ver `infra/terraform/README.md` para el orden de pasos y el estimado de
+  costo mensual, ~110-120 USD con OpenSearch apagado).
+- OpenSearch queda detras de la variable `enable_opensearch` (default
+  `false`): tiene costo fijo aun sin trafico y `SearchService` ya cae a
+  ILIKE en Postgres sin el — se prende mas adelante si el volumen de
+  busquedas lo justifica, mismo criterio que Kafka/EKS en ADR-001/015.
+- JWT_SECRET/JWT_REFRESH_SECRET/DATABASE_PASSWORD de produccion los genera
+  Terraform (`random_password`) y los guarda en Secrets Manager — no hace
+  falta generarlos a mano, y nunca van a coincidir con los valores de dev
+  que circularon en el chat.
+
+### Agregado
+
+- `infra/terraform/bootstrap/`: bucket S3 + tabla DynamoDB para el remote
+  state de Terraform (se aplica una sola vez, antes del resto).
+- `infra/terraform/`: VPC (2 AZs, 1 NAT Gateway), security groups, ECR (2
+  repos con lifecycle policy a 10 imagenes), ACM (cert ALB en sa-east-1 +
+  cert CloudFront en us-east-1, SAN para app./admin./api./cdn.), ALB con
+  listener rules por host header, RDS Postgres 16, ElastiCache Redis,
+  OpenSearch opcional, S3+CloudFront para storage de productos (con Origin
+  Access Control, bucket privado), Secrets Manager (JWT, DB password,
+  placeholders de Mercado Pago/Firebase/Sentry), IAM (execution role +
+  task roles separados para backend/frontend), ECS (cluster, task
+  definitions, servicios).
+- `infra/terraform/README.md`: orden de pasos completo (bootstrap →
+  certificados → infra → build/push de imagenes → DNS → secrets →
+  migration → smoke test), estimado de costo mensual, y que queda
+  pendiente fuera de este Terraform (extender CI para deploy automatico,
+  certificado de AFIP).
+
+### Modificado
+
+- `packages/backend/src/config/cors.config.ts`: dominios de produccion a
+  `app.obraya.com.ar`/`admin.obraya.com.ar`.
+- `packages/backend/.env.example`: comentario de `AWS_CLOUDFRONT_DOMAIN` a
+  `.com.ar`.
+- `infra/docker/Dockerfile.frontend`: agrega `ARG NEXT_PUBLIC_API_URL` +
+  `ENV` antes del build de Next.js — sin esto, seteabarlo solo como
+  variable de entorno en ECS no tiene efecto (Next.js inlinea
+  `NEXT_PUBLIC_*` en el bundle de cliente en build time, no en runtime).
+  Gap encontrado al escribir el Terraform, no habia sido notado antes.
+- `.gitignore`: agrega `terraform.tfvars` y `*.tfplan`.
+
+### Pendiente
+
+- Aprobar costo y correr `terraform apply` (requiere cuenta de AWS con
+  metodo de pago).
+- Extender `.github/workflows/ci.yml` para build+push a ECR y
+  `ecs update-service` automatico en merge a `main`.
+- Decidir como montar el certificado de AFIP en la task de ECS (es un
+  archivo, no un secret de tipo string — no entra en el patron de Secrets
+  Manager usado para el resto).
+
+---
+
 ## [0.27.0] - 2026-10-18
 
 ### Decisiones Tomadas

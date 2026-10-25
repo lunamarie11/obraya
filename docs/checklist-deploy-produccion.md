@@ -7,7 +7,7 @@ asumiera infraestructura (CI/CD, `docker-compose.prod.yml`, certbot) que
 todavía no existe en este repo — el proyecto sigue en Fase 0/1 (pre-seed, ver
 `CLAUDE.md`), sin infraestructura de producción armada todavía.
 
-Última auditoría: 2026-09-23.
+Última auditoría: 2026-10-25.
 
 ## 1. Secrets — bloqueante, con validación automática (ver ADR-014)
 
@@ -67,19 +67,19 @@ negocio queda apagada en silencio:
 | Elasticsearch | ADR-007 | `ELASTICSEARCH_NODE` apuntando a un cluster real. Si no está disponible, `SearchService` cae a `ILIKE` en Postgres — no bloquea, pero es un fallback más lento. |
 | Storage — S3 | — | **RESUELTO (2026-09-29)**: `StorageService` ahora soporta S3 real via `@aws-sdk/client-s3`. Si `AWS_S3_BUCKET`/`AWS_S3_REGION` están seteados usa S3 (URL de CloudFront si además hay `AWS_CLOUDFRONT_DOMAIN`, si no URL directa de S3); si no, sigue cayendo a MinIO como en dev — mismo patrón best-effort que el resto de integraciones. Para producción solo falta: crear el bucket real y setear esas dos env vars (no requiere `AWS_ACCESS_KEY_ID`/`SECRET` explícitos, usa el IAM role de la task de ECS Fargate). |
 
-## 4. CORS y dominios
+## 4. CORS y dominios — RESUELTO (2026-10-25)
 
+**Dominio real confirmado: `obraya.com.ar`.**
 `packages/backend/src/config/cors.config.ts` ya tiene hardcodeados
-`https://app.obraya.com` y `https://admin.obraya.com` para `NODE_ENV=production`,
-más lo que se agregue en `ALLOWED_ORIGINS` (coma-separado). Antes de deploy:
+`https://app.obraya.com.ar` y `https://admin.obraya.com.ar` para
+`NODE_ENV=production`, más lo que se agregue en `ALLOWED_ORIGINS`
+(coma-separado).
 
-- Confirmar que esos son los dominios reales que se van a usar (o
-  actualizarlos en el código si cambiaron).
-- DNS: apuntar los dominios elegidos (frontend, backoffice, API) al servidor/
-  balanceador de producción.
-- HTTPS/SSL: no hay nada de esto en el repo todavía (ni certbot ni
-  Let's Encrypt configurado) — depende de la infraestructura que se elija
-  (ver sección 6).
+- DNS: pendiente como paso de deploy (ver `infra/terraform/README.md`
+  sección 5) — apuntar `app.`/`admin.`/`api.`/`cdn.obraya.com.ar` al ALB/
+  CloudFront que salen de Terraform.
+- HTTPS/SSL: lo maneja el ALB vía ACM (certificado gestionado en el
+  Terraform, sin certbot/Let's Encrypt manual), según ADR-015.
 
 ## 5. Rate limiting
 
@@ -103,18 +103,24 @@ CI/CD. Ya construido y verificado:
   tests), lint + build de frontend, lint + typecheck de mobile y lint de
   shared, en cada PR y push a `main`.
 
-**Sigue pendiente** (todo lo que implica costo real o acceso a la cuenta de
-AWS, fuera del alcance de ADR-015 — requiere aprobación explícita antes de
-crear recursos):
+**RESUELTO en parte (2026-10-25): Terraform completo escrito** en
+`infra/terraform/` (VPC, ECS Fargate, RDS, ElastiCache, OpenSearch opcional,
+S3+CloudFront, ALB, ECR, Secrets Manager, IAM) — ver
+`infra/terraform/README.md` para el orden de pasos y el estimado de costo
+(~110-120 USD/mes con OpenSearch apagado). **Sigue pendiente, requiere
+aprobación explícita por el costo:**
 
-1. Provisionar la infraestructura de AWS en sí (cluster ECS, task
-   definitions, RDS, ElastiCache, OpenSearch, ALB, ECR) — probablemente
-   como Terraform (`infra/` y `.gitignore` ya anticipan `*.tfstate`).
+1. Correr `terraform apply` con una cuenta de AWS real con método de pago
+   (nadie lo corrió todavía — escribir el código no generó costo).
 2. Extender el workflow de CI para hacer build+push a ECR y
    `aws ecs update-service` en merge a `main` (hoy el workflow solo valida,
-   no despliega — no hay nada a lo que desplegar todavía).
+   no despliega; el paso de build+push está documentado como manual en el
+   README de Terraform mientras tanto).
 3. `docker-compose.prod.yml` no aplica bajo este ADR (Fargate reemplaza
    Compose en producción); no hace falta escribirlo.
+4. Decidir cómo montar el certificado de AFIP en la task de ECS (es un
+   archivo, no un secret de tipo string — no entra en el patrón de Secrets
+   Manager usado para JWT/DB password/tokens).
 
 **Gap menor encontrado de paso — resuelto:** los 4 packages (`backend`,
 `frontend`, `shared`, `mobile`) ya tienen configuración de ESLint
@@ -128,15 +134,20 @@ todavía — solo el lint.
 
 1. ~~Decidir la infraestructura de destino (sección 6)~~ — **hecho, ADR-015**.
 2. ~~Generar y verificar la migration inicial (sección 2)~~ — **hecho**.
-3. Generar `JWT_SECRET`/`JWT_REFRESH_SECRET` nuevos y configurar
-   `DATABASE_PASSWORD` real (sección 1) — sin esto el backend no arranca.
-4. Configurar credenciales reales de MercadoPago/AFIP/SES/FCM/Sentry/S3
-   (sección 3) — la app arranca sin esto, pero con funcionalidad de negocio
+3. ~~Dominio real + `cors.config.ts` (sección 4)~~ — **hecho, `obraya.com.ar`**.
+4. ~~Escribir el Terraform de la infraestructura (sección 6)~~ — **hecho**,
+   `infra/terraform/`. `JWT_SECRET`/`JWT_REFRESH_SECRET`/`DATABASE_PASSWORD`
+   (sección 1) ya los genera ese Terraform en Secrets Manager — no hace
+   falta generarlos a mano por separado.
+5. Aprobar costo y correr `terraform apply` (sección 6,
+   `infra/terraform/README.md` tiene el orden exacto de pasos) — requiere
+   cuenta de AWS real con método de pago.
+6. Configurar credenciales reales de MercadoPago/AFIP/SES/FCM/Sentry
+   (sección 3) vía `aws secretsmanager put-secret-value` (ver README de
+   Terraform) — la app arranca sin esto, pero con funcionalidad de negocio
    apagada.
-5. DNS + dominios reales en `cors.config.ts` (sección 4).
-6. Provisionar la infraestructura de AWS (sección 6) — requiere aprobación
-   explícita porque genera costo.
-7. Deploy, correr `migration:run` (sección 2), smoke test de `/api/v1/health`
-   y de un flujo de compra end-to-end contra las integraciones reales
-   (MercadoPago/AFIP en modo producción suelen comportarse distinto que en
-   sandbox).
+7. DNS final apuntando al ALB/CloudFront que salen de Terraform (sección 4).
+8. Deploy (build+push de imágenes, ver README de Terraform), correr
+   `migration:run` (sección 2), smoke test de `/api/v1/health` y de un flujo
+   de compra end-to-end contra las integraciones reales (MercadoPago/AFIP en
+   modo producción suelen comportarse distinto que en sandbox).
