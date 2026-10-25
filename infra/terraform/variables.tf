@@ -21,7 +21,7 @@ variable "vpc_cidr" {
 }
 
 variable "backend_image_tag" {
-  description = "Tag de la imagen en ECR (lo setea CI al hacer push, ver ADR-015 seccion 'siguiente paso')"
+  description = "Tag de la imagen en ECR (lo setea CI al hacer push, ver README.md)"
   type        = string
   default     = "latest"
 }
@@ -29,23 +29,6 @@ variable "backend_image_tag" {
 variable "frontend_image_tag" {
   type    = string
   default = "latest"
-}
-
-variable "backend_desired_count" {
-  description = "Cantidad de tasks del backend. 1 alcanza para pre-lanzamiento; subir a 2+ cuando haya trafico real (no hay HA con 1 sola task)."
-  type        = number
-  default     = 1
-}
-
-variable "frontend_desired_count" {
-  type    = number
-  default = 1
-}
-
-variable "db_instance_class" {
-  description = "db.t4g.micro: el mas chico con soporte de Postgres 16 en RDS. Subir si el volumen lo justifica."
-  type        = string
-  default     = "db.t4g.micro"
 }
 
 variable "db_name" {
@@ -58,9 +41,16 @@ variable "db_username" {
   default = "obraya_app"
 }
 
-variable "redis_node_type" {
-  type    = string
-  default = "cache.t4g.micro"
+variable "instance_type" {
+  description = "t4g.small: 2 vCPU/2GB ARM, alcanza para Postgres+Redis+backend+frontend en un solo host pre-lanzamiento (ver ADR-020). Subir si el volumen lo justifica."
+  type        = string
+  default     = "t4g.small"
+}
+
+variable "root_volume_size_gb" {
+  description = "Disco de la instancia: contenedores + volumenes de Postgres/Redis."
+  type        = number
+  default     = 30
 }
 
 variable "enable_opensearch" {

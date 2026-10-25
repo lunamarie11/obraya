@@ -28,6 +28,22 @@ resource "aws_secretsmanager_secret_version" "jwt_refresh_secret" {
   secret_string = random_password.jwt_refresh_secret.result
 }
 
+# Password de Postgres, que ahora corre como contenedor local en la
+# instancia unica (ver ec2.tf / docker-compose.prod.yml), no como RDS.
+resource "random_password" "db" {
+  length  = 32
+  special = false
+}
+
+resource "aws_secretsmanager_secret" "db_password" {
+  name = "obraya/${var.environment}/db-password"
+}
+
+resource "aws_secretsmanager_secret_version" "db_password" {
+  secret_id     = aws_secretsmanager_secret.db_password.id
+  secret_string = random_password.db.result
+}
+
 # Placeholders para credenciales de proveedores externos (Mercado Pago,
 # Firebase, Sentry). Terraform solo crea el contenedor del secret con un
 # valor dummy -- el valor real se carga aparte con:

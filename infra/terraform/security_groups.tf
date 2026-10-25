@@ -1,10 +1,14 @@
-resource "aws_security_group" "alb" {
-  name        = "obraya-alb-sg"
-  description = "ALB publico: HTTP/HTTPS desde internet"
+# Una sola instancia expuesta a internet (ver ec2.tf). Sin SSH abierto: el
+# acceso remoto es via SSM Session Manager (ver iam.tf), que sale por HTTPS
+# saliente (ya permitido por el egress "allow all"), no necesita puerto de
+# entrada.
+resource "aws_security_group" "app" {
+  name        = "obraya-app-sg"
+  description = "Instancia unica: HTTP/HTTPS desde internet (Caddy hace de reverse proxy)"
   vpc_id      = aws_vpc.main.id
 
   ingress {
-    description = "HTTP"
+    description = "HTTP (redirige a HTTPS en Caddy)"
     from_port   = 80
     to_port     = 80
     protocol    = "tcp"
@@ -26,98 +30,21 @@ resource "aws_security_group" "alb" {
     cidr_blocks = ["0.0.0.0/0"]
   }
 
-  tags = { Name = "obraya-alb-sg" }
-}
-
-resource "aws_security_group" "ecs_tasks" {
-  name        = "obraya-ecs-tasks-sg"
-  description = "Tasks de Fargate (backend + frontend): solo reciben trafico del ALB"
-  vpc_id      = aws_vpc.main.id
-
-  ingress {
-    description     = "Backend desde ALB"
-    from_port       = 3000
-    to_port         = 3000
-    protocol        = "tcp"
-    security_groups = [aws_security_group.alb.id]
-  }
-
-  ingress {
-    description     = "Frontend desde ALB"
-    from_port       = 3001
-    to_port         = 3001
-    protocol        = "tcp"
-    security_groups = [aws_security_group.alb.id]
-  }
-
-  egress {
-    from_port   = 0
-    to_port     = 0
-    protocol    = "-1"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
-
-  tags = { Name = "obraya-ecs-tasks-sg" }
-}
-
-resource "aws_security_group" "rds" {
-  name        = "obraya-rds-sg"
-  description = "Postgres: solo desde las tasks de ECS"
-  vpc_id      = aws_vpc.main.id
-
-  ingress {
-    description     = "Postgres desde ECS"
-    from_port       = 5432
-    to_port         = 5432
-    protocol        = "tcp"
-    security_groups = [aws_security_group.ecs_tasks.id]
-  }
-
-  egress {
-    from_port   = 0
-    to_port     = 0
-    protocol    = "-1"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
-
-  tags = { Name = "obraya-rds-sg" }
-}
-
-resource "aws_security_group" "redis" {
-  name        = "obraya-redis-sg"
-  description = "Redis: solo desde las tasks de ECS"
-  vpc_id      = aws_vpc.main.id
-
-  ingress {
-    description     = "Redis desde ECS"
-    from_port       = 6379
-    to_port         = 6379
-    protocol        = "tcp"
-    security_groups = [aws_security_group.ecs_tasks.id]
-  }
-
-  egress {
-    from_port   = 0
-    to_port     = 0
-    protocol    = "-1"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
-
-  tags = { Name = "obraya-redis-sg" }
+  tags = { Name = "obraya-app-sg" }
 }
 
 resource "aws_security_group" "opensearch" {
   count       = var.enable_opensearch ? 1 : 0
   name        = "obraya-opensearch-sg"
-  description = "OpenSearch: solo desde las tasks de ECS"
+  description = "OpenSearch: solo desde la instancia de la app, dentro de la VPC"
   vpc_id      = aws_vpc.main.id
 
   ingress {
-    description     = "HTTPS desde ECS"
+    description     = "HTTPS desde la instancia"
     from_port       = 443
     to_port         = 443
     protocol        = "tcp"
-    security_groups = [aws_security_group.ecs_tasks.id]
+    security_groups = [aws_security_group.app.id]
   }
 
   egress {

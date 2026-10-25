@@ -8,7 +8,6 @@ domain_name = "obraya.com.ar"
 backend_image_tag  = "latest"
 frontend_image_tag = "latest"
 
-backend_desired_count  = 1
-frontend_desired_count = 1
+instance_type = "t4g.small"
 
 enable_opensearch = false

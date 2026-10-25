@@ -4,6 +4,85 @@ Cada cambio importante del proyecto se documenta aqui. Las decisiones arquitecto
 
 ---
 
+## [0.29.0] - 2026-10-25
+
+### Decisiones Tomadas
+
+- **ADR-020**: se revisa ADR-015 para la etapa pre-lanzamiento. Reemplaza
+  ECS Fargate + RDS + ElastiCache + ALB por **una sola instancia EC2**
+  (`t4g.small`) corriendo Postgres/Redis/backend/frontend como contenedores
+  de Docker Compose, con Caddy de reverse proxy + HTTPS automatico via
+  Let's Encrypt — baja el costo estimado de ~110-120 USD/mes a ~20-25
+  USD/mes. Motivo: cero trafico real todavia, pagar por alta disponibilidad
+  sin nada que escalar es sobrecosto. ADR-015 queda como diseno de destino
+  para cuando el volumen lo justifique (marcado "Superseded" mientras
+  tanto, no se borra).
+- Se evaluo salir de AWS por completo (Hetzner/Fly.io/Railway) para bajar
+  costo aun mas; se descarto por falta de region en Sudamerica y porque
+  StorageService/SES ya estan integrados especificamente contra APIs de
+  AWS (reescribirlos saldria mas caro que el ahorro).
+
+### Agregado
+
+- `infra/terraform/ec2.tf`: instancia EC2 (AMI Amazon Linux 2023 arm64 via
+  SSM Parameter Store, sin hardcodear AMI ID) + Elastic IP asociada +
+  `user_data` que instala Docker/Compose.
+- `infra/docker/docker-compose.prod.yml`: Postgres/Redis/backend/frontend/
+  Caddy en la instancia unica, imagenes de backend/frontend desde ECR (no
+  se buildean en la instancia).
+- `infra/docker/Caddyfile`: reverse proxy + HTTPS automatico (Let's
+  Encrypt HTTP-01) para `app./admin./api.obraya.com.ar`.
+- `docs/adrs/ADR-020-infraestructura-ec2-single-instance.md`.
+
+### Eliminado
+
+- `infra/terraform/ecs.tf`, `alb.tf`, `rds.tf`, `elasticache.tf`,
+  `cloudwatch.tf` — reemplazados por `ec2.tf` + docker-compose.prod.yml.
+  Postgres/Redis dejan de ser servicios managed (RDS/ElastiCache) y vuelven
+  a ser contenedores, igual que en dev, pero en la instancia de produccion.
+
+### Modificado
+
+- `infra/terraform/vpc.tf`: sin NAT Gateway ni subnets privadas (la
+  instancia tiene IP publica propia, no la necesita) — elimina ~35
+  USD/mes.
+- `infra/terraform/security_groups.tf`: un solo security group (`app`,
+  puertos 80/443 desde internet) en vez de los cinco anteriores
+  (alb/ecs_tasks/rds/redis/opensearch).
+- `infra/terraform/iam.tf`: un solo IAM role para la instancia EC2 (en vez
+  de execution role + task roles de ECS), con `AmazonSSMManagedInstanceCore`
+  para acceso remoto via SSM Session Manager (sin SSH).
+- `infra/terraform/acm.tf`: se elimina el certificado ACM de
+  `app./admin./api.` (Caddy emite esos via Let's Encrypt); solo queda el
+  cert de CloudFront (`cdn.`, obligatorio en ACM porque CloudFront no
+  soporta Let's Encrypt).
+- `infra/terraform/secrets.tf`: se recrea el secret de `db-password` (antes
+  vivia en `rds.tf`) — Postgres sigue necesitando password aunque ya no sea
+  RDS.
+- `infra/terraform/variables.tf`, `terraform.tfvars.example`: se quitan
+  variables de ECS/RDS/ElastiCache (`backend_desired_count`,
+  `db_instance_class`, `redis_node_type`, etc.), se agrega `instance_type`
+  (default `t4g.small`) y `root_volume_size_gb`.
+- `infra/terraform/outputs.tf`: se reemplazan los outputs de ALB/RDS/
+  ElastiCache/ECS por `eip_public_ip` e `instance_id`.
+- `infra/terraform/README.md`: reescrito completo para el flujo de deploy
+  de instancia unica (conexion via SSM, armado de `.env.backend` con
+  secrets de Secrets Manager, `docker-compose up`).
+- `docs/adrs/ADR-015-infraestructura-deploy.md`: marcado como Superseded
+  por ADR-020.
+
+### Pendiente
+
+- Backups de Postgres ya no son automaticos (eran de RDS) — falta un cron
+  de `pg_dump` a S3 o snapshot de EBS antes de tener datos reales.
+- Automatizar build+push a ECR y redeploy en CI (hoy manual, ver
+  `infra/terraform/README.md`).
+- Aprobar costo y correr `terraform apply` (requiere cuenta de AWS con
+  metodo de pago) — sigue pendiente, ahora a ~20-25 USD/mes en vez de
+  ~110-120.
+
+---
+
 ## [0.28.0] - 2026-10-25
 
 ### Decisiones Tomadas

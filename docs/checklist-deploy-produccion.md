@@ -7,7 +7,7 @@ asumiera infraestructura (CI/CD, `docker-compose.prod.yml`, certbot) que
 todavía no existe en este repo — el proyecto sigue en Fase 0/1 (pre-seed, ver
 `CLAUDE.md`), sin infraestructura de producción armada todavía.
 
-Última auditoría: 2026-10-25.
+Última auditoría: 2026-10-25 (revisión de infraestructura, ver ADR-020).
 
 ## 1. Secrets — bloqueante, con validación automática (ver ADR-014)
 
@@ -103,22 +103,29 @@ CI/CD. Ya construido y verificado:
   tests), lint + build de frontend, lint + typecheck de mobile y lint de
   shared, en cada PR y push a `main`.
 
-**RESUELTO en parte (2026-10-25): Terraform completo escrito** en
-`infra/terraform/` (VPC, ECS Fargate, RDS, ElastiCache, OpenSearch opcional,
-S3+CloudFront, ALB, ECR, Secrets Manager, IAM) — ver
-`infra/terraform/README.md` para el orden de pasos y el estimado de costo
-(~110-120 USD/mes con OpenSearch apagado). **Sigue pendiente, requiere
-aprobación explícita por el costo:**
+**RESUELTO en parte (2026-10-25): Terraform completo escrito y revisado a
+diseño de instancia única** en `infra/terraform/` (VPC sin NAT, EC2
+`t4g.small` + Docker Compose + Caddy, S3+CloudFront, ECR, Secrets Manager,
+IAM) — ver ADR-020 (revisa ADR-015, que quedó como diseño de destino para
+cuando el volumen lo justifique) y `infra/terraform/README.md` para el
+orden de pasos y el estimado de costo (~20-25 USD/mes con OpenSearch
+apagado, bajó de ~110-120 del diseño original de ADR-015). **Sigue
+pendiente, requiere aprobación explícita por el costo:**
 
 1. Correr `terraform apply` con una cuenta de AWS real con método de pago
    (nadie lo corrió todavía — escribir el código no generó costo).
-2. Extender el workflow de CI para hacer build+push a ECR y
-   `aws ecs update-service` en merge a `main` (hoy el workflow solo valida,
-   no despliega; el paso de build+push está documentado como manual en el
-   README de Terraform mientras tanto).
-3. `docker-compose.prod.yml` no aplica bajo este ADR (Fargate reemplaza
-   Compose en producción); no hace falta escribirlo.
-4. Decidir cómo montar el certificado de AFIP en la task de ECS (es un
+2. Extender el workflow de CI para hacer build+push a ECR y automatizar el
+   redeploy en la instancia (hoy el workflow solo valida, no despliega; el
+   paso de build+push + `docker-compose up` está documentado como manual en
+   el README de Terraform mientras tanto).
+3. `docker-compose.prod.yml` y `Caddyfile` ya están escritos en
+   `infra/docker/` (bajo ADR-020, Docker Compose sí aplica en producción —
+   corre en la instancia única, no reemplazado por Fargate como se había
+   planeado originalmente en ADR-015).
+4. Backups de Postgres ya no son automáticos (eran de RDS en el diseño
+   original) — falta un cron de `pg_dump` a S3 o snapshot de EBS antes de
+   tener datos reales.
+5. Decidir cómo montar el certificado de AFIP en la instancia (es un
    archivo, no un secret de tipo string — no entra en el patrón de Secrets
    Manager usado para JWT/DB password/tokens).
 
@@ -132,7 +139,9 @@ todavía — solo el lint.
 
 ## 7. Orden sugerido antes del primer deploy
 
-1. ~~Decidir la infraestructura de destino (sección 6)~~ — **hecho, ADR-015**.
+1. ~~Decidir la infraestructura de destino (sección 6)~~ — **hecho, ADR-015,
+   revisado por ADR-020 (instancia única EC2 en vez de Fargate, por costo
+   pre-lanzamiento)**.
 2. ~~Generar y verificar la migration inicial (sección 2)~~ — **hecho**.
 3. ~~Dominio real + `cors.config.ts` (sección 4)~~ — **hecho, `obraya.com.ar`**.
 4. ~~Escribir el Terraform de la infraestructura (sección 6)~~ — **hecho**,
@@ -141,13 +150,17 @@ todavía — solo el lint.
    falta generarlos a mano por separado.
 5. Aprobar costo y correr `terraform apply` (sección 6,
    `infra/terraform/README.md` tiene el orden exacto de pasos) — requiere
-   cuenta de AWS real con método de pago.
+   cuenta de AWS real con método de pago. Costo ahora ~20-25 USD/mes (bajó
+   de ~110-120 tras ADR-020).
 6. Configurar credenciales reales de MercadoPago/AFIP/SES/FCM/Sentry
    (sección 3) vía `aws secretsmanager put-secret-value` (ver README de
    Terraform) — la app arranca sin esto, pero con funcionalidad de negocio
    apagada.
-7. DNS final apuntando al ALB/CloudFront que salen de Terraform (sección 4).
-8. Deploy (build+push de imágenes, ver README de Terraform), correr
+7. DNS apuntando a la IP elástica de la instancia (`app./admin./api.`) y a
+   CloudFront (`cdn.`) — ver README de Terraform sección 4 para el detalle
+   (son A records a una IP fija, no CNAME a un ALB).
+8. Deploy (build+push de imágenes a ECR, conectar por SSM y levantar
+   `docker-compose.prod.yml`, ver README de Terraform), correr
    `migration:run` (sección 2), smoke test de `/api/v1/health` y de un flujo
    de compra end-to-end contra las integraciones reales (MercadoPago/AFIP en
    modo producción suelen comportarse distinto que en sandbox).
