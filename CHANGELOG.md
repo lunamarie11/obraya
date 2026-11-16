@@ -4,6 +4,34 @@ Cada cambio importante del proyecto se documenta aqui. Las decisiones arquitecto
 
 ---
 
+## [0.30.0] - 2026-10-31
+
+### Decisiones Tomadas
+
+- **ADR-021**: banners publicitarios pagos en el home, distintos del
+  carrusel de promos de ADR-009 (ese deriva de descuentos reales
+  `Price.scheduledDiscount`; este es contenido pago que el equipo ObraYa da
+  de alta manualmente). Click siempre navega a la ficha del comercio dentro
+  de la app, nunca a una URL externa.
+
+### Agregado
+
+- Entidad `SponsoredBanner` (`companyId`, `title`, `subtitle`, `imageUrl`,
+  `ctaLabel`, `startDate`, `endDate`, `priority`, `isActive`) + migración
+  `CreateSponsoredBanners`.
+- `MarketplacePublicService.findActiveSponsoredBanners()` y endpoint
+  público `GET /public/sponsored-banners`.
+- CRUD en `/admin/sponsored-banners` (alta/edición/baja manual por el
+  equipo ObraYa).
+- Tipo compartido `SponsoredBanner` en `packages/shared`.
+- Banner publicitario rotativo (cada 5s si hay más de uno activo) en el
+  home: en la web (`app/page.tsx`), entre el subtítulo del hero y el
+  buscador; en mobile (`app/(tabs)/index.tsx`), debajo del header con
+  buscador.
+- Datos de ejemplo en `seed-mock-data.ts`: 3 banners (Corralón Norte,
+  Ferretería Central, Distribuidora Norte) y la empresa "Corralón Norte".
+- `docs/adrs/ADR-021-banners-publicitarios-pagos.md`.
+
 ## [0.29.0] - 2026-10-25
 
 ### Decisiones Tomadas

@@ -57,6 +57,12 @@ export class MarketplacePublicController {
     return this.marketplaceService.findActivePromotions();
   }
 
+  @Get('sponsored-banners')
+  @ApiOperation({ summary: 'Banners publicitarios pagos activos (fabricantes destacados, ver ADR-021)' })
+  async findActiveSponsoredBanners() {
+    return this.marketplaceService.findActiveSponsoredBanners();
+  }
+
   @Get('products')
   @ApiOperation({ summary: 'Buscar/listar productos públicos cruzando todas las empresas activas' })
   async findAllProducts(@Query() query: PublicProductQueryDto) {

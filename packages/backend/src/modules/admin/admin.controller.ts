@@ -3,7 +3,7 @@ import {
   Post, Put, Query, UseGuards,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
-import { IsBoolean, IsEnum, IsOptional, IsString } from 'class-validator';
+import { IsBoolean, IsDateString, IsEnum, IsInt, IsOptional, IsString, IsUUID } from 'class-validator';
 import { AdminService } from './admin.service';
 import { JwtAuthGuard } from '../users/guards/jwt-auth.guard';
 import { SuperAdminGuard } from './guards/super-admin.guard';
@@ -24,6 +24,70 @@ class UpdateUserDto {
   @IsOptional()
   @IsBoolean()
   isActive?: boolean;
+}
+
+class CreateSponsoredBannerDto {
+  @IsUUID()
+  companyId: string;
+
+  @IsString()
+  title: string;
+
+  @IsOptional()
+  @IsString()
+  subtitle?: string;
+
+  @IsOptional()
+  @IsString()
+  imageUrl?: string;
+
+  @IsOptional()
+  @IsString()
+  ctaLabel?: string;
+
+  @IsDateString()
+  startDate: string;
+
+  @IsDateString()
+  endDate: string;
+
+  @IsOptional()
+  @IsInt()
+  priority?: number;
+}
+
+class UpdateSponsoredBannerDto {
+  @IsOptional()
+  @IsString()
+  title?: string;
+
+  @IsOptional()
+  @IsString()
+  subtitle?: string;
+
+  @IsOptional()
+  @IsString()
+  imageUrl?: string;
+
+  @IsOptional()
+  @IsString()
+  ctaLabel?: string;
+
+  @IsOptional()
+  @IsDateString()
+  startDate?: string;
+
+  @IsOptional()
+  @IsDateString()
+  endDate?: string;
+
+  @IsOptional()
+  @IsBoolean()
+  isActive?: boolean;
+
+  @IsOptional()
+  @IsInt()
+  priority?: number;
 }
 
 @ApiTags('admin')
@@ -142,5 +206,36 @@ export class AdminController {
   @ApiOperation({ summary: 'Reindexa todos los productos en Elasticsearch (ver ADR-007)' })
   reindexSearch() {
     return this.adminService.reindexSearch();
+  }
+
+  // ── Banners publicitarios pagos (ver ADR-021) ───────────────────────────
+
+  @Get('sponsored-banners')
+  listSponsoredBanners() {
+    return this.adminService.listSponsoredBanners();
+  }
+
+  @Post('sponsored-banners')
+  createSponsoredBanner(@Body() dto: CreateSponsoredBannerDto) {
+    return this.adminService.createSponsoredBanner({
+      ...dto,
+      startDate: new Date(dto.startDate),
+      endDate: new Date(dto.endDate),
+    });
+  }
+
+  @Put('sponsored-banners/:id')
+  updateSponsoredBanner(@Param('id', ParseUUIDPipe) id: string, @Body() dto: UpdateSponsoredBannerDto) {
+    return this.adminService.updateSponsoredBanner(id, {
+      ...dto,
+      startDate: dto.startDate ? new Date(dto.startDate) : undefined,
+      endDate: dto.endDate ? new Date(dto.endDate) : undefined,
+    });
+  }
+
+  @Delete('sponsored-banners/:id')
+  @HttpCode(204)
+  deleteSponsoredBanner(@Param('id', ParseUUIDPipe) id: string) {
+    return this.adminService.deleteSponsoredBanner(id);
   }
 }

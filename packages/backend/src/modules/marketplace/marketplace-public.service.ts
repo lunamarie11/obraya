@@ -1,11 +1,12 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Like, Repository } from 'typeorm';
+import { In, LessThanOrEqual, Like, MoreThanOrEqual, Repository } from 'typeorm';
 import { Company, CompanyStatus, resolveDeliveryZone } from '../users/entities/company.entity';
 import { Product } from '../products/entities/product.entity';
 import { Stock } from '../stock/entities/stock.entity';
 import { PricesService } from '../prices/prices.service';
 import { Price, PriceType } from '../prices/entities/price.entity';
+import { SponsoredBanner } from './entities/sponsored-banner.entity';
 import { PublicProductQueryDto } from './dto/public-product-query.dto';
 import { SearchService } from '../search/search.service';
 import { ReviewsService, ReviewAggregate } from '../reviews/reviews.service';
@@ -28,6 +29,8 @@ export class MarketplacePublicService {
     private readonly stockRepo: Repository<Stock>,
     @InjectRepository(Price)
     private readonly priceRepo: Repository<Price>,
+    @InjectRepository(SponsoredBanner)
+    private readonly sponsoredBannerRepo: Repository<SponsoredBanner>,
     private readonly pricesService: PricesService,
     private readonly searchService: SearchService,
     private readonly reviewsService: ReviewsService,
@@ -132,6 +135,47 @@ export class MarketplacePublicService {
       basePrice: price.basePrice,
       finalPrice: Math.round(price.basePrice * (1 - (price.scheduledDiscount?.discountPercent ?? 0) / 100)),
     }));
+  }
+
+  // Banners publicitarios pagos (ver ADR-021): a diferencia de
+  // findActivePromotions, no derivan de un descuento real sino de un
+  // SponsoredBanner que el equipo ObraYa crea manualmente al cobrarle a un
+  // fabricante/distribuidor por el espacio. companyName siempre se resuelve
+  // contra Company.razonSocial (no se guarda duplicado en el banner) para
+  // que, si la empresa cambia de nombre o se suspende, el banner lo refleje
+  // sin necesidad de editarlo a mano.
+  async findActiveSponsoredBanners(limit = 5) {
+    const now = new Date();
+    const banners = await this.sponsoredBannerRepo.find({
+      where: {
+        isActive: true,
+        startDate: LessThanOrEqual(now),
+        endDate: MoreThanOrEqual(now),
+      },
+      order: { priority: 'DESC', updatedAt: 'DESC' },
+      take: limit,
+    });
+    if (banners.length === 0) return [];
+
+    const companies = await this.companyRepo.find({
+      where: { id: In(banners.map((b) => b.companyId)), status: CompanyStatus.ACTIVE },
+    });
+    const companyById = new Map(companies.map((c) => [c.id, c]));
+
+    return banners
+      .filter((b) => companyById.has(b.companyId))
+      .map((b) => {
+        const company = companyById.get(b.companyId)!;
+        return {
+          id: b.id,
+          companyId: company.id,
+          companyName: company.razonSocial,
+          title: b.title,
+          subtitle: b.subtitle ?? undefined,
+          imageUrl: b.imageUrl ?? undefined,
+          ctaLabel: b.ctaLabel,
+        };
+      });
   }
 
   private async attachPrice(

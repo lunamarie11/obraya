@@ -163,6 +163,20 @@ export interface PromotionBanner {
   finalPrice: number;
 }
 
+// Banner publicitario pago (ver ADR-021): a diferencia de PromotionBanner,
+// no deriva de un descuento real — el fabricante/distribuidor paga por
+// aparecer destacado, y el contenido (title/subtitle/cta) lo define el
+// anunciante, no un precio.
+export interface SponsoredBanner {
+  id: string;
+  companyId: string;
+  companyName: string;
+  title: string;
+  subtitle?: string;
+  imageUrl?: string;
+  ctaLabel: string;
+}
+
 export interface OrderItem {
   id: string;
   orderId: string;

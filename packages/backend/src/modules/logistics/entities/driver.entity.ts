@@ -24,10 +24,10 @@ export class Driver {
   @Column({ name: 'vehicle_type', type: 'enum', enum: VehicleType, nullable: true })
   vehicleType: VehicleType | null;
 
-  @Column({ name: 'license_plate', length: 10, nullable: true })
+  @Column({ name: 'license_plate', type: 'varchar', length: 10, nullable: true })
   licensePlate: string | null;
 
-  @Column({ length: 20, nullable: true })
+  @Column({ type: 'varchar', length: 20, nullable: true })
   phone: string | null;
 
   // "Disponible para recibir pedidos". Default true para no bloquear a

@@ -78,7 +78,7 @@ export class Order {
   @Column({ name: 'assigned_driver_id', type: 'uuid', nullable: true })
   assignedDriverId: string | null;
 
-  @Column({ name: 'assigned_at', nullable: true })
+  @Column({ name: 'assigned_at', type: 'timestamptz', nullable: true })
   assignedAt: Date | null;
 
   @OneToMany(() => OrderItem, (item) => item.order, { cascade: true })

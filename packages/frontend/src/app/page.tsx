@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useQuery, useQueries } from '@tanstack/react-query';
 import { Search } from 'lucide-react';
@@ -10,7 +10,7 @@ import { StoreCard } from '@/components/marketplace/StoreCard';
 import { ProductCard, ProductCardSkeleton, type ProductCardData } from '@/components/marketplace/ProductCard';
 import { CartStickyBar } from '@/components/cart/CartStickyBar';
 import { BottomTabBar } from '@/components/nav/BottomTabBar';
-import { getPublicCompanies, getPublicProduct, getActivePromotions } from '@/lib/marketplace';
+import { getPublicCompanies, getPublicProduct, getActivePromotions, getSponsoredBanners } from '@/lib/marketplace';
 import { getStoredBuyer } from '@/lib/buyer-auth';
 import { addToCart } from '@/lib/cart';
 import { api, formatARS } from '@/lib/api';
@@ -41,6 +41,23 @@ export default function Home() {
     queryKey: ['active-promotions'],
     queryFn: getActivePromotions,
   });
+
+  // Banner publicitario pago (ver ADR-021): fabricantes/distribuidores que
+  // pagan por destacarse entre el hero y el buscador. Rota cada 5s si hay
+  // más de uno activo.
+  const { data: sponsoredBanners } = useQuery({
+    queryKey: ['sponsored-banners'],
+    queryFn: getSponsoredBanners,
+  });
+
+  const [bannerIndex, setBannerIndex] = useState(0);
+  useEffect(() => {
+    if (!sponsoredBanners || sponsoredBanners.length < 2) return;
+    const t = setInterval(() => setBannerIndex((i) => (i + 1) % sponsoredBanners.length), 5000);
+    return () => clearInterval(t);
+  }, [sponsoredBanners]);
+
+  const activeBanner = sponsoredBanners?.[bannerIndex];
 
   // "Mejor calificados": mismo dato que ya trae /public/companies (averageRating
   // real, ver ADR-008), ordenado client-side. Solo se muestran empresas con al
@@ -122,6 +139,23 @@ export default function Home() {
         <p className="text-sm text-slate-500 mb-4">
           Materiales de construcción directo de fabricantes y distribuidores.
         </p>
+        {activeBanner && (
+          <button
+            onClick={() => router.push(`/marketplace/${activeBanner.companyId}`)}
+            className="w-full text-left mb-4 rounded-2xl overflow-hidden bg-gradient-to-r from-slate-900 to-slate-700 p-4 flex items-center gap-3 shadow-sm hover:opacity-95 transition-opacity"
+          >
+            <span className="shrink-0 text-[10px] font-bold uppercase tracking-wide text-white/70 bg-white/10 rounded-full px-2 py-1">
+              Publicidad
+            </span>
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-bold text-white truncate">{activeBanner.companyName} · {activeBanner.title}</p>
+              {activeBanner.subtitle && <p className="text-xs text-white/80 truncate">{activeBanner.subtitle}</p>}
+            </div>
+            <span className="shrink-0 text-xs font-semibold text-white bg-white/15 rounded-full px-3 py-1.5">
+              {activeBanner.ctaLabel}
+            </span>
+          </button>
+        )}
         <form onSubmit={handleSearchSubmit} className="relative">
           <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 w-5 h-5 pointer-events-none" />
           <input

@@ -10,6 +10,7 @@ import { StockMovement, MovementType } from '../modules/stock/entities/stock-mov
 import { Order, OrderStatus } from '../modules/orders/entities/order.entity';
 import { OrderItem } from '../modules/orders/entities/order-item.entity';
 import { OrderMessage, MessageSender } from '../modules/orders/entities/order-message.entity';
+import { SponsoredBanner } from '../modules/marketplace/entities/sponsored-banner.entity';
 
 const COMPANY_EMAIL = 'contacto@obraya.com';
 
@@ -32,6 +33,7 @@ async function seed() {
       { email: 'ferreteria2@obraya.com', razonSocial: 'Ferretería Central', phone: '+54 11 1111 0002', city: 'CABA' },
       { email: 'ferreteria3@obraya.com', razonSocial: 'Distribuidora Norte', phone: '+54 11 1111 0003', city: 'San Isidro' },
       { email: 'ferreteria4@obraya.com', razonSocial: 'Materiales del Sur', phone: '+54 11 1111 0004', city: 'Lanús' },
+      { email: 'corralonnorte@obraya.com', razonSocial: 'Corralón Norte', phone: '+54 11 1111 0005', city: 'Tigre' },
     ];
 
     const productsData = [
@@ -106,6 +108,54 @@ async function seed() {
     }
 
     // (Products already created per store above)
+
+    // Banners publicitarios pagos de ejemplo (ver ADR-021): simulan 3
+    // fabricantes/distribuidores que ya le pagaron a ObraYa por destacarse
+    // en el home. Fechas corridas desde ayer hasta dentro de 30 días para
+    // que siempre aparezcan activos en un ambiente recién seedeado.
+    const sponsoredBannerRepo = dataSource.getRepository(SponsoredBanner);
+    const bannerStart = new Date(Date.now() - 24 * 60 * 60 * 1000);
+    const bannerEnd = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+    const bannersData = [
+      {
+        email: 'corralonnorte@obraya.com',
+        title: 'Corralón Norte',
+        subtitle: 'Hasta 15% OFF en cemento y hierro esta semana',
+        ctaLabel: 'Ver tienda',
+        priority: 10,
+      },
+      {
+        email: 'ferreteria2@obraya.com',
+        title: 'Ferretería Central',
+        subtitle: 'Envío gratis en compras mayores a $50.000',
+        ctaLabel: 'Ver ofertas',
+        priority: 5,
+      },
+      {
+        email: 'ferreteria3@obraya.com',
+        title: 'Distribuidora Norte',
+        subtitle: 'Nuevo: porcelanato premium a precio de fábrica',
+        ctaLabel: 'Descubrir',
+        priority: 0,
+      },
+    ];
+    for (const b of bannersData) {
+      const company = await companyRepo.findOne({ where: { email: b.email } });
+      if (!company) continue;
+      const existing = await sponsoredBannerRepo.findOne({ where: { companyId: company.id, title: b.title } });
+      if (existing) continue;
+      const banner = sponsoredBannerRepo.create({
+        companyId: company.id,
+        title: b.title,
+        subtitle: b.subtitle,
+        ctaLabel: b.ctaLabel,
+        priority: b.priority,
+        startDate: bannerStart,
+        endDate: bannerEnd,
+      });
+      await sponsoredBannerRepo.save(banner);
+      console.log('Created sponsored banner', b.title);
+    }
 
     // Create a couple of sample orders
     const buyerEmail = 'buyer@obraya.com';
