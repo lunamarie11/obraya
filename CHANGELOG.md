@@ -4,6 +4,30 @@ Cada cambio importante del proyecto se documenta aqui. Las decisiones arquitecto
 
 ---
 
+## [0.33.9] - 2026-11-17
+
+### Bug crítico: rate limit de login bloqueaba a TODOS los usuarios, no por IP
+
+El SuperAdmin y un cliente (Certezza) reportaron `ThrottlerException: Too
+Many Requests` al intentar loguearse, sin haber hecho ellos 5 intentos
+cada uno. Causa: el backend corre detrás de Caddy (reverse proxy) pero
+Express nunca fue configurado con `trust proxy` — sin eso, ignora
+`X-Forwarded-For` y `req.ip` es igual para **todas** las requests (la IP
+interna de Caddy). El throttler de login (5 intentos/15min "por IP", ver
+`throttling.module.ts`) terminaba siendo 5 intentos/15min **para todo el
+sitio junto**: cualquier combinación de intentos fallidos de cualquier
+usuario (incluyendo los intentos fallidos de Certezza por el typo de
+0.33.8) agotaba el límite y bloqueaba el login de todos los demás.
+
+Fix: `app.set('trust proxy', 1)` en `main.ts` (el backend solo es
+alcanzable a través de Caddy, un único hop, nunca se publica el puerto
+3000 al host — confiar en ese hop es seguro). Desplegado a producción;
+el restart del contenedor también reseteó los contadores en memoria del
+throttler, desbloqueando a todos de inmediato. Verificado con login real
+del SuperAdmin contra `api.obraya.com.ar` → `200 OK`.
+
+---
+
 ## [0.33.8] - 2026-11-17
 
 ### Bug real en producción: fabricante registrado sin email y sin poder ingresar
