@@ -86,6 +86,20 @@ export class UsersService {
     });
     await this.companyUserRepo.save(adminUser);
 
+    // Email de confirmacion al que se registra + alerta interna a ObraYa
+    // para que sepan que hay una empresa pendiente de aprobar (ver
+    // ADR-025). Best-effort: no bloquea el registro si SES falla.
+    this.emailService
+      .sendRegistrationReceivedEmail(dto.adminEmail, company.razonSocial)
+      .catch((err) => this.logger.warn(`No se pudo enviar el email de registro a ${dto.adminEmail}: ${(err as Error).message}`));
+
+    const adminNotificationEmail = this.config.get<string>('ADMIN_NOTIFICATION_EMAIL');
+    if (adminNotificationEmail) {
+      this.emailService
+        .sendNewCompanyAdminAlert(adminNotificationEmail, company.razonSocial, company.cuit)
+        .catch((err) => this.logger.warn(`No se pudo enviar la alerta de nueva empresa: ${(err as Error).message}`));
+    }
+
     return { company, adminUser };
   }
 

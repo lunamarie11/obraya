@@ -7,6 +7,7 @@ import { Order, OrderStatus } from '../orders/entities/order.entity';
 import { Product } from '../products/entities/product.entity';
 import { SponsoredBanner } from '../marketplace/entities/sponsored-banner.entity';
 import { ProductsService } from '../products/products.service';
+import { EmailService } from '../email/email.service';
 
 @Injectable()
 export class AdminService {
@@ -22,6 +23,7 @@ export class AdminService {
     @InjectRepository(SponsoredBanner)
     private readonly sponsoredBannerRepo: Repository<SponsoredBanner>,
     private readonly productsService: ProductsService,
+    private readonly emailService: EmailService,
   ) {}
 
   async getStats() {
@@ -77,14 +79,26 @@ export class AdminService {
   }
 
   async updateCompanyStatus(id: string, status: CompanyStatus, approvedBy: string): Promise<Company> {
-    const company = await this.companyRepo.findOne({ where: { id } });
+    const company = await this.companyRepo.findOne({ where: { id }, relations: ['users'] });
     if (!company) throw new NotFoundException('Empresa no encontrada');
+    const wasActive = company.status === CompanyStatus.ACTIVE;
     company.status = status;
     if (status === CompanyStatus.ACTIVE) {
       company.approvedAt = new Date();
       company.approvedBy = approvedBy;
     }
-    return this.companyRepo.save(company);
+    const saved = await this.companyRepo.save(company);
+
+    // Avisar al admin de la empresa que ya puede ingresar (ver ADR-025).
+    // Best-effort: no bloquea la aprobacion si el email falla.
+    if (status === CompanyStatus.ACTIVE && !wasActive) {
+      const admin = company.users?.find((u) => u.role === UserRole.ADMIN);
+      if (admin) {
+        this.emailService.sendCompanyApprovedEmail(admin.email, company.razonSocial).catch(() => undefined);
+      }
+    }
+
+    return saved;
   }
 
   async deleteCompany(id: string): Promise<void> {

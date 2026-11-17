@@ -4,6 +4,35 @@ Cada cambio importante del proyecto se documenta aqui. Las decisiones arquitecto
 
 ---
 
+## [0.33.8] - 2026-11-17
+
+### Bug real en producción: fabricante registrado sin email y sin poder ingresar
+
+Un fabricante real (Certezza s.r.l.) se registró y reportó no haber
+recibido el email de confirmación y no poder ingresar a cargar su
+catálogo. Investigación y fix (ver ADR-025):
+
+- **`EmailService` nunca enviaba nada en producción**: exigía
+  `AWS_ACCESS_KEY_ID`/`AWS_SECRET_ACCESS_KEY` explícitas que nunca
+  estuvieron seteadas en la instancia (ni hacía falta: el IAM role ya
+  tiene `ses:SendEmail`). Se refactorizó para usar el provider chain
+  default del SDK (mismo patrón que `StorageService`/S3) — ya no requiere
+  esas dos variables.
+- Se agregó email de "registro recibido" al fabricante y alerta a ObraYa
+  (`ADMIN_NOTIFICATION_EMAIL`) cuando se registra una empresa nueva, y
+  email de "empresa aprobada" cuando `AdminService` pasa el status a
+  `active`. Antes no existía ningún email en este flujo.
+- Causa puntual del login: el admin de Certezza se registró con un typo
+  en su email (`...gmail.coom`) — se corrigió en la base de producción y
+  se aprobó manualmente la empresa para desbloquearlo. El login y la
+  carga de productos nunca bloquearon por `Company.status` (se revisó
+  código, no hay guard ahí) — el síntoma era 100% el email mal escrito.
+- Verificado en producción: `[EmailService] AWS SES inicializado` en el
+  log de arranque, y un envío de prueba vía `aws ses send-email` desde la
+  instancia (mismo IAM role que usa la app) entregó correctamente.
+
+---
+
 ## [0.33.7] - 2026-11-17
 
 ### Decisiones Tomadas
