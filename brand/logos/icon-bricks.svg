@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#fb923c"/>
+      <stop offset="100%" stop-color="#ea580c"/>
+    </linearGradient>
+  </defs>
+  <rect width="1024" height="1024" rx="220" fill="url(#bg)"/>
+
+  <!-- Fila superior -->
+  <rect x="72" y="248" width="400" height="160" rx="16" fill="#ffffff"/>
+  <rect x="552" y="248" width="400" height="160" rx="16" fill="#ffffff"/>
+
+  <!-- Fila del medio, en aparejo (offset) -->
+  <rect x="72" y="432" width="160" height="160" rx="16" fill="#ffffff"/>
+  <rect x="272" y="432" width="480" height="160" rx="16" fill="#ffffff"/>
+  <rect x="792" y="432" width="160" height="160" rx="16" fill="#ffffff"/>
+
+  <!-- Fila inferior -->
+  <rect x="72" y="616" width="400" height="160" rx="16" fill="#ffffff"/>
+  <rect x="552" y="616" width="400" height="160" rx="16" fill="#ffffff"/>
+</svg>

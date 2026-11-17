@@ -15,6 +15,7 @@ import { getStoredBuyer } from '@/lib/buyer-auth';
 import { addToCart } from '@/lib/cart';
 import { api, formatARS } from '@/lib/api';
 import DemoCredentials from '@/components/DemoCredentials';
+import { UnicornLanding } from '@/components/landing/UnicornLanding';
 import type { Order } from '@obraya/shared';
 
 const PROMOS = [
@@ -128,7 +129,15 @@ export default function Home() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 pb-tabbar">
+    <>
+      {/* Desktop/computadora: landing estilo unicornio, pensada para
+          convertir visitas de marketing, no para navegar el catálogo
+          directo. Mobile sigue yendo directo a la experiencia de app. */}
+      <div className="hidden md:block">
+        <UnicornLanding companiesCount={companies?.length} />
+      </div>
+
+      <div className="md:hidden min-h-screen bg-slate-50 pb-tabbar">
       <MarketplaceHeader showSearch={false} />
 
       {/* Hero + buscador prominente */}
@@ -269,15 +278,16 @@ export default function Home() {
         <div className="max-w-7xl mx-auto px-6 flex flex-col md:flex-row items-center justify-between text-sm">
           <div>© {new Date().getFullYear()} ObraYa</div>
           <div className="flex gap-4 mt-4 md:mt-0 text-slate-300">
-            <span>Política de privacidad</span>
-            <span>Términos</span>
+            <a href="/privacidad" className="hover:text-white">Política de privacidad</a>
+            <a href="/terminos" className="hover:text-white">Términos</a>
           </div>
         </div>
       </footer>
 
       <CartStickyBar />
       <BottomTabBar />
-    </div>
+      </div>
+    </>
   );
 }
 

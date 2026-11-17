@@ -11,6 +11,8 @@ const PUBLIC_PREFIXES = [
   '/login',
   '/register',
   '/accept-invite',
+  '/terminos',
+  '/privacidad',
 ];
 
 // Rutas que solo puede ver SuperAdmin
@@ -54,5 +56,10 @@ export function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ['/((?!_next/static|_next/image|favicon.ico|api).*)'],
+  // El negative lookahead excluye además cualquier ruta con extensión de
+  // archivo (ícono, SVG, manifest, etc. servidos desde /public o desde las
+  // convenciones de metadata de Next) — si no, el middleware las intercepta
+  // y las redirige a /login por no tener token (bug real: rompía favicon.ico,
+  // icon.png, apple-icon.png y /brand/obraya-lockup.svg en producción).
+  matcher: ['/((?!_next/static|_next/image|favicon.ico|api|.*\\..*).*)'],
 };
