@@ -81,12 +81,18 @@ negocio queda apagada en silencio:
 - HTTPS/SSL: lo maneja el ALB vía ACM (certificado gestionado en el
   Terraform, sin certbot/Let's Encrypt manual), según ADR-015.
 
-## 5. Rate limiting
+## 5. Rate limiting — RESUELTO (2026-11-16, ver ADR-023)
 
-`ThrottlingModule` (`config/throttling.module.ts`) ya tiene límites
-razonables por defecto (100 req/15min general, 5 req/15min en auth, etc.) y
-no depende de configuración adicional — no hay acción pendiente acá, solo
-queda validado como ya cubierto.
+`ThrottlingModule` (`config/throttling.module.ts`) tenía un bug de alcance:
+el throttler `auth` (5 intentos/15min, pensado solo para login) se
+aplicaba por defecto a toda la API (`@nestjs/throttler` aplica todos los
+throttlers nombrados a todas las rutas salvo `@SkipThrottle` explícito),
+bloqueando `/orders` y el resto tras pocos requests sostenidos. Corregido
+con `ApiThrottlerGuard`/`AuthThrottlerGuard` dedicados
+(`config/scoped-throttler.guard.ts`) que acotan cada uno a un solo
+throttler nombrado. Quedan 2 throttlers: `api` (120/min, global) y `auth`
+(5/15min, solo en los controllers de login). Verificado con build limpio y
+pruebas de carga manuales — ver ADR-023. No hay acción pendiente acá.
 
 ## 6. Infraestructura de deploy — en progreso (ver ADR-015)
 

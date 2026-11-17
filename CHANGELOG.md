@@ -4,6 +4,94 @@ Cada cambio importante del proyecto se documenta aqui. Las decisiones arquitecto
 
 ---
 
+## [0.32.0] - 2026-11-16
+
+### Decisiones Tomadas
+
+- **ADR-023**: corrige un bug de rate limiting detectado durante la
+  verificación manual de Fase 4d: el throttler `auth` (5 intentos/15min,
+  pensado solo para login) se estaba aplicando a toda la API (`/orders`,
+  `/delivery`, etc.) por el comportamiento por defecto de
+  `@nestjs/throttler` (todos los throttlers nombrados aplican a todas las
+  rutas salvo `@SkipThrottle` explícito). Bug latente desde ADR-007, nunca
+  disparado antes por falta de tráfico sostenido en pruebas.
+
+### Agregado
+
+- `packages/backend/src/config/scoped-throttler.guard.ts`:
+  `ApiThrottlerGuard`/`AuthThrottlerGuard`, cada uno filtra
+  `this.throttlers` a un único throttler nombrado en `onModuleInit()`.
+- ADR-023 (`docs/adrs/ADR-023-alcance-correcto-rate-limiting-por-throttler.md`).
+
+### Modificado
+
+- `packages/backend/src/config/throttling.module.ts`: elimina los
+  throttlers `general` y `search` (redundante/nunca usado); `api` sube de
+  50/min a 120/min y pasa a ser el único `APP_GUARD` global
+  (`ApiThrottlerGuard`); `auth` (5/15min, sin cambios) se aplica solo vía
+  `AuthThrottlerGuard` exportado; módulo pasa a `@Global()`.
+- `packages/backend/src/modules/users/auth.controller.ts` y
+  `packages/backend/src/modules/buyers/buyer-auth.controller.ts`: agregan
+  `@UseGuards(AuthThrottlerGuard)` junto al `@Throttle({ auth: {...} })`
+  existente.
+
+### Verificado
+
+- `npm run build --workspace=packages/backend`: build limpio.
+- 6 intentos seguidos de `POST /auth/login` con credenciales inválidas:
+  los primeros 5 devuelven `401`, el 6° devuelve `429` (el throttler
+  `auth` sigue protegiendo login correctamente).
+- 8 requests seguidos a `GET /health`: los 8 devuelven `200` (rutas
+  fuera de login ya no heredan el límite de `auth`).
+
+---
+
+## [0.31.0] - 2026-11-16
+
+### Decisiones Tomadas
+
+- **Fase 4d: ruteo optimizado para repartidores** (ver
+  `docs/specs/fase4d-ruteo-optimizado.md` y ADR-022). Se descarta integrar
+  la Directions/Geocoding API de pago de Google (Opción A): se delega el
+  ruteo a la app de Google Maps del repartidor via deep link (Opción B),
+  sin costo ni facturación de Google Cloud — mismo criterio que
+  ADR-008/012/018.
+- Se relaja la restricción de "un solo pedido activo a la vez" en
+  `/delivery` (introducida en Fase 4c): sin eso, el botón de ruteo con 2+
+  paradas no tenía ningún caso de uso real. Un repartidor ahora puede
+  tomar varios pedidos `Despachado` asignados simultáneamente.
+
+### Agregado
+
+- Botón "Abrir ruta en Google Maps" en `/delivery`, visible con 2 o más
+  pedidos asignados: arma la URL `google.com/maps/dir` con las
+  direcciones de los pedidos como `waypoints`/`destination` y, si hay
+  permiso de geolocalización, la posición actual como `origin`.
+- Tarjeta simple (`AssignedOrderCard`) para los pedidos asignados más allá
+  del primero, con botón directo "Marcar entregado" (el primer pedido
+  conserva el timeline paso a paso existente).
+- ADR-022 (`docs/adrs/ADR-022-ruteo-repartidores-google-maps-deeplink.md`).
+
+### Modificado
+
+- `packages/frontend/src/app/(backoffice)/delivery/page.tsx`: "Pedidos
+  disponibles" ya no se oculta mientras hay una entrega activa; el reporte
+  de posición (ADR-018) ahora depende de tener al menos un pedido
+  asignado, no solo del primero.
+- `docs/specs/fase4d-ruteo-optimizado.md`: estado actualizado a
+  Implementado.
+- `docs/roadmap-estado-actual.md`: sección Fase 4 actualizada con el
+  párrafo de Fase 4d.
+
+### Verificado
+
+- `npm run build --workspace=packages/frontend`: build limpio.
+- No hay cambios de backend ni de modelo de datos (confirmado en el spec:
+  la URL de Google Maps se arma enteramente en el frontend con datos que
+  `GET /orders?assignedToMe=true` ya devuelve).
+
+---
+
 ## [0.30.0] - 2026-10-31
 
 ### Decisiones Tomadas

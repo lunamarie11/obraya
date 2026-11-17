@@ -107,7 +107,12 @@ export default function DeliveryPage() {
 
   const availableOrders: any[] = availableData?.data ?? [];
   const historyOrders: any[] = historyData?.data ?? [];
-  const activeOrder = mineData?.data?.[0] ?? null;
+  // Ver docs/specs/fase4d-ruteo-optimizado.md: un repartidor puede tener
+  // varios pedidos Despachado asignados a la vez. El primero mantiene el
+  // timeline cosmético paso a paso; el resto se muestra como lista simple.
+  const mineOrders: any[] = mineData?.data ?? [];
+  const activeOrder = mineOrders[0] ?? null;
+  const extraOrders = mineOrders.slice(1);
 
   // Si ya tengo un pedido asignado (ej. al recargar la página), arranco el
   // timeline cosmético en "heading" en vez de "available".
@@ -116,14 +121,16 @@ export default function DeliveryPage() {
     if (!activeOrder && deliveryStep !== 'available') setDeliveryStep('available');
   }, [activeOrder, deliveryStep]);
 
-  // Ver ADR-018: mientras hay un pedido activo asignado, reporto mi posición
-  // con la Geolocation API del navegador (throttle de ~15s entre envíos).
-  // Best-effort: si el permiso se niega o falla, no bloquea el resto del flujo.
+  // Ver ADR-018: mientras tengo al menos un pedido activo asignado, reporto
+  // mi posición con la Geolocation API del navegador (throttle de ~15s
+  // entre envíos). Best-effort: si el permiso se niega o falla, no bloquea
+  // el resto del flujo.
   const lastSentAtRef = useRef(0);
   const watchIdRef = useRef<number | null>(null);
+  const hasActiveOrder = mineOrders.length > 0;
 
   useEffect(() => {
-    if (!activeOrder || typeof navigator === 'undefined' || !navigator.geolocation) return;
+    if (!hasActiveOrder || typeof navigator === 'undefined' || !navigator.geolocation) return;
 
     watchIdRef.current = navigator.geolocation.watchPosition(
       (position) => {
@@ -148,7 +155,7 @@ export default function DeliveryPage() {
       if (watchIdRef.current != null) navigator.geolocation.clearWatch(watchIdRef.current);
       watchIdRef.current = null;
     };
-  }, [activeOrder?.id]);
+  }, [hasActiveOrder]);
 
   const todayStr = new Date().toDateString();
   const todayDeliveries = historyOrders.filter(o =>
@@ -168,6 +175,38 @@ export default function DeliveryPage() {
 
   function takeOrder(order: any) {
     claimOrder.mutate(order.id);
+  }
+
+  // Ver docs/specs/fase4d-ruteo-optimizado.md (Opción B, ADR-022): no
+  // geocodificamos ni calculamos la ruta nosotros; armamos un deep link a
+  // Google Maps y dejamos que la app/navegador del repartidor resuelva el
+  // orden óptimo de las paradas.
+  function openRoute(orders: any[]) {
+    const addresses = orders
+      .map((o) => [o.deliveryAddress?.street, o.deliveryAddress?.city, o.deliveryAddress?.province]
+        .filter(Boolean).join(', '))
+      .filter(Boolean);
+    if (addresses.length < 2) return;
+
+    const destination = addresses[addresses.length - 1];
+    const waypoints = addresses.slice(0, -1);
+
+    function buildUrl(origin?: string) {
+      const params = new URLSearchParams({ api: '1', destination, travelmode: 'driving' });
+      if (waypoints.length) params.set('waypoints', waypoints.join('|'));
+      if (origin) params.set('origin', origin);
+      return `https://www.google.com/maps/dir/?${params.toString()}`;
+    }
+
+    if (typeof navigator !== 'undefined' && navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (pos) => window.open(buildUrl(`${pos.coords.latitude},${pos.coords.longitude}`), '_blank'),
+        () => window.open(buildUrl(), '_blank'),
+        { maximumAge: 30_000, timeout: 3_000 },
+      );
+    } else {
+      window.open(buildUrl(), '_blank');
+    }
   }
 
   const currentStepIndex = STEPS.findIndex(s => s.key === deliveryStep);
@@ -236,6 +275,18 @@ export default function DeliveryPage() {
             <AlertCircle size={16} />
             {claimError}
           </div>
+        )}
+
+        {/* Ver docs/specs/fase4d-ruteo-optimizado.md: con 2+ pedidos asignados,
+            delegamos el orden óptimo de las paradas a Google Maps (deep link). */}
+        {mineOrders.length >= 2 && (
+          <button
+            onClick={() => openRoute(mineOrders)}
+            className="w-full py-3 bg-slate-900 hover:bg-slate-800 text-white font-bold rounded-xl text-sm transition-colors flex items-center justify-center gap-2"
+          >
+            <Navigation size={16} />
+            Abrir ruta en Google Maps ({mineOrders.length} paradas)
+          </button>
         )}
 
         {/* Entrega activa */}
@@ -326,6 +377,26 @@ export default function DeliveryPage() {
           </section>
         )}
 
+        {/* Otros pedidos asignados (ver docs/specs/fase4d-ruteo-optimizado.md) */}
+        {extraOrders.length > 0 && (
+          <section>
+            <h2 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2 px-1">
+              También asignados a vos ({extraOrders.length})
+            </h2>
+            <div className="space-y-3">
+              {extraOrders.map((order: any) => (
+                <AssignedOrderCard
+                  key={order.id}
+                  order={order}
+                  earn={earn}
+                  onDeliver={() => markDelivered.mutate(order.id)}
+                  delivering={markDelivered.isPending}
+                />
+              ))}
+            </div>
+          </section>
+        )}
+
         {/* Sin conexión */}
         {!isOnline && (
           <div className="bg-white border border-slate-200 rounded-2xl p-6 text-center shadow-sm">
@@ -335,8 +406,10 @@ export default function DeliveryPage() {
           </div>
         )}
 
-        {/* Pedidos disponibles */}
-        {isOnline && !activeOrder && (
+        {/* Pedidos disponibles. Ver docs/specs/fase4d-ruteo-optimizado.md:
+            un repartidor puede tomar más de un pedido a la vez, ya no se
+            oculta esta sección mientras hay una entrega activa. */}
+        {isOnline && (
           <section>
             <div className="flex items-center justify-between mb-2 px-1">
               <h2 className="text-xs font-bold text-slate-500 uppercase tracking-wider">
@@ -358,15 +431,6 @@ export default function DeliveryPage() {
                 ))}
               </div>
             )}
-          </section>
-        )}
-
-        {isOnline && activeOrder && availableOrders.length > 0 && (
-          <section>
-            <h2 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2 px-1">
-              Más pedidos ({availableOrders.length})
-            </h2>
-            <p className="text-xs text-slate-500 text-center py-4">Terminá la entrega actual primero.</p>
           </section>
         )}
 
@@ -426,6 +490,51 @@ function OrderCard({ order, earn, onTake, taking }: { order: any; earn: (cents: 
           className="w-full py-3 bg-orange-500 hover:bg-orange-600 disabled:opacity-60 text-white font-bold rounded-xl text-sm transition-colors"
         >
           {taking ? 'Tomando...' : 'Tomar pedido'}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// Ver docs/specs/fase4d-ruteo-optimizado.md: tarjeta simple (sin timeline
+// paso a paso) para los pedidos asignados más allá del primero.
+function AssignedOrderCard({ order, earn, onDeliver, delivering }: {
+  order: any; earn: (cents: number) => number; onDeliver: () => void; delivering: boolean;
+}) {
+  const earnings = earn(order.totalAmount);
+  const itemCount = order.items?.length ?? 0;
+
+  return (
+    <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm">
+      <div className="p-4">
+        <div className="flex items-start justify-between mb-3">
+          <div>
+            <span className="text-xs font-mono text-slate-500">{order.orderNumber}</span>
+            <p className="text-slate-900 font-semibold text-sm mt-0.5">{order.buyerName}</p>
+          </div>
+          <div className="text-right">
+            <p className="text-green-600 font-extrabold text-lg">+{formatARS(earnings)}</p>
+            <p className="text-slate-500 text-xs">tu ganancia</p>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2.5 mb-3">
+          <MapPin size={14} className="text-green-600 shrink-0" />
+          <p className="text-xs text-slate-500 truncate">
+            {order.deliveryAddress?.street}, <span className="text-slate-700 font-medium">{order.deliveryAddress?.city}</span>
+          </p>
+        </div>
+
+        <div className="text-xs text-slate-500 mb-3">
+          {itemCount} ítem{itemCount !== 1 ? 's' : ''} · {formatARS(order.totalAmount)}
+        </div>
+
+        <button
+          onClick={onDeliver}
+          disabled={delivering}
+          className="w-full py-3 bg-orange-500 hover:bg-orange-600 disabled:opacity-60 text-white font-bold rounded-xl text-sm transition-colors"
+        >
+          {delivering ? 'Confirmando...' : 'Marcar entregado'}
         </button>
       </div>
     </div>

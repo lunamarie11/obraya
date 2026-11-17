@@ -8,8 +8,12 @@ import { RegisterBuyerDto } from './dto/register-buyer.dto';
 import { LoginBuyerDto } from './dto/login-buyer.dto';
 import { BuyerJwtAuthGuard } from './guards/buyer-jwt-auth.guard';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
+import { AuthThrottlerGuard } from '../../config/scoped-throttler.guard';
 
-// Ver ADR-007: throttler 'auth' (5 intentos / 15 min) contra brute-force de credenciales.
+// Ver ADR-007 y ADR-023: throttler 'auth' (5 intentos / 15 min) contra
+// brute-force de credenciales, aplicado explicitamente solo aqui via
+// @UseGuards(AuthThrottlerGuard) (el guard global solo corre 'api').
+@UseGuards(AuthThrottlerGuard)
 @Throttle({ auth: { limit: 5, ttl: 900000 } })
 @ApiTags('buyer-auth')
 @Controller('buyer-auth')
