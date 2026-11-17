@@ -41,6 +41,18 @@ resource "aws_route53_record" "app_subdomains" {
   records = [aws_eip.app.public_ip]
 }
 
+# <dominio> (apex, sin subdominio) -> landing de marketing, separada de
+# app.<dominio> (la app logueada). Mismo frontend/instancia que app./admin.,
+# el Next.js decide via Host header (ver middleware.ts) si sirve la landing
+# o la app -- no son despliegues distintos.
+resource "aws_route53_record" "apex" {
+  zone_id = aws_route53_zone.main.zone_id
+  name    = var.domain_name
+  type    = "A"
+  ttl     = 300
+  records = [aws_eip.app.public_ip]
+}
+
 # cdn.<dominio> -> distribucion de CloudFront (storage de imagenes/archivos).
 resource "aws_route53_record" "cdn" {
   zone_id = aws_route53_zone.main.zone_id

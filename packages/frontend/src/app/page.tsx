@@ -15,7 +15,6 @@ import { getStoredBuyer } from '@/lib/buyer-auth';
 import { addToCart } from '@/lib/cart';
 import { api, formatARS } from '@/lib/api';
 import DemoCredentials from '@/components/DemoCredentials';
-import { UnicornLanding } from '@/components/landing/UnicornLanding';
 import type { Order } from '@obraya/shared';
 
 const PROMOS = [
@@ -129,15 +128,7 @@ export default function Home() {
   }
 
   return (
-    <>
-      {/* Desktop/computadora: landing estilo unicornio, pensada para
-          convertir visitas de marketing, no para navegar el catálogo
-          directo. Mobile sigue yendo directo a la experiencia de app. */}
-      <div className="hidden md:block">
-        <UnicornLanding companiesCount={companies?.length} />
-      </div>
-
-      <div className="md:hidden min-h-screen bg-slate-50 pb-tabbar">
+    <div className="min-h-screen bg-slate-50 pb-tabbar">
       <MarketplaceHeader showSearch={false} />
 
       {/* Hero + buscador prominente */}
@@ -286,8 +277,7 @@ export default function Home() {
 
       <CartStickyBar />
       <BottomTabBar />
-      </div>
-    </>
+    </div>
   );
 }
 

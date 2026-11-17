@@ -1,4 +1,3 @@
-import Link from 'next/link';
 import {
   ArrowRight,
   Zap,
@@ -11,6 +10,11 @@ import {
   Building2,
   Sparkles,
 } from 'lucide-react';
+
+// Esta landing se sirve en el dominio apex (obraya.com.ar), separado de
+// app.obraya.com.ar (la app real) -- ver ADR de separacion de dominios y
+// middleware.ts. Por eso los links a la app son absolutos, no relativos.
+const APP_URL = 'https://app.obraya.com.ar';
 
 const FEATURES = [
   {
@@ -56,22 +60,22 @@ export function UnicornLanding({ companiesCount }: Props) {
           <nav className="hidden lg:flex items-center gap-8 text-sm font-medium text-slate-600">
             <a href="#como-funciona" className="hover:text-slate-900 transition-colors">Cómo funciona</a>
             <a href="#fabricantes" className="hover:text-slate-900 transition-colors">Para fabricantes</a>
-            <Link href="/marketplace" className="hover:text-slate-900 transition-colors">Catálogo</Link>
+            <a href={`${APP_URL}/marketplace`} className="hover:text-slate-900 transition-colors">Catálogo</a>
           </nav>
           <div className="flex items-center gap-3">
-            <Link
-              href="/account"
+            <a
+              href={`${APP_URL}/account`}
               className="hidden sm:inline-flex items-center h-10 px-4 rounded-full text-sm font-semibold text-slate-700 hover:bg-slate-100 transition-colors"
             >
               Ingresar
-            </Link>
-            <Link
-              href="/marketplace"
+            </a>
+            <a
+              href={`${APP_URL}/marketplace`}
               className="inline-flex items-center gap-1.5 h-10 px-5 rounded-full bg-orange-500 text-white text-sm font-semibold hover:bg-orange-600 transition-colors shadow-sm shadow-orange-200"
             >
               Explorar catálogo
               <ArrowRight size={15} />
-            </Link>
+            </a>
           </div>
         </div>
       </header>
@@ -102,20 +106,20 @@ export function UnicornLanding({ companiesCount }: Props) {
           </p>
 
           <div className="mt-10 flex flex-col sm:flex-row items-center justify-center gap-4">
-            <Link
-              href="/marketplace"
+            <a
+              href={`${APP_URL}/marketplace`}
               className="inline-flex items-center gap-2 px-7 py-3.5 rounded-full bg-slate-900 text-white font-semibold hover:bg-slate-800 transition-colors shadow-lg shadow-slate-200"
             >
               Comprar materiales
               <ArrowRight size={18} />
-            </Link>
-            <Link
-              href="/register"
+            </a>
+            <a
+              href={`${APP_URL}/register`}
               className="inline-flex items-center gap-2 px-7 py-3.5 rounded-full bg-white border border-slate-200 text-slate-900 font-semibold hover:border-slate-300 hover:bg-slate-50 transition-colors"
             >
               <Building2 size={18} />
               Soy fabricante o distribuidor
-            </Link>
+            </a>
           </div>
 
           <p className="mt-5 text-xs text-slate-400">
@@ -202,13 +206,13 @@ export function UnicornLanding({ companiesCount }: Props) {
             facturá automático ante AFIP.
           </p>
           <div className="mt-8">
-            <Link
-              href="/register"
+            <a
+              href={`${APP_URL}/register`}
               className="inline-flex items-center gap-2 px-7 py-3.5 rounded-full bg-orange-500 text-white font-semibold hover:bg-orange-600 transition-colors"
             >
               Registrar mi empresa
               <ArrowRight size={18} />
-            </Link>
+            </a>
           </div>
         </div>
       </section>
@@ -218,8 +222,8 @@ export function UnicornLanding({ companiesCount }: Props) {
         <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4 text-sm">
           <div className="text-slate-400">© {new Date().getFullYear()} ObraYa</div>
           <div className="flex gap-6 text-slate-400">
-            <Link href="/privacidad" className="hover:text-white transition-colors">Política de privacidad</Link>
-            <Link href="/terminos" className="hover:text-white transition-colors">Términos</Link>
+            <a href="/privacidad" className="hover:text-white transition-colors">Política de privacidad</a>
+            <a href="/terminos" className="hover:text-white transition-colors">Términos</a>
           </div>
         </div>
       </footer>

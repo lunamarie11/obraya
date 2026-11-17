@@ -4,6 +4,26 @@ Cada cambio importante del proyecto se documenta aqui. Las decisiones arquitecto
 
 ---
 
+## [0.33.7] - 2026-11-17
+
+### Decisiones Tomadas
+
+- **Dominio separado para la landing de marketing** (ver ADR-024).
+  `obraya.com.ar` (apex) ahora sirve la landing (`UnicornLanding`), y
+  `app.obraya.com.ar` volvió a mostrar siempre la app de compra en `/`
+  (se eliminó el split responsive `hidden md:block`/`md:hidden`
+  introducido en 0.33.6). Mismo contenedor de frontend para ambos
+  dominios: `middleware.ts` hace `rewrite` de `/` a `/landing` según el
+  header `Host`. Los links de la landing a la app ahora son absolutos a
+  `https://app.obraya.com.ar`.
+- Nuevo registro DNS `aws_route53_record.apex` (`infra/terraform/route53.tf`)
+  y bloque nuevo en `infra/docker/Caddyfile` para `obraya.com.ar` (mismo
+  Elastic IP, Caddy emite su propio certificado Let's Encrypt).
+  Desplegado y verificado: `https://obraya.com.ar` → `200` (landing),
+  `https://app.obraya.com.ar` → `200` (app, sin landing).
+
+---
+
 ## [0.33.6] - 2026-11-17
 
 ### Decisiones Tomadas

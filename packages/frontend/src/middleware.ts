@@ -13,6 +13,7 @@ const PUBLIC_PREFIXES = [
   '/accept-invite',
   '/terminos',
   '/privacidad',
+  '/landing',
 ];
 
 // Rutas que solo puede ver SuperAdmin
@@ -20,6 +21,16 @@ const SUPERADMIN_PREFIXES = ['/superadmin/dashboard', '/superadmin/companies', '
 
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
+
+  // Dominio apex (obraya.com.ar, sin subdominio) = landing de marketing,
+  // separada de app.obraya.com.ar (la app logueada). Mismo contenedor de
+  // frontend para ambos dominios (ver Caddyfile) -- la unica diferencia es
+  // que "/" se resuelve a una pagina distinta segun el Host.
+  const host = request.headers.get('host') ?? '';
+  const isApexHost = host === 'obraya.com.ar' || host === 'www.obraya.com.ar';
+  if (isApexHost && pathname === '/') {
+    return NextResponse.rewrite(new URL('/landing', request.url));
+  }
 
   // Rutas públicas — buyer experience + auth pages
   const isPublic = PUBLIC_PREFIXES.some(
