@@ -1,3 +1,8 @@
+output "route53_name_servers" {
+  description = "Delegar estos NS en NIC.ar (seccion 'Delegar' del dominio obraya.com.ar) para que el DNS real pase a administrarse en esta hosted zone de Route53."
+  value       = aws_route53_zone.main.name_servers
+}
+
 output "eip_public_ip" {
   description = "Apuntar aqui (A record) app./admin./api.<dominio> en el DNS real. Caddy en la instancia emite los certificados TLS de estos tres solo (ver acm.tf)."
   value       = aws_eip.app.public_ip

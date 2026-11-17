@@ -35,6 +35,20 @@ data "aws_iam_policy_document" "app_permissions" {
     resources = [aws_s3_bucket.storage.arn]
   }
 
+  # Backups de Postgres (ver backups.tf / docs/backlog-salida-produccion.md
+  # punto 4) -- bucket separado del de storage de imagenes.
+  statement {
+    sid       = "S3BackupsWrite"
+    actions   = ["s3:PutObject"]
+    resources = ["${aws_s3_bucket.backups.arn}/*"]
+  }
+
+  statement {
+    sid       = "S3BackupsListBucket"
+    actions   = ["s3:ListBucket"]
+    resources = [aws_s3_bucket.backups.arn]
+  }
+
   statement {
     sid       = "SesSendEmail"
     actions   = ["ses:SendEmail", "ses:SendRawEmail"]
@@ -51,6 +65,7 @@ data "aws_iam_policy_document" "app_permissions" {
       aws_secretsmanager_secret.mercadopago_token.arn,
       aws_secretsmanager_secret.firebase_service_account.arn,
       aws_secretsmanager_secret.sentry_dsn.arn,
+      aws_secretsmanager_secret.afip_access_token.arn,
     ]
   }
 

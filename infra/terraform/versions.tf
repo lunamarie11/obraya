@@ -6,16 +6,15 @@ terraform {
     random = { source = "hashicorp/random", version = "~> 3.6" }
   }
 
-  # Backend remoto: completar con los valores que salen de
-  # `terraform apply` en infra/terraform/bootstrap/ (ver README.md),
-  # despues correr `terraform init` para migrar el state local a S3.
-  # backend "s3" {
-  #   bucket         = "obraya-terraform-state-XXXXXXXX"
-  #   key            = "produccion/terraform.tfstate"
-  #   region         = "sa-east-1"
-  #   dynamodb_table = "obraya-terraform-locks"
-  #   encrypt        = true
-  # }
+  # Backend remoto: creado por `terraform apply` en infra/terraform/bootstrap/
+  # (ver README.md). State local ya migrado a S3 via `terraform init`.
+  backend "s3" {
+    bucket         = "obraya-terraform-state-0aa31cf0"
+    key            = "produccion/terraform.tfstate"
+    region         = "sa-east-1"
+    dynamodb_table = "obraya-terraform-locks"
+    encrypt        = true
+  }
 }
 
 provider "aws" {
