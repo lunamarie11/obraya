@@ -126,3 +126,26 @@ Factura A), documentada acá para no confundirla con un bug.
   disponible en este entorno). El primer paso al configurar credenciales reales debe ser
   validar `createInvoice` contra un pedido de prueba antes de depender de él en
   operaciones reales.
+
+## Corrección (2026-11-17) — selección de tipo de comprobante
+
+Al probar `createInvoice` contra AFIP producción real por primera vez (certificado real
+de la empresa, CUIT monotributo `20191259905`, ver `docs/backlog-salida-produccion.md`
+punto 1), un pedido de prueba con el fabricante en `ivaCondition: RI` (el default) falló
+con el error real de AFIP `(10000) NO AUTORIZADO A EMITIR COMPROBANTES - LA CUIT
+INFORMADA NO CORRESPONDE A UN RESPONSABLE INSCRIPTO EN EL IMPUESTO IVA`.
+
+Causa raíz: el diseño original de la sección 2/3 de este ADR decidía `CbteTipo` (Factura
+B vs C) según `company.ivaCondition` — la condición de IVA del **fabricante** dueño del
+pedido. Esto está mal: quien efectivamente emite la factura ante AFIP es **ObraYa**, con
+**un único CUIT compartido** para todos los fabricantes (ver sección "Consecuencias").
+AFIP exige que el tipo de comprobante coincida con la condición de IVA de quien lo
+**emite**, no de ningún tercero mencionado en la operación. Si ese CUIT compartido es
+Monotributo (como es el caso real), solo puede emitir Factura C — sin importar si el
+fabricante es Responsable Inscripto o no.
+
+Corregido en `afip.service.ts`: `CbteTipo` ahora depende de una nueva variable de entorno
+`AFIP_ISSUER_IVA_CONDITION` (condición de IVA del CUIT configurado en `AFIP_CUIT`),
+default `MONOTRIBUTO` si no se configura. `company.ivaCondition` del fabricante ya no se
+usa para esta decisión — queda como dato informativo de la empresa, sin efecto en la
+facturación mientras se use este modelo de CUIT compartido.

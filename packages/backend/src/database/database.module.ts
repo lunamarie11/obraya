@@ -19,7 +19,7 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
         // En dev sincroniza automáticamente. En prod usar migrations siempre.
         synchronize: config.get('app.nodeEnv') === 'development',
         logging: config.get('app.nodeEnv') === 'development',
-        ssl: config.get('app.nodeEnv') === 'production' ? { rejectUnauthorized: false } : false,
+        ssl: config.get('database.ssl') ? { rejectUnauthorized: false } : false,
       }),
     }),
   ],
