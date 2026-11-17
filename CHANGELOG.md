@@ -4,6 +4,191 @@ Cada cambio importante del proyecto se documenta aqui. Las decisiones arquitecto
 
 ---
 
+## [0.33.5] - 2026-11-17
+
+### Decisiones Tomadas
+
+- **Términos y Condiciones + Política de Privacidad publicados** (ver
+  `docs/backlog-salida-produccion.md` punto 11, único bloqueante legal que
+  faltaba para operar con pagos y datos personales en Argentina). Nuevas
+  paginas `packages/frontend/src/app/terminos/page.tsx` y
+  `.../privacidad/page.tsx`, agregadas a `PUBLIC_PREFIXES` en
+  `packages/frontend/src/middleware.ts` para que sean accesibles sin login,
+  y linkeadas desde el footer del home (`packages/frontend/src/app/page.tsx`).
+  Contenido cubre: rol de ObraYa como intermediario (no vendedor), pagos vía
+  Mercado Pago, facturación electrónica AFIP/ARCA, Ley de Defensa del
+  Consumidor (24.240) y Ley de Protección de Datos Personales (25.326).
+  Desplegado a producción (`https://app.obraya.com.ar/terminos` y
+  `/privacidad`, verificado `200 OK`).
+
+### Riesgos / Pendientes
+
+- Es un borrador inicial, no redactado por un abogado — el propio texto de
+  las páginas lo advierte. Debe revisarse con un profesional matriculado en
+  Argentina antes de considerarse definitivo, en especial las cláusulas de
+  responsabilidad del marketplace y el alcance de los derechos ARCO sobre
+  datos personales.
+
+---
+
+## [0.33.4] - 2026-11-17
+
+### Decisiones Tomadas
+
+- **SES sale de modo sandbox.** Nuevo `infra/terraform/ses.tf`: identidad
+  de dominio `obraya.com.ar` con Easy DKIM (3 CNAME) + dominio MAIL FROM
+  propio (`mail.obraya.com.ar`, MX + SPF) para mejorar reputación de
+  entrega. Solicitud de salida de sandbox enviada vía
+  `aws sesv2 put-account-details` (mail type transactional) y **aprobada
+  automáticamente** (`ReviewDetails.Status: GRANTED`) — cuota ahora
+  50.000 emails/día. Las invitaciones a usuarios y notificaciones por
+  email ya le llegan a destinatarios reales, no solo a direcciones
+  verificadas manualmente.
+- **Alarma de presupuesto AWS.** Nuevo `infra/terraform/budget.tf`:
+  `aws_budgets_budget` mensual (default USD 50), notifica por email a
+  80% de gasto real, 100% proyectado y 100% real.
+- **Backups de Postgres.** Nuevo `infra/terraform/backups.tf`: bucket S3
+  dedicado `obraya-backups-production` (privado, cifrado, lifecycle de
+  30 días). Script `/opt/obraya/backup-db.sh` (`pg_dump` + gzip + subida a
+  S3) instalado en la instancia y agendado por cron diario a las 6am UTC
+  (3am Argentina). Permisos agregados al role de la instancia
+  (`infra/terraform/iam.tf`).
+
+### Riesgos
+
+- El script de backup y el cron se instalaron manualmente en la
+  instancia EC2 (mismo patrón ya usado para `docker-compose.prod.yml`/
+  `Caddyfile`, ver README.md) — no están en `user_data` de Terraform. Si
+  la instancia se recrea, hay que reinstalar `/opt/obraya/backup-db.sh` y
+  el cron a mano.
+
+---
+
+## [0.33.0] - 2026-11-17
+
+### Decisiones Tomadas
+
+- **Primer deploy real a producción.** `terraform apply` corrido contra
+  una cuenta de AWS real (`sa-east-1`, ver ADR-020): instancia EC2 +
+  Docker Compose + Caddy levantados, DNS apuntando, HTTPS funcionando en
+  `api.`/`admin.`/`app.obraya.com.ar`. Secrets de JWT/DB/Mercado
+  Pago/Firebase/Sentry cargados en Secrets Manager. Migración inicial de
+  TypeORM corrida sin errores contra la base real.
+
+### Corregido
+
+- `packages/shared` nunca se compilaba a JavaScript antes de este deploy
+  (`package.json` apuntaba a `src/index.ts` en vez de `dist/`, y no tenía
+  `tsconfig.json` propio) — rompía cualquier build de producción del
+  backend/frontend. Agregado `packages/shared/tsconfig.json`, corregidos
+  `main`/`types` en `package.json`, y agregado el paso de build del
+  package `shared` en `infra/docker/Dockerfile.backend` y
+  `Dockerfile.frontend`.
+- `packages/backend/src/database/database.module.ts` forzaba SSL en la
+  conexión a Postgres cuando `NODE_ENV=production`, asumiendo el diseño
+  original de RDS (ADR-015) — pero ADR-020 corre Postgres local sin SSL,
+  causando `Error: The server does not support SSL connections` en
+  producción. Ahora `ssl` depende de una env var explícita
+  `DATABASE_SSL` (`packages/backend/src/config/app.config.ts`), no de
+  `NODE_ENV`.
+
+### Documentación
+
+- `docs/checklist-deploy-produccion.md`: sección 6/7 actualizadas,
+  infraestructura de deploy marcada como resuelta.
+- Nuevo `docs/backlog-salida-produccion.md`: backlog de lo que falta para
+  operar en serio (no para "llegar a producción", que ya está hecho) —
+  AFIP real, confirmar token de Mercado Pago de producción, salir del
+  sandbox de SES, backups de Postgres, alarma de presupuesto, automatizar
+  CI/CD, y pendientes de negocio (soporte, términos y condiciones).
+
+### Verificado
+
+- `curl https://api.obraya.com.ar/api/v1/health` → `200` (DB `ok: true`).
+- `curl https://admin.obraya.com.ar` y `https://app.obraya.com.ar` → `200`.
+- Migración (`migration:run`): 5 migraciones ejecutadas sin errores.
+
+---
+
+## [0.33.1] - 2026-11-17
+
+### Corregido
+
+- `AfipService` (`packages/backend/src/modules/afip/afip.service.ts`)
+  quedaba deshabilitado en producción con error `401` al emitir
+  facturas, detectado al probar un pedido real de punta a punta con el
+  certificado/CUIT reales recién configurados. Causa: la librería
+  `@afipsdk/afip.js` no habla directo con los servidores de AFIP — todas
+  sus llamadas (incluso con certificado propio) pasan por un proxy en la
+  nube de AfipSDK (`app.afipsdk.com`), que exige su propio
+  `access_token` (gratuito, se obtiene registrándose en esa plataforma)
+  y nunca estaba configurado. Agregada la variable `AFIP_ACCESS_TOKEN`
+  (`.env.example`, ver ADR-010); en producción el módulo ahora exige
+  esta variable igual que `AFIP_CERT_PATH`/`AFIP_KEY_PATH`, en vez de
+  fallar en silencio con un 401 al primer intento de facturación.
+
+### Verificado
+
+- Flujo de pedido de punta a punta contra producción real (`curl`):
+  registro de empresa → aprobación (vía usuario `SuperAdmin` creado con
+  `seed:test-users`) → alta de producto/precio/stock → registro de
+  comprador → creación de pedido → `Nuevo → Aceptado → Preparación →
+  Despachado`. Todo el flujo de negocio funcionó sin errores; solo la
+  emisión de la factura AFIP falló por el motivo de arriba (pendiente
+  reintentar una vez cargado `AFIP_ACCESS_TOKEN` en producción).
+
+---
+
+## [0.33.2] - 2026-11-17
+
+### Corregido
+
+- `AfipService.createInvoice` elegía el tipo de comprobante (Factura B
+  vs C) según `company.ivaCondition` del **fabricante** dueño del
+  pedido — incorrecto, ya que quien efectivamente factura ante AFIP es
+  **ObraYa**, con un único CUIT compartido para todos los fabricantes
+  (ver ADR-010, sección "Consecuencias"). Detectado al reintentar el
+  pedido de punta a punta tras cargar `AFIP_ACCESS_TOKEN`: AFIP rechazó
+  la Factura B con el error real `(10000) NO AUTORIZADO A EMITIR
+  COMPROBANTES - LA CUIT INFORMADA NO CORRESPONDE A UN RESPONSABLE
+  INSCRITO EN EL IMPUESTO IVA`, porque el CUIT compartido configurado es
+  Monotributo. Agregada la variable `AFIP_ISSUER_IVA_CONDITION`
+  (`.env.example`, default `MONOTRIBUTO`): ahora el tipo de comprobante
+  depende de la condición de IVA de quien emite (`AFIP_CUIT`), no del
+  fabricante. Ver corrección documentada en ADR-010.
+
+### Verificado
+
+- Pedido de punta a punta (`OBY-MWL4X4KD-MY2`) llevado a `Despachado`
+  contra producción real: AFIP devolvió CAE real `86463187159134`,
+  Factura C N°68, `afipStatus: "emitida"`. Flujo de negocio completo
+  (registro de empresa → aprobación → alta de producto → compra →
+  despacho → facturación AFIP) confirmado funcionando de punta a punta
+  en producción.
+
+---
+
+## [0.33.3] - 2026-11-17
+
+### Corregido
+
+- El secret `obraya/production/mercadopago-access-token` en Secrets
+  Manager tenía el placeholder `CHANGEME`... en realidad tenía el texto
+  "PEGÁ_ACÁ_TU_ACCESS_TOKEN_DE_PRODUCCION" pegado **antes** del token
+  real en vez de haber sido reemplazado (`put-secret-value` concatenó en
+  vez de sobrescribir), dejando un valor corrupto que habría roto
+  cualquier intento de cobro real. Corregido con el valor limpio
+  (`APP_USR-...`) y redeploy del backend.
+
+### Verificado
+
+- Token de Mercado Pago validado contra `GET
+  https://api.mercadopago.com/users/me`: es un token de **producción**
+  real (prefijo `APP_USR-`, no `TEST-`), asociado a la cuenta real de
+  Mercado Pago de Delyana (`DELYVELAZCO`, delyanave@gmail.com).
+
+---
+
 ## [0.32.0] - 2026-11-16
 
 ### Decisiones Tomadas
