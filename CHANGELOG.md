@@ -4,6 +4,30 @@ Cada cambio importante del proyecto se documenta aqui. Las decisiones arquitecto
 
 ---
 
+## [0.33.6] - 2026-11-17
+
+### Decisiones Tomadas
+
+- **Landing de marketing para desktop/web.** Nuevo componente
+  `packages/frontend/src/components/landing/UnicornLanding.tsx`, mostrado
+  en `/` solo en viewport `md` o mayor (`hidden md:block`); mobile sigue
+  yendo directo a la experiencia de app actual (`md:hidden`), sin cambios.
+  Pensada para convertir visitas de marketing (buscadores, redes, campañas)
+  en vez de llevar directo al catálogo. Usa los assets de marca nuevos en
+  `brand/` y `packages/frontend/public/brand/obraya-lockup.svg`.
+- Desplegada a producción (`https://app.obraya.com.ar`, verificado `200 OK`
+  en viewport desktop).
+
+### Corregido
+
+- El `matcher` del middleware (`packages/frontend/src/middleware.ts`)
+  interceptaba cualquier archivo estático servido desde `/public` o las
+  convenciones de metadata de Next (favicon.ico, icon.png, apple-icon.png,
+  SVGs de `/brand`) y los redirigía a `/login` por no tener token. Corregido
+  excluyendo del matcher cualquier ruta con extensión de archivo.
+
+---
+
 ## [0.33.5] - 2026-11-17
 
 ### Decisiones Tomadas
