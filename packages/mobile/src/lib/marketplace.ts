@@ -1,5 +1,5 @@
 import { api } from './api';
-import type { PublicCompany, PublicProduct, Review, ShippingQuote } from '@obraya/shared';
+import type { PublicCompany, PublicProduct, Review, ShippingQuote, SponsoredBanner } from '@obraya/shared';
 
 // Espejo exacto de packages/frontend/src/lib/marketplace.ts — mismos endpoints
 // públicos (ver ADR-003), mismos tipos de @obraya/shared.
@@ -39,6 +39,13 @@ export async function getPublicProduct(
   params: { variantId?: string; quantity?: number } = {},
 ): Promise<PublicProduct & { variants?: PublicProductVariant[]; availableStock: number }> {
   const { data } = await api.get(`/public/products/${productId}`, { params });
+  return data;
+}
+
+// Banners publicitarios pagos (ver ADR-021): fabricantes/distribuidores que
+// pagaron por destacarse en el home.
+export async function getSponsoredBanners(): Promise<SponsoredBanner[]> {
+  const { data } = await api.get('/public/sponsored-banners');
   return data;
 }
 

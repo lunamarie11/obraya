@@ -16,6 +16,13 @@ RUN npm ci
 # Copy source code
 COPY . .
 
+# NEXT_PUBLIC_* se inlinea en el bundle de cliente durante `next build`,
+# no se puede setear en runtime via variables de entorno de ECS (ver
+# infra/terraform/README.md). Hay que pasarlo como --build-arg al hacer
+# `docker build` en CI con la URL real de la API (https://api.obraya.com.ar/api/v1).
+ARG NEXT_PUBLIC_API_URL
+ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
+
 # Build the application (requiere output: 'standalone' en next.config.js)
 RUN npm run build --workspace=@obraya/frontend
 

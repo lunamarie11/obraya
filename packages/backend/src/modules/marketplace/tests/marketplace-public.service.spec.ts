@@ -9,6 +9,7 @@ import { PricesService } from '../../prices/prices.service';
 import { Price, PriceType } from '../../prices/entities/price.entity';
 import { SearchService } from '../../search/search.service';
 import { ReviewsService } from '../../reviews/reviews.service';
+import { SponsoredBanner } from '../entities/sponsored-banner.entity';
 
 function makeCompany(overrides: Partial<Company> = {}): Company {
   const c = new Company();
@@ -92,6 +93,10 @@ const mockReviewsService = {
   findByCompany: jest.fn(),
 };
 
+const mockSponsoredBannerRepo = {
+  find: jest.fn().mockResolvedValue([]),
+};
+
 describe('MarketplacePublicService', () => {
   let service: MarketplacePublicService;
 
@@ -108,6 +113,7 @@ describe('MarketplacePublicService', () => {
         { provide: getRepositoryToken(Product), useValue: mockProductRepo },
         { provide: getRepositoryToken(Stock), useValue: mockStockRepo },
         { provide: getRepositoryToken(Price), useValue: mockPriceRepo },
+        { provide: getRepositoryToken(SponsoredBanner), useValue: mockSponsoredBannerRepo },
         { provide: PricesService, useValue: mockPricesService },
         { provide: SearchService, useValue: mockSearchService },
         { provide: ReviewsService, useValue: mockReviewsService },

@@ -8,8 +8,8 @@ export const CorsConfig = (): CorsOptions => {
   ];
 
   if (process.env.NODE_ENV === 'production') {
-    allowedOrigins.push('https://app.obraya.com');
-    allowedOrigins.push('https://admin.obraya.com');
+    allowedOrigins.push('https://app.obraya.com.ar');
+    allowedOrigins.push('https://admin.obraya.com.ar');
   }
 
   if (process.env.ALLOWED_ORIGINS) {

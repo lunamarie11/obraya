@@ -4,6 +4,267 @@ Cada cambio importante del proyecto se documenta aqui. Las decisiones arquitecto
 
 ---
 
+## [0.32.0] - 2026-11-16
+
+### Decisiones Tomadas
+
+- **ADR-023**: corrige un bug de rate limiting detectado durante la
+  verificación manual de Fase 4d: el throttler `auth` (5 intentos/15min,
+  pensado solo para login) se estaba aplicando a toda la API (`/orders`,
+  `/delivery`, etc.) por el comportamiento por defecto de
+  `@nestjs/throttler` (todos los throttlers nombrados aplican a todas las
+  rutas salvo `@SkipThrottle` explícito). Bug latente desde ADR-007, nunca
+  disparado antes por falta de tráfico sostenido en pruebas.
+
+### Agregado
+
+- `packages/backend/src/config/scoped-throttler.guard.ts`:
+  `ApiThrottlerGuard`/`AuthThrottlerGuard`, cada uno filtra
+  `this.throttlers` a un único throttler nombrado en `onModuleInit()`.
+- ADR-023 (`docs/adrs/ADR-023-alcance-correcto-rate-limiting-por-throttler.md`).
+
+### Modificado
+
+- `packages/backend/src/config/throttling.module.ts`: elimina los
+  throttlers `general` y `search` (redundante/nunca usado); `api` sube de
+  50/min a 120/min y pasa a ser el único `APP_GUARD` global
+  (`ApiThrottlerGuard`); `auth` (5/15min, sin cambios) se aplica solo vía
+  `AuthThrottlerGuard` exportado; módulo pasa a `@Global()`.
+- `packages/backend/src/modules/users/auth.controller.ts` y
+  `packages/backend/src/modules/buyers/buyer-auth.controller.ts`: agregan
+  `@UseGuards(AuthThrottlerGuard)` junto al `@Throttle({ auth: {...} })`
+  existente.
+
+### Verificado
+
+- `npm run build --workspace=packages/backend`: build limpio.
+- 6 intentos seguidos de `POST /auth/login` con credenciales inválidas:
+  los primeros 5 devuelven `401`, el 6° devuelve `429` (el throttler
+  `auth` sigue protegiendo login correctamente).
+- 8 requests seguidos a `GET /health`: los 8 devuelven `200` (rutas
+  fuera de login ya no heredan el límite de `auth`).
+
+---
+
+## [0.31.0] - 2026-11-16
+
+### Decisiones Tomadas
+
+- **Fase 4d: ruteo optimizado para repartidores** (ver
+  `docs/specs/fase4d-ruteo-optimizado.md` y ADR-022). Se descarta integrar
+  la Directions/Geocoding API de pago de Google (Opción A): se delega el
+  ruteo a la app de Google Maps del repartidor via deep link (Opción B),
+  sin costo ni facturación de Google Cloud — mismo criterio que
+  ADR-008/012/018.
+- Se relaja la restricción de "un solo pedido activo a la vez" en
+  `/delivery` (introducida en Fase 4c): sin eso, el botón de ruteo con 2+
+  paradas no tenía ningún caso de uso real. Un repartidor ahora puede
+  tomar varios pedidos `Despachado` asignados simultáneamente.
+
+### Agregado
+
+- Botón "Abrir ruta en Google Maps" en `/delivery`, visible con 2 o más
+  pedidos asignados: arma la URL `google.com/maps/dir` con las
+  direcciones de los pedidos como `waypoints`/`destination` y, si hay
+  permiso de geolocalización, la posición actual como `origin`.
+- Tarjeta simple (`AssignedOrderCard`) para los pedidos asignados más allá
+  del primero, con botón directo "Marcar entregado" (el primer pedido
+  conserva el timeline paso a paso existente).
+- ADR-022 (`docs/adrs/ADR-022-ruteo-repartidores-google-maps-deeplink.md`).
+
+### Modificado
+
+- `packages/frontend/src/app/(backoffice)/delivery/page.tsx`: "Pedidos
+  disponibles" ya no se oculta mientras hay una entrega activa; el reporte
+  de posición (ADR-018) ahora depende de tener al menos un pedido
+  asignado, no solo del primero.
+- `docs/specs/fase4d-ruteo-optimizado.md`: estado actualizado a
+  Implementado.
+- `docs/roadmap-estado-actual.md`: sección Fase 4 actualizada con el
+  párrafo de Fase 4d.
+
+### Verificado
+
+- `npm run build --workspace=packages/frontend`: build limpio.
+- No hay cambios de backend ni de modelo de datos (confirmado en el spec:
+  la URL de Google Maps se arma enteramente en el frontend con datos que
+  `GET /orders?assignedToMe=true` ya devuelve).
+
+---
+
+## [0.30.0] - 2026-10-31
+
+### Decisiones Tomadas
+
+- **ADR-021**: banners publicitarios pagos en el home, distintos del
+  carrusel de promos de ADR-009 (ese deriva de descuentos reales
+  `Price.scheduledDiscount`; este es contenido pago que el equipo ObraYa da
+  de alta manualmente). Click siempre navega a la ficha del comercio dentro
+  de la app, nunca a una URL externa.
+
+### Agregado
+
+- Entidad `SponsoredBanner` (`companyId`, `title`, `subtitle`, `imageUrl`,
+  `ctaLabel`, `startDate`, `endDate`, `priority`, `isActive`) + migración
+  `CreateSponsoredBanners`.
+- `MarketplacePublicService.findActiveSponsoredBanners()` y endpoint
+  público `GET /public/sponsored-banners`.
+- CRUD en `/admin/sponsored-banners` (alta/edición/baja manual por el
+  equipo ObraYa).
+- Tipo compartido `SponsoredBanner` en `packages/shared`.
+- Banner publicitario rotativo (cada 5s si hay más de uno activo) en el
+  home: en la web (`app/page.tsx`), entre el subtítulo del hero y el
+  buscador; en mobile (`app/(tabs)/index.tsx`), debajo del header con
+  buscador.
+- Datos de ejemplo en `seed-mock-data.ts`: 3 banners (Corralón Norte,
+  Ferretería Central, Distribuidora Norte) y la empresa "Corralón Norte".
+- `docs/adrs/ADR-021-banners-publicitarios-pagos.md`.
+
+## [0.29.0] - 2026-10-25
+
+### Decisiones Tomadas
+
+- **ADR-020**: se revisa ADR-015 para la etapa pre-lanzamiento. Reemplaza
+  ECS Fargate + RDS + ElastiCache + ALB por **una sola instancia EC2**
+  (`t4g.small`) corriendo Postgres/Redis/backend/frontend como contenedores
+  de Docker Compose, con Caddy de reverse proxy + HTTPS automatico via
+  Let's Encrypt — baja el costo estimado de ~110-120 USD/mes a ~20-25
+  USD/mes. Motivo: cero trafico real todavia, pagar por alta disponibilidad
+  sin nada que escalar es sobrecosto. ADR-015 queda como diseno de destino
+  para cuando el volumen lo justifique (marcado "Superseded" mientras
+  tanto, no se borra).
+- Se evaluo salir de AWS por completo (Hetzner/Fly.io/Railway) para bajar
+  costo aun mas; se descarto por falta de region en Sudamerica y porque
+  StorageService/SES ya estan integrados especificamente contra APIs de
+  AWS (reescribirlos saldria mas caro que el ahorro).
+
+### Agregado
+
+- `infra/terraform/ec2.tf`: instancia EC2 (AMI Amazon Linux 2023 arm64 via
+  SSM Parameter Store, sin hardcodear AMI ID) + Elastic IP asociada +
+  `user_data` que instala Docker/Compose.
+- `infra/docker/docker-compose.prod.yml`: Postgres/Redis/backend/frontend/
+  Caddy en la instancia unica, imagenes de backend/frontend desde ECR (no
+  se buildean en la instancia).
+- `infra/docker/Caddyfile`: reverse proxy + HTTPS automatico (Let's
+  Encrypt HTTP-01) para `app./admin./api.obraya.com.ar`.
+- `docs/adrs/ADR-020-infraestructura-ec2-single-instance.md`.
+
+### Eliminado
+
+- `infra/terraform/ecs.tf`, `alb.tf`, `rds.tf`, `elasticache.tf`,
+  `cloudwatch.tf` — reemplazados por `ec2.tf` + docker-compose.prod.yml.
+  Postgres/Redis dejan de ser servicios managed (RDS/ElastiCache) y vuelven
+  a ser contenedores, igual que en dev, pero en la instancia de produccion.
+
+### Modificado
+
+- `infra/terraform/vpc.tf`: sin NAT Gateway ni subnets privadas (la
+  instancia tiene IP publica propia, no la necesita) — elimina ~35
+  USD/mes.
+- `infra/terraform/security_groups.tf`: un solo security group (`app`,
+  puertos 80/443 desde internet) en vez de los cinco anteriores
+  (alb/ecs_tasks/rds/redis/opensearch).
+- `infra/terraform/iam.tf`: un solo IAM role para la instancia EC2 (en vez
+  de execution role + task roles de ECS), con `AmazonSSMManagedInstanceCore`
+  para acceso remoto via SSM Session Manager (sin SSH).
+- `infra/terraform/acm.tf`: se elimina el certificado ACM de
+  `app./admin./api.` (Caddy emite esos via Let's Encrypt); solo queda el
+  cert de CloudFront (`cdn.`, obligatorio en ACM porque CloudFront no
+  soporta Let's Encrypt).
+- `infra/terraform/secrets.tf`: se recrea el secret de `db-password` (antes
+  vivia en `rds.tf`) — Postgres sigue necesitando password aunque ya no sea
+  RDS.
+- `infra/terraform/variables.tf`, `terraform.tfvars.example`: se quitan
+  variables de ECS/RDS/ElastiCache (`backend_desired_count`,
+  `db_instance_class`, `redis_node_type`, etc.), se agrega `instance_type`
+  (default `t4g.small`) y `root_volume_size_gb`.
+- `infra/terraform/outputs.tf`: se reemplazan los outputs de ALB/RDS/
+  ElastiCache/ECS por `eip_public_ip` e `instance_id`.
+- `infra/terraform/README.md`: reescrito completo para el flujo de deploy
+  de instancia unica (conexion via SSM, armado de `.env.backend` con
+  secrets de Secrets Manager, `docker-compose up`).
+- `docs/adrs/ADR-015-infraestructura-deploy.md`: marcado como Superseded
+  por ADR-020.
+
+### Pendiente
+
+- Backups de Postgres ya no son automaticos (eran de RDS) — falta un cron
+  de `pg_dump` a S3 o snapshot de EBS antes de tener datos reales.
+- Automatizar build+push a ECR y redeploy en CI (hoy manual, ver
+  `infra/terraform/README.md`).
+- Aprobar costo y correr `terraform apply` (requiere cuenta de AWS con
+  metodo de pago) — sigue pendiente, ahora a ~20-25 USD/mes en vez de
+  ~110-120.
+
+---
+
+## [0.28.0] - 2026-10-25
+
+### Decisiones Tomadas
+
+- **Dominio real confirmado: `obraya.com.ar`** (no `.com`). Se corrige la
+  inconsistencia que habia entre `cors.config.ts` (`app.obraya.com`) y
+  `.env.example`/SES (`obraya.com.ar`).
+- Groundwork completo de Terraform para la infraestructura de ADR-015
+  (ECS Fargate, RDS, ElastiCache, S3/CloudFront, ALB, ECR, Secrets Manager,
+  IAM) en `infra/terraform/`. **No se corrio `terraform apply` todavia** —
+  sigue pendiente la aprobacion de costo y las credenciales de AWS reales
+  (ver `infra/terraform/README.md` para el orden de pasos y el estimado de
+  costo mensual, ~110-120 USD con OpenSearch apagado).
+- OpenSearch queda detras de la variable `enable_opensearch` (default
+  `false`): tiene costo fijo aun sin trafico y `SearchService` ya cae a
+  ILIKE en Postgres sin el — se prende mas adelante si el volumen de
+  busquedas lo justifica, mismo criterio que Kafka/EKS en ADR-001/015.
+- JWT_SECRET/JWT_REFRESH_SECRET/DATABASE_PASSWORD de produccion los genera
+  Terraform (`random_password`) y los guarda en Secrets Manager — no hace
+  falta generarlos a mano, y nunca van a coincidir con los valores de dev
+  que circularon en el chat.
+
+### Agregado
+
+- `infra/terraform/bootstrap/`: bucket S3 + tabla DynamoDB para el remote
+  state de Terraform (se aplica una sola vez, antes del resto).
+- `infra/terraform/`: VPC (2 AZs, 1 NAT Gateway), security groups, ECR (2
+  repos con lifecycle policy a 10 imagenes), ACM (cert ALB en sa-east-1 +
+  cert CloudFront en us-east-1, SAN para app./admin./api./cdn.), ALB con
+  listener rules por host header, RDS Postgres 16, ElastiCache Redis,
+  OpenSearch opcional, S3+CloudFront para storage de productos (con Origin
+  Access Control, bucket privado), Secrets Manager (JWT, DB password,
+  placeholders de Mercado Pago/Firebase/Sentry), IAM (execution role +
+  task roles separados para backend/frontend), ECS (cluster, task
+  definitions, servicios).
+- `infra/terraform/README.md`: orden de pasos completo (bootstrap →
+  certificados → infra → build/push de imagenes → DNS → secrets →
+  migration → smoke test), estimado de costo mensual, y que queda
+  pendiente fuera de este Terraform (extender CI para deploy automatico,
+  certificado de AFIP).
+
+### Modificado
+
+- `packages/backend/src/config/cors.config.ts`: dominios de produccion a
+  `app.obraya.com.ar`/`admin.obraya.com.ar`.
+- `packages/backend/.env.example`: comentario de `AWS_CLOUDFRONT_DOMAIN` a
+  `.com.ar`.
+- `infra/docker/Dockerfile.frontend`: agrega `ARG NEXT_PUBLIC_API_URL` +
+  `ENV` antes del build de Next.js — sin esto, seteabarlo solo como
+  variable de entorno en ECS no tiene efecto (Next.js inlinea
+  `NEXT_PUBLIC_*` en el bundle de cliente en build time, no en runtime).
+  Gap encontrado al escribir el Terraform, no habia sido notado antes.
+- `.gitignore`: agrega `terraform.tfvars` y `*.tfplan`.
+
+### Pendiente
+
+- Aprobar costo y correr `terraform apply` (requiere cuenta de AWS con
+  metodo de pago).
+- Extender `.github/workflows/ci.yml` para build+push a ECR y
+  `ecs update-service` automatico en merge a `main`.
+- Decidir como montar el certificado de AFIP en la task de ECS (es un
+  archivo, no un secret de tipo string — no entra en el patron de Secrets
+  Manager usado para el resto).
+
+---
+
 ## [0.27.0] - 2026-10-18
 
 ### Decisiones Tomadas

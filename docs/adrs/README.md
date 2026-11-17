@@ -23,6 +23,10 @@ Registro de decisiones arquitectonicas del proyecto ObraYa.
 | 017 | Asignación de pedidos a repartidores vía claim atómico | Aceptado | 2026-09-29 |
 | 018 | Tracking en vivo de repartidores (polling + Leaflet, sin WebSockets ni Google Maps) | Aceptado | 2026-10-07 |
 | 019 | Entidad `Driver` como perfil 1:1 de repartidor (no identidad separada) | Aceptado | 2026-10-18 |
+| 020 | Infraestructura de deploy pre-lanzamiento (EC2 single-instance, revisa ADR-015) | Aceptado | 2026-10-25 |
+| 021 | Banners publicitarios pagos en el home (mobile y web) | Aceptado | 2026-10-31 |
+| 022 | Ruteo de repartidores via deep link a Google Maps (Fase 4d) | Aceptado | 2026-11-16 |
+| 023 | Alcance correcto de rate limiting por throttler nombrado | Aceptado | 2026-11-16 |
 
 ## Como agregar un ADR
 

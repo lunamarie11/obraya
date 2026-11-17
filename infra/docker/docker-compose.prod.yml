@@ -1,0 +1,90 @@
+version: '3.8'
+
+# Produccion: instancia unica EC2 (ver infra/terraform/ec2.tf, ADR-020).
+# Postgres/Redis corren como contenedores locales -- no son servicios
+# managed (RDS/ElastiCache), a diferencia del diseno original de ADR-015.
+# Imagenes de backend/frontend vienen de ECR (no se buildean en la
+# instancia). Variables con "CHANGEME_" se completan en runtime: ver
+# infra/terraform/README.md seccion "primer deploy" para como se bajan
+# los secrets reales de Secrets Manager a un .env antes de levantar esto.
+
+services:
+  postgres:
+    image: postgres:16
+    container_name: obraya-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${DATABASE_NAME:-obraya}
+      POSTGRES_USER: ${DATABASE_USER:-obraya_app}
+      POSTGRES_PASSWORD: ${DATABASE_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DATABASE_USER:-obraya_app} -d ${DATABASE_NAME:-obraya}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    # Sin "ports": solo accesible desde otros contenedores de esta red,
+    # nunca expuesto a internet (a diferencia de dev, ver docker-compose.yml).
+
+  redis:
+    image: redis:7
+    container_name: obraya-redis
+    restart: unless-stopped
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    image: ${ECR_BACKEND_IMAGE}
+    container_name: obraya-backend
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    env_file:
+      - .env.backend
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3000/api/v1/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+
+  frontend:
+    image: ${ECR_FRONTEND_IMAGE}
+    container_name: obraya-frontend
+    restart: unless-stopped
+    depends_on:
+      - backend
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3001/"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+
+  caddy:
+    image: caddy:2-alpine
+    container_name: obraya-caddy
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    depends_on:
+      - backend
+      - frontend
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+
+volumes:
+  postgres_data:
+  redis_data:
+  caddy_data:
+  caddy_config:

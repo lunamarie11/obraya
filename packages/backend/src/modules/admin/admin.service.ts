@@ -1,10 +1,11 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { In, Repository } from 'typeorm';
 import { Company, CompanyStatus } from '../users/entities/company.entity';
 import { CompanyUser, UserRole } from '../users/entities/company-user.entity';
 import { Order, OrderStatus } from '../orders/entities/order.entity';
 import { Product } from '../products/entities/product.entity';
+import { SponsoredBanner } from '../marketplace/entities/sponsored-banner.entity';
 import { ProductsService } from '../products/products.service';
 
 @Injectable()
@@ -18,6 +19,8 @@ export class AdminService {
     private readonly orderRepo: Repository<Order>,
     @InjectRepository(Product)
     private readonly productRepo: Repository<Product>,
+    @InjectRepository(SponsoredBanner)
+    private readonly sponsoredBannerRepo: Repository<SponsoredBanner>,
     private readonly productsService: ProductsService,
   ) {}
 
@@ -243,5 +246,71 @@ export class AdminService {
 
   async reindexSearch(): Promise<{ indexed: number }> {
     return this.productsService.reindexAll();
+  }
+
+  // ── Banners publicitarios pagos (ver ADR-021) ───────────────────────────
+  // Alta/gestión manual por el equipo ObraYa: todavía no hay flujo de pago
+  // con MercadoPago para que un fabricante compre su lugar directamente.
+
+  async listSponsoredBanners() {
+    const banners = await this.sponsoredBannerRepo.find({ order: { priority: 'DESC', createdAt: 'DESC' } });
+    const companies = await this.companyRepo.find({ where: { id: In(banners.map((b) => b.companyId)) } });
+    const companyById = new Map(companies.map((c) => [c.id, c]));
+
+    return banners.map((b) => ({
+      ...b,
+      companyName: companyById.get(b.companyId)?.razonSocial ?? '—',
+    }));
+  }
+
+  async createSponsoredBanner(dto: {
+    companyId: string;
+    title: string;
+    subtitle?: string;
+    imageUrl?: string;
+    ctaLabel?: string;
+    startDate: Date;
+    endDate: Date;
+    priority?: number;
+  }): Promise<SponsoredBanner> {
+    const company = await this.companyRepo.findOne({ where: { id: dto.companyId } });
+    if (!company) throw new NotFoundException('Empresa no encontrada');
+
+    const banner = this.sponsoredBannerRepo.create({
+      companyId: dto.companyId,
+      title: dto.title,
+      subtitle: dto.subtitle ?? null,
+      imageUrl: dto.imageUrl ?? null,
+      ctaLabel: dto.ctaLabel ?? 'Ver tienda',
+      startDate: dto.startDate,
+      endDate: dto.endDate,
+      priority: dto.priority ?? 0,
+    });
+    return this.sponsoredBannerRepo.save(banner);
+  }
+
+  async updateSponsoredBanner(
+    id: string,
+    dto: Partial<{
+      title: string;
+      subtitle: string | null;
+      imageUrl: string | null;
+      ctaLabel: string;
+      startDate: Date;
+      endDate: Date;
+      isActive: boolean;
+      priority: number;
+    }>,
+  ): Promise<SponsoredBanner> {
+    const banner = await this.sponsoredBannerRepo.findOne({ where: { id } });
+    if (!banner) throw new NotFoundException('Banner no encontrado');
+    Object.assign(banner, dto);
+    return this.sponsoredBannerRepo.save(banner);
+  }
+
+  async deleteSponsoredBanner(id: string): Promise<void> {
+    const banner = await this.sponsoredBannerRepo.findOne({ where: { id } });
+    if (!banner) throw new NotFoundException('Banner no encontrado');
+    await this.sponsoredBannerRepo.remove(banner);
   }
 }

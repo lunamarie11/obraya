@@ -138,6 +138,22 @@ disponibilidad — mismo criterio que Fase 4a/4b. **Limitaciones que siguen
 pendientes:** sin integración con transportistas externos ni ruteo
 optimizado — eso queda para Fase 4d.
 
+**Fase 4d (2026-11-16, ver ADR-022 y `docs/specs/fase4d-ruteo-optimizado.md`):**
+agregado ruteo para repartidores con varios pedidos asignados a la vez. Se
+relajó la restricción que ocultaba "Pedidos disponibles" mientras había una
+entrega activa (introducida en Fase 4c): ahora un repartidor puede tomar 2+
+pedidos `Despachado` simultáneamente. Con 2 o más asignados, aparece un
+botón "Abrir ruta en Google Maps" que arma un deep link
+(`google.com/maps/dir`) con las direcciones de los pedidos como waypoints y
+la posición actual del repartidor como origen (si hay permiso de
+geolocalización); Google Maps resuelve el geocoding y el orden sugerido de
+las paradas, sin costo ni API de pago (Opción B del spec, igual criterio
+que ADR-008/012/018). **Limitaciones que siguen pendientes:** sin
+geocoding ni ETA propios dentro de la UI de ObraYa (el repartidor navega en
+la app externa de Google Maps), y sigue sin existir integración con
+transportistas externos (Andreani, OCA), fleet management ni capacidad por
+vehículo.
+
 ---
 
 ## Resumen ejecutivo

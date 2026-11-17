@@ -1,0 +1,13 @@
+# Copiar a terraform.tfvars y ajustar si hace falta. Los defaults de
+# variables.tf ya sirven para un primer apply.
+
+aws_region  = "sa-east-1"
+environment = "production"
+domain_name = "obraya.com.ar"
+
+backend_image_tag  = "latest"
+frontend_image_tag = "latest"
+
+instance_type = "t4g.small"
+
+enable_opensearch = false

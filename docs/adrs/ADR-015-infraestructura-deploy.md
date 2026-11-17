@@ -1,6 +1,10 @@
 # ADR-015: Infraestructura de deploy (ECS Fargate, no EKS/ArgoCD por ahora)
 
-**Estado:** Aceptado
+**Estado:** Superseded por ADR-020 (2026-10-25) para la etapa pre-lanzamiento
+— ver `ADR-020-infraestructura-ec2-single-instance.md`. El diseño de este
+ADR (Fargate + RDS + ElastiCache + ALB) sigue siendo el destino de
+referencia para cuando el volumen de tráfico lo justifique; mientras tanto
+se usa una sola instancia EC2 por costo.
 **Fecha:** 2026-09-29
 **Decidido por:** ObraYa Dev (con Claude Code)
 

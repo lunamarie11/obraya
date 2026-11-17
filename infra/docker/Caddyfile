@@ -1,0 +1,17 @@
+# Caddy emite y renueva certificados TLS automaticamente via Let's Encrypt
+# (HTTP-01), sin ACM ni ALB de por medio (ver infra/terraform/acm.tf). Los
+# tres dominios deben apuntar (A/AAAA) a la IP elastica de la instancia
+# (output eip_public_ip de terraform) antes de levantar este stack, o el
+# challenge HTTP-01 falla.
+
+api.obraya.com.ar {
+	reverse_proxy backend:3000
+}
+
+admin.obraya.com.ar {
+	reverse_proxy frontend:3001
+}
+
+app.obraya.com.ar {
+	reverse_proxy frontend:3001
+}

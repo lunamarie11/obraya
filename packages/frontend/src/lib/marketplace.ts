@@ -1,5 +1,5 @@
 import { api } from '@/lib/api';
-import type { PublicCompany, PublicProduct, PromotionBanner, Review, ShippingQuote } from '@obraya/shared';
+import type { PublicCompany, PublicProduct, PromotionBanner, SponsoredBanner, Review, ShippingQuote } from '@obraya/shared';
 
 export interface PaginatedResponse<T> {
   data: T[];
@@ -44,6 +44,14 @@ export async function getPublicProduct(
 // productos con descuento programado activo ahora mismo.
 export async function getActivePromotions(): Promise<PromotionBanner[]> {
   const { data } = await api.get('/public/promotions');
+  return data;
+}
+
+// Banners publicitarios pagos (ver ADR-021): fabricantes/distribuidores que
+// pagaron por destacarse en el home, distinto de getActivePromotions (que
+// no tiene costo, deriva de un descuento real).
+export async function getSponsoredBanners(): Promise<SponsoredBanner[]> {
+  const { data } = await api.get('/public/sponsored-banners');
   return data;
 }
 
