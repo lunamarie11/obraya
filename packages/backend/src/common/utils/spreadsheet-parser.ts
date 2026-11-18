@@ -11,6 +11,50 @@ import * as ExcelJS from 'exceljs';
 // saber de donde vino el archivo. Usamos exceljs en vez de "xlsx" (SheetJS)
 // porque esa libreria tiene vulnerabilidades altas sin parche (prototype
 // pollution + ReDoS) y procesamos archivos subidos por usuarios externos.
+
+// Clientes reales suben planillas con encabezados en espanol (toda la app y
+// la base de clientes es hispanohablante), pero ProductsService/StockService
+// esperan las claves en ingles (name, sku, unit_of_measure, etc. - ver
+// importFromFile/bulkUpdateFromCsv). En vez de tocar esos dos services,
+// se traduce el alias aca mismo, en el unico punto donde se normalizan
+// headers, para que ambos importers lo hereden gratis.
+const SPANISH_HEADER_ALIASES: Record<string, string> = {
+  nombre: 'name',
+  codigo: 'sku',
+  'codigo de producto': 'sku',
+  descripcion: 'description',
+  categoria: 'category',
+  subcategoria: 'subcategory',
+  marca: 'brand',
+  unidad: 'unit_of_measure',
+  'unidad de medida': 'unit_of_measure',
+  precio: 'price',
+  cantidad: 'quantity',
+  'id de producto': 'product_id',
+  'id del producto': 'product_id',
+  'codigo de producto id': 'product_id',
+  deposito: 'warehouse_id',
+  'id de deposito': 'warehouse_id',
+  'id del deposito': 'warehouse_id',
+  notas: 'notes',
+  nota: 'notes',
+};
+
+// Quita tildes/diacriticos para que "Código" y "codigo" matcheen el mismo
+// alias (los clientes no siempre tipean los acentos correctamente).
+function stripAccents(value: string): string {
+  return value.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+}
+
+// Forma canonica usada solo para buscar en el diccionario de alias: sin
+// acentos, guiones bajos como espacios, espacios colapsados. La clave final
+// devuelta sigue siendo la normalizedKey original si no hay alias (asi no
+// se rompe nada para los headers en ingles que ya funcionaban).
+function resolveHeaderKey(normalizedKey: string): string {
+  const canonical = stripAccents(normalizedKey).replace(/_/g, ' ').replace(/\s+/g, ' ').trim();
+  return SPANISH_HEADER_ALIASES[canonical] ?? normalizedKey;
+}
+
 export async function parseSpreadsheet(
   buffer: Buffer,
   originalName?: string,
@@ -65,7 +109,7 @@ export async function parseSpreadsheet(
   return rawRows.map((row) => {
     const normalized: Record<string, string> = {};
     for (const [key, value] of Object.entries(row)) {
-      const normalizedKey = key.trim().toLowerCase();
+      const normalizedKey = resolveHeaderKey(key.trim().toLowerCase());
       if (value === null || value === undefined) {
         normalized[normalizedKey] = '';
       } else if (typeof value === 'object' && 'result' in (value as any)) {
