@@ -81,6 +81,16 @@ export class Order {
   @Column({ name: 'assigned_at', type: 'timestamptz', nullable: true })
   assignedAt: Date | null;
 
+  // Repartidor independiente (entidad Delivery, sin empresa) que reclamó
+  // este pedido -- ver ADR-026. Mutuamente excluyente con assignedDriverId:
+  // un pedido lo toma el repartidor interno de la empresa O un delivery
+  // independiente de todo el marketplace, nunca ambos.
+  @Column({ name: 'assigned_delivery_id', type: 'uuid', nullable: true })
+  assignedDeliveryId: string | null;
+
+  @Column({ name: 'assigned_delivery_at', type: 'timestamptz', nullable: true })
+  assignedDeliveryAt: Date | null;
+
   @OneToMany(() => OrderItem, (item) => item.order, { cascade: true })
   items: OrderItem[];
 

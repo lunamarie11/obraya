@@ -4,6 +4,46 @@ Cada cambio importante del proyecto se documenta aqui. Las decisiones arquitecto
 
 ---
 
+## [0.34.0] - 2026-11-17
+
+### Nueva identidad "Delivery" independiente + selector de registro de 3 vías en la landing
+
+Hasta ahora el repartidor (`Driver`, ver ADR-019) era un perfil 1:1 de un
+`CompanyUser` con rol `Logistica`, de alta por invitación de la empresa —
+sin login propio ni auto-registro público. El negocio pidió explícitamente
+que cualquier persona pueda darse de alta como repartidor independiente,
+cargando sus datos y tipo de vehículo, y ver los pedidos disponibles de
+todo el marketplace (no solo de una empresa). Esto entra en conflicto
+directo con ADR-019, así que se documentó como una identidad nueva que
+**coexiste** con `Driver` en vez de reemplazarlo — ver **ADR-026**.
+
+- Backend: nueva entidad `Delivery` (tabla `deliveries`), con JWT propio
+  (`'jwt-delivery'`) y auto-registro público, siguiendo el mismo patrón que
+  `Buyer` (ADR-006): `DeliveriesService`, `DeliveryAuthService`,
+  `DeliveryAuthController` (`/delivery-auth/register|login|refresh`),
+  `DeliveryJwtStrategy`/`DeliveryJwtAuthGuard`.
+- `Order` ganó columnas nullable `assignedDeliveryId`/`assignedDeliveryAt`
+  (migración `AddAssignedDeliveryToOrders`), mutuamente excluyentes con
+  `assignedDriverId` vía `UPDATE ... WHERE assigned_driver_id IS NULL AND
+  assigned_delivery_id IS NULL` (mismo patrón atómico que ya usaba
+  `claimOrder`, ahora replicado en `claimOrderForDelivery`). Nuevo
+  `DeliveryOrdersController` (`/delivery-orders/available|mine|:id/claim|
+  :id/unassign|:id/delivered`), sin tocar ningún endpoint ni guard
+  existente de `OrdersController`/`BuyerOrdersController`.
+- Frontend: `/get-started` — selector público de los 3 tipos de registro
+  (Comercio → `/register`, Delivery → `/delivery/register`, Comprador →
+  `/account/register`), enlazado desde un nuevo botón "Registrate" en el
+  header de la landing (`UnicornLanding.tsx`). Nuevas páginas
+  `/delivery/register`, `/delivery/login` y `/delivery/orders` (pestañas
+  "Disponibles"/"Mis pedidos", reclamar y marcar entregado), con
+  `lib/delivery-auth.ts` (sesión en localStorage, claves separadas de
+  `buyerUser`/`user` para poder tener las tres sesiones abiertas a la vez).
+- Migraciones `CreateDeliveries` y `AddAssignedDeliveryToOrders`
+  verificadas (up + down) contra una base Postgres limpia antes de este
+  commit; **no corridas aún contra producción**.
+
+---
+
 ## [0.33.10] - 2026-11-17
 
 ### Límite de intentos de login subido de 5 a 15 (misma ventana de 15min)

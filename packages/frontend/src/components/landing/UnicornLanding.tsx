@@ -70,6 +70,12 @@ export function UnicornLanding({ companiesCount }: Props) {
               Ingresar
             </a>
             <a
+              href={`${APP_URL}/get-started`}
+              className="hidden sm:inline-flex items-center h-10 px-4 rounded-full text-sm font-semibold text-slate-700 hover:bg-slate-100 transition-colors"
+            >
+              Registrate
+            </a>
+            <a
               href={`${APP_URL}/marketplace`}
               className="inline-flex items-center gap-1.5 h-10 px-5 rounded-full bg-orange-500 text-white text-sm font-semibold hover:bg-orange-600 transition-colors shadow-sm shadow-orange-200"
             >

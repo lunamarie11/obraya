@@ -14,6 +14,8 @@ const PUBLIC_PREFIXES = [
   '/terminos',
   '/privacidad',
   '/landing',
+  '/get-started',
+  '/delivery',
 ];
 
 // Rutas que solo puede ver SuperAdmin

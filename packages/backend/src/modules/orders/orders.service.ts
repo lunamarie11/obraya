@@ -228,11 +228,17 @@ export class OrdersService {
       .createQueryBuilder()
       .update(Order)
       .set({ assignedDriverId: userId, assignedAt: () => 'now()' })
-      .where('id = :id AND company_id = :companyId AND status = :status AND assigned_driver_id IS NULL', {
-        id,
-        companyId,
-        status: OrderStatus.DESPACHADO,
-      })
+      // Ver ADR-026: "assigned_delivery_id IS NULL" evita que un repartidor
+      // interno tome un pedido que ya se llevó un delivery independiente
+      // (que reclama marketplace-wide, sin el filtro de company_id de acá).
+      .where(
+        'id = :id AND company_id = :companyId AND status = :status AND assigned_driver_id IS NULL AND assigned_delivery_id IS NULL',
+        {
+          id,
+          companyId,
+          status: OrderStatus.DESPACHADO,
+        },
+      )
       .execute();
 
     if (!result.affected) {
@@ -242,6 +248,86 @@ export class OrdersService {
     }
 
     return this.orderRepo.findOne({ where: { id, companyId }, relations: ['items'] }) as Promise<Order>;
+  }
+
+  // Ver ADR-026: pedidos Despachados disponibles para CUALQUIER delivery
+  // independiente del marketplace (sin filtro de company_id, a diferencia
+  // de claimOrder/findAll que son siempre de una sola empresa).
+  async findAvailableForDelivery(): Promise<Order[]> {
+    return this.orderRepo.find({
+      where: { status: OrderStatus.DESPACHADO, assignedDriverId: undefined, assignedDeliveryId: undefined },
+      relations: ['items'],
+      order: { createdAt: 'ASC' },
+    }).then((orders) =>
+      orders.filter((o) => !o.assignedDriverId && !o.assignedDeliveryId),
+    );
+  }
+
+  async findAllForDelivery(deliveryId: string): Promise<Order[]> {
+    return this.orderRepo.find({
+      where: { assignedDeliveryId: deliveryId },
+      relations: ['items'],
+      order: { assignedDeliveryAt: 'DESC' },
+    });
+  }
+
+  // Mismo patrón de UPDATE atómico condicional que claimOrder, pero sin
+  // scope de empresa (ver ADR-026): un delivery independiente puede
+  // reclamar el pedido de cualquier fabricante.
+  async claimOrderForDelivery(id: string, deliveryId: string): Promise<Order> {
+    const result = await this.orderRepo
+      .createQueryBuilder()
+      .update(Order)
+      .set({ assignedDeliveryId: deliveryId, assignedDeliveryAt: () => 'now()' })
+      .where(
+        'id = :id AND status = :status AND assigned_driver_id IS NULL AND assigned_delivery_id IS NULL',
+        { id, status: OrderStatus.DESPACHADO },
+      )
+      .execute();
+
+    if (!result.affected) {
+      const exists = await this.orderRepo.findOne({ where: { id } });
+      if (!exists) throw new NotFoundException('Pedido no encontrado');
+      throw new ConflictException('Este pedido ya fue tomado por otro repartidor');
+    }
+
+    return this.orderRepo.findOne({ where: { id }, relations: ['items'] }) as Promise<Order>;
+  }
+
+  async unassignOrderForDelivery(id: string, deliveryId: string): Promise<Order> {
+    const order = await this.orderRepo.findOne({ where: { id } });
+    if (!order) throw new NotFoundException('Pedido no encontrado');
+
+    if (order.assignedDeliveryId !== deliveryId) {
+      throw new ForbiddenException('Este pedido esta asignado a otro repartidor');
+    }
+
+    order.assignedDeliveryId = null;
+    order.assignedDeliveryAt = null;
+    return this.orderRepo.save(order);
+  }
+
+  // Marca Entregado un pedido reclamado por un delivery independiente.
+  // Reusa la misma validación de transición que updateStatus, pero sin
+  // companyId (el delivery no pertenece a ninguna empresa, ver ADR-026).
+  async markDeliveredByDelivery(id: string, deliveryId: string): Promise<Order> {
+    const order = await this.orderRepo.findOne({ where: { id }, relations: ['items'] });
+    if (!order) throw new NotFoundException('Pedido no encontrado');
+
+    if (order.assignedDeliveryId !== deliveryId) {
+      throw new ForbiddenException('Este pedido esta asignado a otro repartidor');
+    }
+
+    const validNext = VALID_TRANSITIONS[order.status];
+    if (!validNext.includes(OrderStatus.ENTREGADO)) {
+      throw new BadRequestException(
+        `No se puede pasar de "${order.status}" a "${OrderStatus.ENTREGADO}"`,
+      );
+    }
+
+    order.status = OrderStatus.ENTREGADO;
+    order.actualDeliveryDate = new Date();
+    return this.orderRepo.save(order);
   }
 
   // Ver ADR-018: usado por LogisticsService para saber que repartidores

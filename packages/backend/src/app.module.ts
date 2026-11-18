@@ -31,6 +31,9 @@ import { ReviewsModule } from './modules/reviews/reviews.module';
 import { LogisticsModule } from './modules/logistics/logistics.module';
 // import { AnalyticsModule } from './modules/analytics/analytics.module';
 
+// Repartidor independiente del marketplace, identidad separada -- ver ADR-026.
+import { DeliveryModule } from './modules/delivery/delivery.module';
+
 @Module({
   imports: [
     ConfigModule.forRoot({
@@ -58,6 +61,7 @@ import { LogisticsModule } from './modules/logistics/logistics.module';
     SearchModule,
     ReviewsModule,
     LogisticsModule,
+    DeliveryModule,
   ],
 })
 export class AppModule {
