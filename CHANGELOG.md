@@ -4,6 +4,49 @@ Cada cambio importante del proyecto se documenta aqui. Las decisiones arquitecto
 
 ---
 
+## [0.35.0] - 2026-11-18
+
+### Fix: import de productos por CSV/Excel estaba roto (bug de seguridad global) + carga de precio/stock en el mismo archivo
+
+El import masivo de productos (CSV) y de stock (CSV) no funcionaba para
+nadie, ni con CSV ni con Excel. La causa real no era la falta de soporte
+de XLSX (aunque tampoco existía): el `SecureValidationPipe` global (ver
+ADR-007) sanitiza cualquier parámetro de los controllers, incluido
+`@UploadedFile()`, y `InputSanitizerService.sanitizeObject()` reconstruía
+cualquier `object` iterando `Object.entries()` — para un `Buffer` (que es
+`typeof 'object'`), eso devuelve sus bytes como claves `"0","1","2"...` y
+el objeto resultante pierde el prototipo de `Buffer`. El archivo subido
+llegaba corrupto a cualquier parser (CSV o Excel), rompiendo el import
+desde el día uno. Fix: `sanitizeObject` ahora hace `Buffer.isBuffer(obj)`
+y lo devuelve intacto antes de la rama de objeto genérico
+(`input-sanitizer.service.ts`).
+
+- Nuevo `common/utils/spreadsheet-parser.ts`: parser único para CSV y
+  Excel (.xlsx/.xls), usado tanto por el import de productos como por el
+  bulk-update de stock. Se usa `exceljs` (no `xlsx`/SheetJS, que tiene
+  vulnerabilidades altas sin parche de prototype pollution y ReDoS,
+  inaceptable para archivos subidos por usuarios externos).
+- `ProductsService.importFromFile` (antes `importFromCsv`, solo CSV):
+  ahora admite también columnas opcionales `price` (ARS, acepta `1234.56`
+  o `1234,56`) y `stock`/`quantity` en el mismo archivo, seteando el
+  precio B2C (`PricesService.setPrice`) y el stock inicial
+  (`StockService.updateStock`) de una sola pasada — pedido explícito:
+  "los comercios deben poder hacer la carga de todo su stock" en un solo
+  archivo, no solo los datos del producto.
+- `StockService.bulkUpdateFromCsv` migrado al mismo parser (ahora admite
+  Excel, no solo CSV).
+- Frontend: nuevo botón "Importar CSV/Excel" en `/products` (antes no
+  existía ningún control de import en esa página, pese a que el texto del
+  estado vacío lo mencionaba) con feedback de creados/actualizados/errores
+  por fila. El input de `/stock` ahora también acepta `.xlsx`/`.xls`
+  (antes `accept=".csv"` lo bloqueaba en el selector de archivos).
+- Verificado en local contra Postgres real: CSV y Excel, alta y
+  actualización por SKU, parseo de precio con coma decimal, y que el fix
+  del sanitizer no rompe ningún otro test (`npx jest` — 127/128 ok, la
+  única falla es preexistente en `afip.service.spec.ts`, no relacionada).
+
+---
+
 ## [0.34.0] - 2026-11-17
 
 ### Nueva identidad "Delivery" independiente + selector de registro de 3 vías en la landing

@@ -6,7 +6,6 @@ import {
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, Like, FindOptionsWhere } from 'typeorm';
-import { parse as csvParse } from 'csv-parse/sync';
 import { Product } from './entities/product.entity';
 import { ProductVariant } from './entities/product-variant.entity';
 import { StorageService } from './storage.service';
@@ -14,6 +13,10 @@ import { CreateProductDto } from './dto/create-product.dto';
 import { UpdateProductDto } from './dto/update-product.dto';
 import { ProductQueryDto } from './dto/product-query.dto';
 import { SearchService, ProductSearchDoc } from '../search/search.service';
+import { parseSpreadsheet } from '../../common/utils/spreadsheet-parser';
+import { PricesService } from '../prices/prices.service';
+import { PriceType } from '../prices/entities/price.entity';
+import { StockService } from '../stock/stock.service';
 
 @Injectable()
 export class ProductsService {
@@ -24,6 +27,8 @@ export class ProductsService {
     private readonly variantRepo: Repository<ProductVariant>,
     private readonly storageService: StorageService,
     private readonly searchService: SearchService,
+    private readonly pricesService: PricesService,
+    private readonly stockService: StockService,
   ) {}
 
   private toSearchDoc(product: Product): ProductSearchDoc {
@@ -170,21 +175,33 @@ export class ProductsService {
     return this.productRepo.save(product);
   }
 
-  async importFromCsv(companyId: string, fileBuffer: Buffer): Promise<{
+  // Convierte un string de precio en ARS (admite "1234.56" o "1234,56") a
+  // centavos (int). Devuelve null si el valor esta vacio o no es numerico.
+  private parsePriceToCents(raw: string): number | null {
+    const value = raw.trim();
+    if (!value) return null;
+    const normalized = value.replace(/\./g, '').replace(',', '.');
+    const parsed = Number(normalized.includes('.') ? normalized : value);
+    if (isNaN(parsed) || parsed < 0) return null;
+    return Math.round(parsed * 100);
+  }
+
+  // Import masivo de productos (CSV o Excel). Ademas de los datos del
+  // producto, si el archivo trae columnas "price" y/o "stock"/"quantity"
+  // carga tambien el precio B2C y el stock inicial en el mismo paso, para
+  // que un comercio pueda subir todo su catalogo (productos + precios +
+  // stock) de una sola vez (ver pedido de soporte: carga masiva de stock).
+  async importFromFile(
+    companyId: string,
+    fileBuffer: Buffer,
+    originalName: string,
+    userId: string,
+  ): Promise<{
     created: number;
     updated: number;
     errors: Array<{ row: number; error: string }>;
   }> {
-    let rows: Record<string, string>[];
-    try {
-      rows = csvParse(fileBuffer, {
-        columns: true,
-        skip_empty_lines: true,
-        trim: true,
-      });
-    } catch {
-      throw new BadRequestException('El archivo CSV tiene formato inválido');
-    }
+    const rows = await parseSpreadsheet(fileBuffer, originalName);
 
     const results = { created: 0, updated: 0, errors: [] as Array<{ row: number; error: string }> };
 
@@ -198,11 +215,12 @@ export class ProductsService {
           continue;
         }
 
-        // Buscar por SKU si viene en el CSV
+        // Buscar por SKU si viene en el archivo
         const existing = row.sku
           ? await this.productRepo.findOne({ where: { sku: row.sku, companyId } })
           : null;
 
+        let product: Product;
         if (existing) {
           await this.productRepo.update(existing.id, {
             name: row.name,
@@ -211,9 +229,10 @@ export class ProductsService {
             brand: row.brand || existing.brand,
             unitOfMeasure: row.unit_of_measure || existing.unitOfMeasure,
           });
+          product = existing;
           results.updated++;
         } else {
-          await this.productRepo.save(
+          product = await this.productRepo.save(
             this.productRepo.create({
               companyId,
               name: row.name,
@@ -226,6 +245,37 @@ export class ProductsService {
             }),
           );
           results.created++;
+        }
+
+        // Precio (columna "price", en ARS): opcional, setea precio B2C
+        if (row.price) {
+          const basePrice = this.parsePriceToCents(row.price);
+          if (basePrice === null) {
+            results.errors.push({ row: rowNum, error: 'Columna "price" inválida' });
+          } else {
+            await this.pricesService.setPrice(
+              product.id,
+              companyId,
+              { type: PriceType.B2C, basePrice, reason: 'Importación masiva' },
+              userId,
+            );
+          }
+        }
+
+        // Stock (columna "stock" o "quantity"): opcional, setea stock inicial
+        const stockRaw = row.stock || row.quantity;
+        if (stockRaw) {
+          const quantity = parseInt(stockRaw, 10);
+          if (isNaN(quantity) || quantity < 0) {
+            results.errors.push({ row: rowNum, error: 'Columna "stock" inválida' });
+          } else {
+            await this.stockService.updateStock(
+              product.id,
+              companyId,
+              { quantity, notes: 'Importación masiva' },
+              userId,
+            );
+          }
         }
       } catch (err) {
         results.errors.push({ row: rowNum, error: err.message });

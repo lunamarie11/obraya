@@ -10,6 +10,7 @@ import {
   UseInterceptors,
   UploadedFile,
   ParseUUIDPipe,
+  BadRequestException,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { ApiTags, ApiOperation, ApiBearerAuth, ApiConsumes } from '@nestjs/swagger';
@@ -90,11 +91,17 @@ export class StockController {
   }
 
   @Post('bulk-update/csv')
-  @ApiOperation({ summary: 'Actualización masiva de stock via CSV' })
+  @ApiOperation({ summary: 'Actualización masiva de stock via CSV o Excel' })
   @ApiConsumes('multipart/form-data')
   @Roles(UserRole.ADMIN, UserRole.VENDEDOR, UserRole.LOGISTICA)
   @UseInterceptors(FileInterceptor('file', { storage: memoryStorage() }))
   async bulkUpdateFromCsv(@UploadedFile() file: Express.Multer.File, @CurrentUser() user: any) {
-    return this.stockService.bulkUpdateFromCsv(user.companyId, file.buffer, user.id);
+    if (!file) throw new BadRequestException('Debe adjuntar un archivo CSV o Excel');
+    return this.stockService.bulkUpdateFromCsv(
+      user.companyId,
+      file.buffer,
+      user.id,
+      file.originalname,
+    );
   }
 }

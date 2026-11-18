@@ -1,12 +1,11 @@
 import {
   Injectable,
   NotFoundException,
-  BadRequestException,
   Logger,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, DataSource } from 'typeorm';
-import { parse as csvParse } from 'csv-parse/sync';
+import { parseSpreadsheet } from '../../common/utils/spreadsheet-parser';
 import { Stock } from './entities/stock.entity';
 import { StockMovement, MovementType } from './entities/stock-movement.entity';
 import { UpdateStockDto, BulkUpdateStockItemDto } from './dto/update-stock.dto';
@@ -160,13 +159,9 @@ export class StockService {
     companyId: string,
     fileBuffer: Buffer,
     userId: string,
+    originalName?: string,
   ): Promise<{ updated: number; errors: Array<{ row: number; error: string }> }> {
-    let rows: Record<string, string>[];
-    try {
-      rows = csvParse(fileBuffer, { columns: true, skip_empty_lines: true, trim: true });
-    } catch {
-      throw new BadRequestException('El archivo CSV tiene formato inválido');
-    }
+    const rows = await parseSpreadsheet(fileBuffer, originalName);
 
     const results = { updated: 0, errors: [] as Array<{ row: number; error: string }> };
 
