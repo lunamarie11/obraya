@@ -31,6 +31,10 @@ jobs:
           node-version: 20
           cache: npm
       - run: npm ci
+      # frontend importa tipos de @obraya/shared; hay que compilarlo antes
+      # (dist/ esta en .gitignore, no viene en el checkout) o el build de
+      # Next.js falla con "Cannot find module '@obraya/shared'".
+      - run: npm run build --workspace=packages/shared
       - run: npm run lint --workspace=packages/frontend
       - run: npm run build --workspace=packages/frontend
 
@@ -43,6 +47,8 @@ jobs:
           node-version: 20
           cache: npm
       - run: npm ci
+      # Idem frontend: mobile tambien importa tipos de @obraya/shared.
+      - run: npm run build --workspace=packages/shared
       - run: npm run lint --workspace=packages/mobile
       - run: npm run typecheck:mobile
 
@@ -56,6 +62,4 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run lint --workspace=packages/shared
-      # `npm run build --workspace=packages/shared` (tsc) no funciona hoy:
-      # el package no tiene tsconfig.json propio (gap preexistente, no
-      # relacionado con lint). Se agrega cuando se resuelva eso.
+      - run: npm run build --workspace=packages/shared
