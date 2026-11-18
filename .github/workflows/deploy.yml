@@ -111,6 +111,8 @@ jobs:
             docker-compose -f docker-compose.prod.yml up -d backend frontend"
 
           run_remote "cd /opt/obraya && \
+            export ECR_BACKEND_IMAGE=${ECR_REGISTRY}/obraya-backend:${{ steps.vars.outputs.sha }} && \
+            export ECR_FRONTEND_IMAGE=${ECR_REGISTRY}/obraya-frontend:${{ steps.vars.outputs.sha }} && \
             docker-compose -f docker-compose.prod.yml exec -T backend sh -c 'cd packages/backend && npm run migration:run'"
 
           run_remote "for i in \$(seq 1 12); do \
