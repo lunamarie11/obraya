@@ -42,6 +42,6 @@ export class OrderMessage {
   @Column({ name: 'is_predefined', default: false })
   isPredefined: boolean;
 
-  @CreateDateColumn({ name: 'created_at' })
+  @CreateDateColumn({ name: 'created_at', type: 'timestamptz' })
   createdAt: Date;
 }

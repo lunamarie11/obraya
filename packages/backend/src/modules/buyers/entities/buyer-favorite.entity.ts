@@ -22,6 +22,6 @@ export class BuyerFavorite {
   @Column({ name: 'target_id' })
   targetId: string;
 
-  @CreateDateColumn({ name: 'created_at' })
+  @CreateDateColumn({ name: 'created_at', type: 'timestamptz' })
   createdAt: Date;
 }

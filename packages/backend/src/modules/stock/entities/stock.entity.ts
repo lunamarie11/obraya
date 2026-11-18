@@ -55,10 +55,10 @@ export class Stock {
   @Column({ name: 'last_restock_at', nullable: true })
   lastRestockAt: Date;
 
-  @UpdateDateColumn({ name: 'updated_at' })
+  @UpdateDateColumn({ name: 'updated_at', type: 'timestamptz' })
   updatedAt: Date;
 
-  @CreateDateColumn({ name: 'created_at' })
+  @CreateDateColumn({ name: 'created_at', type: 'timestamptz' })
   createdAt: Date;
 
   get availableQuantity(): number {

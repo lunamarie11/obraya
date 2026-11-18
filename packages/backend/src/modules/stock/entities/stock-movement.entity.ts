@@ -49,6 +49,6 @@ export class StockMovement {
   @Column({ name: 'user_id', nullable: true, length: 36 })
   userId: string;
 
-  @CreateDateColumn({ name: 'created_at' })
+  @CreateDateColumn({ name: 'created_at', type: 'timestamptz' })
   createdAt: Date;
 }

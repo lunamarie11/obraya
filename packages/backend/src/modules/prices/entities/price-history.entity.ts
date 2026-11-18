@@ -35,6 +35,6 @@ export class PriceHistory {
   @Column({ nullable: true, length: 200 })
   reason: string;
 
-  @CreateDateColumn({ name: 'created_at' })
+  @CreateDateColumn({ name: 'created_at', type: 'timestamptz' })
   createdAt: Date;
 }
