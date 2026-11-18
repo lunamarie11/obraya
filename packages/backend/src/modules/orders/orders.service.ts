@@ -390,7 +390,7 @@ export class OrdersService {
   // Marca Entregado un pedido reclamado por un delivery independiente.
   // Reusa la misma validación de transición que updateStatus, pero sin
   // companyId (el delivery no pertenece a ninguna empresa, ver ADR-026).
-  async markDeliveredByDelivery(id: string, deliveryId: string): Promise<Order> {
+  async markDeliveredByDelivery(id: string, deliveryId: string, deliveryName: string): Promise<Order> {
     const order = await this.orderRepo.findOne({ where: { id }, relations: ['items'] });
     if (!order) throw new NotFoundException('Pedido no encontrado');
 
@@ -408,6 +408,23 @@ export class OrdersService {
     order.status = OrderStatus.ENTREGADO;
     order.actualDeliveryDate = new Date();
     const saved = await this.orderRepo.save(order);
+
+    // Ver updateStatus: ahi se genera un mensaje de sistema por cada cambio
+    // de estado, pero este metodo (flujo de delivery independiente, ADR-026)
+    // no pasaba por esa transaccion y se habia quedado sin el suyo -- bug
+    // encontrado por QA (el pedido quedaba "Entregado" sin avisarle nada al
+    // comprador en el chat del pedido).
+    await this.messageRepo.save(
+      this.messageRepo.create({
+        orderId: id,
+        sender: MessageSender.SYSTEM,
+        senderId: deliveryId,
+        senderName: deliveryName,
+        content: `Estado actualizado a: ${OrderStatus.ENTREGADO}`,
+        isPredefined: false,
+      }),
+    );
+
     return this.hideFinancials(saved);
   }
 

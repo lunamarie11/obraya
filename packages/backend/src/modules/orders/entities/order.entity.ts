@@ -144,10 +144,10 @@ export class Order {
   @Column({ name: 'route_calculated_at', type: 'timestamptz', nullable: true })
   routeCalculatedAt: Date | null;
 
-  @Column({ name: 'scheduled_delivery_date', nullable: true })
+  @Column({ name: 'scheduled_delivery_date', type: 'timestamptz', nullable: true })
   scheduledDeliveryDate: Date;
 
-  @Column({ name: 'actual_delivery_date', nullable: true })
+  @Column({ name: 'actual_delivery_date', type: 'timestamptz', nullable: true })
   actualDeliveryDate: Date;
 
   @Column({ name: 'payment_method', type: 'enum', enum: PaymentMethod, default: PaymentMethod.EFECTIVO })

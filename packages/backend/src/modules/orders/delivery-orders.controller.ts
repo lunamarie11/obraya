@@ -41,6 +41,7 @@ export class DeliveryOrdersController {
   @Put(':id/delivered')
   @ApiOperation({ summary: 'Marcar un pedido propio como entregado' })
   async delivered(@Param('id', ParseUUIDPipe) id: string, @CurrentUser() delivery: any) {
-    return this.ordersService.markDeliveredByDelivery(id, delivery.id);
+    const deliveryName = `${delivery.firstName ?? ''} ${delivery.lastName ?? ''}`.trim();
+    return this.ordersService.markDeliveredByDelivery(id, delivery.id, deliveryName);
   }
 }
