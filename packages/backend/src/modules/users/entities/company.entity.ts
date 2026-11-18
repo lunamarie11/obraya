@@ -134,6 +134,12 @@ export class Company {
   @Column({ name: 'driver_commission_percent', type: 'int', default: 8 })
   driverCommissionPercent: number;
 
+  // Comisión que cobra ObraYa sobre el total de venta (itemsTotal, sin
+  // envío) de cada pedido, en porcentaje entero (0-100). Default 4% a nivel
+  // plataforma; queda por empresa para permitir tarifas negociadas a futuro.
+  @Column({ name: 'platform_commission_percent', type: 'int', default: 4 })
+  platformCommissionPercent: number;
+
   @OneToMany(() => CompanyUser, (user) => user.company)
   users: CompanyUser[];
 

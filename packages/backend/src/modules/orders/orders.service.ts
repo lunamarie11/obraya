@@ -57,6 +57,18 @@ export class OrdersService {
     return `OBY-${ts}-${rand}`;
   }
 
+  // Comprador y delivery independiente no deben ver el desglose financiero
+  // interno de ObraYa (comisión propia, fee de MP, neto que recibe la
+  // empresa) — solo el backoffice del fabricante lo necesita.
+  private hideFinancials(order: Order): Order {
+    const { platformCommissionAmount, mpFeeAmount, netAmountToCompany, ...rest } = order;
+    return rest as Order;
+  }
+
+  private hideFinancialsAll(orders: Order[]): Order[] {
+    return orders.map((o) => this.hideFinancials(o));
+  }
+
   async findAll(companyId: string, query: OrderQueryDto, currentUserId?: string) {
     const qb = this.orderRepo
       .createQueryBuilder('order')
@@ -135,6 +147,21 @@ export class OrdersService {
     const company = await this.companyRepo.findOne({ where: { id: companyId } });
     const zone = resolveDeliveryZone(company?.deliveryZones, dto.deliveryAddress?.postalCode);
     const shippingCost = zone?.shippingCost ?? 0;
+    const totalAmount = itemsTotal + shippingCost;
+
+    // Comisión de ObraYa: % sobre itemsTotal (la venta en sí, sin contar el
+    // envío, que es un costo logístico que pasa íntegro al fabricante/flota).
+    // Se calcula con el % vigente de la empresa al momento del pedido para
+    // que cambios futuros en platformCommissionPercent no afecten pedidos ya creados.
+    const commissionPercent = company?.platformCommissionPercent ?? 4;
+    const platformCommissionAmount = Math.round((itemsTotal * commissionPercent) / 100);
+
+    // El fee de MercadoPago no se conoce hasta que el webhook confirma el
+    // pago; para Efectivo/Transferencia no hay fee y el neto se calcula ya.
+    const paymentMethod = dto.paymentMethod ?? PaymentMethod.EFECTIVO;
+    const mpFeeAmount = paymentMethod === PaymentMethod.MERCADO_PAGO ? null : 0;
+    const netAmountToCompany =
+      paymentMethod === PaymentMethod.MERCADO_PAGO ? null : totalAmount - platformCommissionAmount;
 
     const order = this.orderRepo.create({
       companyId,
@@ -145,13 +172,16 @@ export class OrdersService {
       orderNumber: this.generateOrderNumber(),
       status: OrderStatus.NUEVO,
       items,
-      totalAmount: itemsTotal + shippingCost,
+      totalAmount,
       shippingCost,
       shippingZoneName: zone?.name,
       currency: 'ARS',
       notes: dto.notes,
       deliveryAddress: dto.deliveryAddress,
-      paymentMethod: dto.paymentMethod ?? PaymentMethod.EFECTIVO,
+      paymentMethod,
+      platformCommissionAmount,
+      mpFeeAmount,
+      netAmountToCompany,
     });
 
     const saved = await this.orderRepo.save(order);
@@ -191,15 +221,17 @@ export class OrdersService {
   // Ver ADR-006: el comprador crea el pedido para el fabricante indicado en
   // dto.companyId (el carrito ya viene agrupado por companyId desde el frontend).
   async createForBuyer(buyerId: string, dto: CreateOrderDto): Promise<Order> {
-    return this.create(dto.companyId, buyerId, dto);
+    const order = await this.create(dto.companyId, buyerId, dto);
+    return this.hideFinancials(order);
   }
 
   async findAllForBuyer(buyerId: string): Promise<Order[]> {
-    return this.orderRepo.find({
+    const orders = await this.orderRepo.find({
       where: { buyerId },
       relations: ['items'],
       order: { createdAt: 'DESC' },
     });
+    return this.hideFinancialsAll(orders);
   }
 
   async findOneForBuyer(id: string, buyerId: string): Promise<Order> {
@@ -209,7 +241,7 @@ export class OrdersService {
       order: { messages: { createdAt: 'ASC' } },
     });
     if (!order) throw new NotFoundException('Pedido no encontrado');
-    return order;
+    return this.hideFinancials(order);
   }
 
   // Ver ADR-017: reclama un pedido Despachado sin repartidor asignado. Update
@@ -254,21 +286,21 @@ export class OrdersService {
   // independiente del marketplace (sin filtro de company_id, a diferencia
   // de claimOrder/findAll que son siempre de una sola empresa).
   async findAvailableForDelivery(): Promise<Order[]> {
-    return this.orderRepo.find({
+    const orders = await this.orderRepo.find({
       where: { status: OrderStatus.DESPACHADO, assignedDriverId: undefined, assignedDeliveryId: undefined },
       relations: ['items'],
       order: { createdAt: 'ASC' },
-    }).then((orders) =>
-      orders.filter((o) => !o.assignedDriverId && !o.assignedDeliveryId),
-    );
+    });
+    return this.hideFinancialsAll(orders.filter((o) => !o.assignedDriverId && !o.assignedDeliveryId));
   }
 
   async findAllForDelivery(deliveryId: string): Promise<Order[]> {
-    return this.orderRepo.find({
+    const orders = await this.orderRepo.find({
       where: { assignedDeliveryId: deliveryId },
       relations: ['items'],
       order: { assignedDeliveryAt: 'DESC' },
     });
+    return this.hideFinancialsAll(orders);
   }
 
   // Mismo patrón de UPDATE atómico condicional que claimOrder, pero sin
@@ -291,7 +323,8 @@ export class OrdersService {
       throw new ConflictException('Este pedido ya fue tomado por otro repartidor');
     }
 
-    return this.orderRepo.findOne({ where: { id }, relations: ['items'] }) as Promise<Order>;
+    const claimed = await this.orderRepo.findOne({ where: { id }, relations: ['items'] });
+    return this.hideFinancials(claimed as Order);
   }
 
   async unassignOrderForDelivery(id: string, deliveryId: string): Promise<Order> {
@@ -304,7 +337,8 @@ export class OrdersService {
 
     order.assignedDeliveryId = null;
     order.assignedDeliveryAt = null;
-    return this.orderRepo.save(order);
+    const saved = await this.orderRepo.save(order);
+    return this.hideFinancials(saved);
   }
 
   // Marca Entregado un pedido reclamado por un delivery independiente.
@@ -327,7 +361,8 @@ export class OrdersService {
 
     order.status = OrderStatus.ENTREGADO;
     order.actualDeliveryDate = new Date();
-    return this.orderRepo.save(order);
+    const saved = await this.orderRepo.save(order);
+    return this.hideFinancials(saved);
   }
 
   // Ver ADR-018: usado por LogisticsService para saber que repartidores

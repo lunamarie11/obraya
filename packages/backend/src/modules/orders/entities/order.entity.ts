@@ -149,6 +149,24 @@ export class Order {
   @Column({ name: 'payment_status', nullable: true, length: 30 })
   paymentStatus: string;
 
+  // Comisión de ObraYa sobre itemsTotal (sin envío), calculada al crear el
+  // pedido con Company.platformCommissionPercent vigente en ese momento.
+  // En centavos de ARS, misma convención que totalAmount.
+  @Column({ name: 'platform_commission_amount', type: 'bigint', default: 0 })
+  platformCommissionAmount: number;
+
+  // Fee que cobra Mercado Pago por procesar el pago (suma de fee_details del
+  // Payment), en centavos de ARS. Null hasta que el webhook confirma el pago;
+  // 0 para pedidos que no se pagan con MercadoPago (Efectivo/Transferencia).
+  @Column({ name: 'mp_fee_amount', type: 'bigint', nullable: true })
+  mpFeeAmount: number | null;
+
+  // Lo que efectivamente le corresponde cobrar al fabricante/vendedor:
+  // totalAmount - platformCommissionAmount - mpFeeAmount. Null hasta que se
+  // conoce el fee de MP (pedidos en efectivo/transferencia se calculan al crear).
+  @Column({ name: 'net_amount_to_company', type: 'bigint', nullable: true })
+  netAmountToCompany: number | null;
+
   // Factura electrónica AFIP (ver ADR-010). Se emite al pasar a Despachado;
   // nulos si AFIP no está configurado o el pedido aún no llegó a ese estado.
   @Column({ name: 'afip_cae', nullable: true, length: 20 })

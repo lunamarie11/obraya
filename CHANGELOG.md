@@ -4,6 +4,48 @@ Cada cambio importante del proyecto se documenta aqui. Las decisiones arquitecto
 
 ---
 
+## [0.36.0] - 2026-11-18
+
+### Feat: separación de la comisión de ObraYa (4%) y el fee de Mercado Pago en cada pedido
+
+Pedido explícito: "ObraYa recibe el 4% del total de la venta, hay que
+separar lo que cobra Mercado Pago". Hasta ahora `Order` no registraba
+ningún desglose: `totalAmount` se cobraba íntegro al comprador sin que
+quedara trazado cuánto correspondía a ObraYa, cuánto a MercadoPago y
+cuánto neto le quedaba al fabricante.
+
+- `Company.platformCommissionPercent` (int, default 4) — mismo patrón que
+  `driverCommissionPercent` (ADR-017), permite negociar % distinto por
+  empresa a futuro aunque hoy sea un 4% plano a nivel plataforma.
+- Nuevas columnas en `Order`: `platformCommissionAmount` (centavos,
+  calculado al crear el pedido sobre `itemsTotal` — **sin** el envío, que
+  es un costo logístico que pasa íntegro al fabricante/flota, no "venta"),
+  `mpFeeAmount` (centavos, null hasta que el webhook confirma el pago;
+  `0` en Efectivo/Transferencia) y `netAmountToCompany` (centavos,
+  `totalAmount - platformCommissionAmount - mpFeeAmount`).
+- `OrdersService.create()`: calcula `platformCommissionAmount` con el %
+  vigente de la empresa en ese momento (no se recalcula si cambia después).
+  Para Efectivo/Transferencia calcula `netAmountToCompany` de una, porque
+  no hay fee de MP que esperar.
+- `PaymentsController.webhook`: cuando MP confirma `approved`, suma los
+  `fee_details` del Payment (vienen en ARS, se convierten a centavos) y
+  completa `mpFeeAmount`/`netAmountToCompany`.
+- Migración `1790760000000-AddPlatformCommissionToOrders`.
+- El desglose financiero (comisión propia, fee de MP, neto de la empresa)
+  es información interna de ObraYa/el fabricante: se oculta en las
+  respuestas de `/buyer-orders` y `/delivery-orders` (comprador y delivery
+  independiente no tienen por qué ver cuánto se queda cada parte),
+  manteniéndose visible solo en el backoffice del fabricante.
+- Tests nuevos en `orders.service.spec.ts` cubriendo el cálculo con % default
+  y % negociado, Efectivo/Transferencia vs MercadoPago, y que el envío no
+  entra en la base de cálculo de la comisión.
+- Pendiente a futuro (no bloqueante para este cambio): hoy todos los pagos
+  de MercadoPago entran a la cuenta de ObraYa (no hay split-payment real
+  por vendedor vía OAuth); el reparto comisión/neto es contable/informativo,
+  todavía no dispara una transferencia real al fabricante.
+
+---
+
 ## [0.35.0] - 2026-11-18
 
 ### Fix: import de productos por CSV/Excel estaba roto (bug de seguridad global) + carga de precio/stock en el mismo archivo

@@ -49,6 +49,14 @@ export class PaymentsController {
       let systemMsg: string | null = null;
 
       if (info.status === 'approved') {
+        // fee_details viene en ARS (no centavos), ver tipo FeeDetails del SDK.
+        // Sumamos todos los fees (mercadopago_fee + financing_fee si aplica)
+        // porque todos reducen lo que efectivamente recibe ObraYa del pago.
+        const mpFeeAmount = Math.round(
+          (info.fee_details ?? []).reduce((sum, fee) => sum + (fee.amount ?? 0), 0) * 100,
+        );
+        order.mpFeeAmount = mpFeeAmount;
+        order.netAmountToCompany = Number(order.totalAmount) - Number(order.platformCommissionAmount) - mpFeeAmount;
         systemMsg = 'Pago acreditado vía Mercado Pago';
       } else if (info.status === 'rejected') {
         if (order.status === OrderStatus.NUEVO && VALID_TRANSITIONS[order.status].includes(OrderStatus.CANCELADO)) {
