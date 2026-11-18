@@ -4,6 +4,43 @@ Cada cambio importante del proyecto se documenta aqui. Las decisiones arquitecto
 
 ---
 
+## [0.37.0] - 2026-11-18
+
+### Feature: tracking con Google Maps embebido in-app (backend, ver ADR-027)
+
+Spec completo en `docs/specs/fase4e-tracking-google-maps.md`. Reemplaza el
+enfoque anterior (Leaflet/OSM + deep link externo a Google Maps, ver
+ADR-022) por Google Maps embebido en los 3 surfaces (comercio, delivery,
+comprador) y ruta calculada server-side via Directions API. Esta entrega
+es solo el backend; frontend/mobile quedan para una siguiente etapa.
+
+- `GoogleMapsService` nuevo (`logistics/google-maps.service.ts`): wrapper
+  best-effort sobre la Directions API (mismo patrón que `AfipService` /
+  `PaymentsService` — sin `GOOGLE_MAPS_SERVER_API_KEY` configurada, queda
+  deshabilitado y no bloquea nada).
+- `OrdersService.updateStatus()`: al pasar un pedido a `Despachado`, calcula
+  la ruta UNA sola vez (compañía → `deliveryAddress`) y la guarda en el
+  pedido (`route_polyline`, `route_distance_meters`,
+  `route_duration_seconds`, `route_calculated_at` — migración
+  `1790790000000-AddRouteToOrders`). Si falla, el despacho sigue igual.
+- Nueva tabla `delivery_locations` (migración
+  `1790780000000-CreateDeliveryLocations`) + entidad `DeliveryLocation`:
+  extiende el tracking de ubicación (ADR-018) para cubrir también al
+  delivery independiente (ADR-026), que no tenía tabla propia. Nuevo
+  endpoint `PUT /delivery-orders/location`.
+- `LogisticsService.getActiveDriverLocations()` ahora mezcla resultados de
+  repartidor interno (`driver_locations`) y delivery independiente
+  (`delivery_locations`) en una sola respuesta.
+- Nuevo endpoint `GET /buyer-orders/:id/tracking`: posición en tiempo real
+  del repartidor asignado + ruta, para el comprador (fuera de alcance en
+  ADR-018). Devuelve 404 si el pedido no está Despachado, sin repartidor
+  asignado, o sin posición reportada todavía.
+- `.env.example`: nuevas variables `GOOGLE_MAPS_API_KEY` (pública,
+  frontend) y `GOOGLE_MAPS_SERVER_API_KEY` (privada, backend).
+- Requiere activar facturación en Google Cloud por primera vez (sin costo
+  esperado a la escala actual — ver sección "Costo de Google Maps" del
+  spec).
+
 ## [0.36.1] - 2026-11-18
 
 ### Fix: bug urgente de login tras el registro ("contraseña inválida" con email bien tipeado)
