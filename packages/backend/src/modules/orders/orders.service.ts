@@ -24,6 +24,8 @@ import { EmailService } from '../email/email.service';
 import { BuyersService } from '../buyers/buyers.service';
 import { AfipService } from '../afip/afip.service';
 import { DriversService } from '../logistics/drivers.service';
+import { GoogleMapsService } from '../logistics/google-maps.service';
+import { LogisticsService } from '../logistics/logistics.service';
 import { Company, resolveDeliveryZone } from '../users/entities/company.entity';
 import { UserRole } from '../users/entities/company-user.entity';
 
@@ -49,6 +51,13 @@ export class OrdersService {
     private readonly afipService: AfipService,
     @Inject(forwardRef(() => DriversService))
     private readonly driversService: DriversService,
+    private readonly googleMapsService: GoogleMapsService,
+    // Ver ADR-027: GoogleMapsService no depende de nada circular (solo
+    // ConfigService), pero LogisticsService si -- mismo forwardRef que ya
+    // usa DriversService, porque LogisticsModule.forwardRef(OrdersModule)
+    // ya cierra el ciclo del otro lado.
+    @Inject(forwardRef(() => LogisticsService))
+    private readonly logisticsService: LogisticsService,
   ) {}
 
   private generateOrderNumber(): string {
@@ -244,6 +253,43 @@ export class OrdersService {
     return this.hideFinancials(order);
   }
 
+  // Ver ADR-027 / fase4e: tracking en tiempo real para el comprador, que
+  // ADR-018 habia dejado explicitamente fuera de alcance. Devuelve null
+  // (no 404 -- eso lo decide el controller) si el pedido todavia no esta
+  // Despachado, no tiene repartidor asignado, o el repartidor asignado aun
+  // no reporto ninguna posicion -- en todos esos casos el frontend cae al
+  // stepper textual existente, sin mapa.
+  async getTrackingForBuyer(
+    id: string,
+    buyerId: string,
+  ): Promise<{
+    driverLat: number;
+    driverLng: number;
+    routePolyline: string | null;
+    routeDistanceMeters: number | null;
+    routeDurationSeconds: number | null;
+  } | null> {
+    const order = await this.orderRepo.findOne({ where: { id, buyerId } });
+    if (!order) throw new NotFoundException('Pedido no encontrado');
+
+    if (order.status !== OrderStatus.DESPACHADO) return null;
+    if (!order.assignedDriverId && !order.assignedDeliveryId) return null;
+
+    const location = await this.logisticsService.getLocationForAssignment(
+      order.assignedDriverId,
+      order.assignedDeliveryId,
+    );
+    if (!location) return null;
+
+    return {
+      driverLat: location.lat,
+      driverLng: location.lng,
+      routePolyline: order.routePolyline,
+      routeDistanceMeters: order.routeDistanceMeters,
+      routeDurationSeconds: order.routeDurationSeconds,
+    };
+  }
+
   // Ver ADR-017: reclama un pedido Despachado sin repartidor asignado. Update
   // atómico y condicional (no read-then-write) para que dos repartidores que
   // intenten tomar el mismo pedido a la vez no puedan asignárselo ambos: solo
@@ -365,19 +411,27 @@ export class OrdersService {
     return this.hideFinancials(saved);
   }
 
-  // Ver ADR-018: usado por LogisticsService para saber que repartidores
-  // tienen un pedido activo asignado en este momento, sin que el modulo de
-  // logistica acceda directamente al repositorio de Order (comunicacion
-  // entre modulos via inyeccion de dependencias, ver CLAUDE.md).
+  // Ver ADR-018 (extendido en ADR-027/fase4e): usado por LogisticsService
+  // para saber que repartidores tienen un pedido activo asignado en este
+  // momento, sin que el modulo de logistica acceda directamente al
+  // repositorio de Order (comunicacion entre modulos via inyeccion de
+  // dependencias, ver CLAUDE.md). Incluye tanto repartidor interno
+  // (assignedDriverId) como delivery independiente (assignedDeliveryId,
+  // ADR-026) -- un pedido tiene a lo sumo uno de los dos.
   async findActiveAssignments(
     companyId: string,
-  ): Promise<{ orderId: string; orderNumber: string; assignedDriverId: string }[]> {
+  ): Promise<{ orderId: string; orderNumber: string; assignedDriverId: string | null; assignedDeliveryId: string | null }[]> {
     const orders = await this.orderRepo.find({
       where: { companyId, status: OrderStatus.DESPACHADO },
     });
     return orders
-      .filter((o) => !!o.assignedDriverId)
-      .map((o) => ({ orderId: o.id, orderNumber: o.orderNumber, assignedDriverId: o.assignedDriverId as string }));
+      .filter((o) => !!o.assignedDriverId || !!o.assignedDeliveryId)
+      .map((o) => ({
+        orderId: o.id,
+        orderNumber: o.orderNumber,
+        assignedDriverId: o.assignedDriverId,
+        assignedDeliveryId: o.assignedDeliveryId,
+      }));
   }
 
   // Libera un pedido asignado sin cambiar su status. Logistica solo puede
@@ -476,8 +530,9 @@ export class OrdersService {
       // la factura por una cancelación posterior. Best-effort: si AFIP no
       // está configurado o falla, no bloquea el cambio de estado del pedido.
       if (dto.status === OrderStatus.DESPACHADO) {
+        const company = await manager.getRepository(Company).findOne({ where: { id: companyId } });
+
         try {
-          const company = await manager.getRepository(Company).findOne({ where: { id: companyId } });
           const invoice = company ? await this.afipService.createInvoice({ order, company }) : null;
           if (invoice) {
             order.afipCae = invoice.cae;
@@ -489,6 +544,35 @@ export class OrdersService {
         } catch (err) {
           order.afipStatus = 'error';
           this.logger.warn(`No se pudo emitir factura AFIP para ${order.orderNumber}: ${(err as Error).message}`);
+        }
+
+        // Ruta de Google Maps para tracking (ver ADR-027 /
+        // fase4e-tracking-google-maps.md). Origen y destino se pasan como
+        // texto libre -- Directions API geocodea internamente, no hace
+        // falta agregar Geocoding API aparte. Se calcula UNA sola vez (no
+        // se recalcula en cada poll de posicion) para no multiplicar el
+        // costo por el polling. Best-effort: si falla, el pedido se
+        // despacha igual, solo sin ruta dibujada.
+        try {
+          const destination = order.deliveryAddress
+            ? [order.deliveryAddress.street, order.deliveryAddress.city, order.deliveryAddress.province]
+                .filter(Boolean)
+                .join(', ')
+            : null;
+          const route =
+            company?.address && destination
+              ? await this.googleMapsService.calculateRoute(company.address, destination)
+              : null;
+          if (route) {
+            order.routePolyline = route.polyline;
+            order.routeDistanceMeters = route.distanceMeters;
+            order.routeDurationSeconds = route.durationSeconds;
+            order.routeCalculatedAt = new Date();
+          }
+        } catch (err) {
+          this.logger.warn(
+            `No se pudo calcular la ruta de Google Maps para ${order.orderNumber}: ${(err as Error).message}`,
+          );
         }
       }
 

@@ -2,6 +2,8 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { LogisticsService } from '../logistics.service';
 import { DriverLocation } from '../entities/driver-location.entity';
+import { DeliveryLocation } from '../../delivery/entities/delivery-location.entity';
+import { Delivery } from '../../delivery/entities/delivery.entity';
 import { CompanyUser, UserRole } from '../../users/entities/company-user.entity';
 import { OrdersService } from '../../orders/orders.service';
 
@@ -14,6 +16,24 @@ function makeDriverLocation(overrides: Partial<DriverLocation> = {}): DriverLoca
   loc.accuracy = 15;
   loc.recordedAt = new Date('2026-10-07T12:00:00Z');
   return Object.assign(loc, overrides);
+}
+
+function makeDeliveryLocation(overrides: Partial<DeliveryLocation> = {}): DeliveryLocation {
+  const loc = new DeliveryLocation();
+  loc.deliveryId = 'delivery-1';
+  loc.lat = -34.61;
+  loc.lng = -58.38;
+  loc.accuracy = 20;
+  loc.recordedAt = new Date('2026-10-07T12:05:00Z');
+  return Object.assign(loc, overrides);
+}
+
+function makeDelivery(overrides: Partial<Delivery> = {}): Delivery {
+  const d = new Delivery();
+  d.id = 'delivery-1';
+  d.firstName = 'Pedro';
+  d.lastName = 'Delivery';
+  return Object.assign(d, overrides);
 }
 
 function makeUser(overrides: Partial<CompanyUser> = {}): CompanyUser {
@@ -29,9 +49,20 @@ function makeUser(overrides: Partial<CompanyUser> = {}): CompanyUser {
 const mockLocationRepo = {
   upsert: jest.fn(),
   find: jest.fn(),
+  findOne: jest.fn(),
+};
+
+const mockDeliveryLocationRepo = {
+  upsert: jest.fn(),
+  find: jest.fn(),
+  findOne: jest.fn(),
 };
 
 const mockUserRepo = {
+  find: jest.fn(),
+};
+
+const mockDeliveryRepo = {
   find: jest.fn(),
 };
 
@@ -48,7 +79,9 @@ describe('LogisticsService', () => {
       providers: [
         LogisticsService,
         { provide: getRepositoryToken(DriverLocation), useValue: mockLocationRepo },
+        { provide: getRepositoryToken(DeliveryLocation), useValue: mockDeliveryLocationRepo },
         { provide: getRepositoryToken(CompanyUser), useValue: mockUserRepo },
+        { provide: getRepositoryToken(Delivery), useValue: mockDeliveryRepo },
         { provide: OrdersService, useValue: mockOrdersService },
       ],
     }).compile();
@@ -132,6 +165,101 @@ describe('LogisticsService', () => {
       const result = await service.getActiveDriverLocations('company-uuid-1');
 
       expect(result).toEqual([]);
+    });
+
+    it('cruza delivery_locations con pedidos activos de un delivery independiente (ver ADR-027)', async () => {
+      // Sin asignaciones de driver interno: resolveDriverLocations() corta antes
+      // de llamar a locationRepo.find()/userRepo.find() (ver logistics.service.ts),
+      // por eso no se encolan mocks para esos repos en este test.
+      mockOrdersService.findActiveAssignments.mockResolvedValueOnce([
+        { orderId: 'order-1', orderNumber: 'OBY-001', assignedDriverId: null, assignedDeliveryId: 'delivery-1' },
+      ]);
+      mockDeliveryLocationRepo.find.mockResolvedValueOnce([makeDeliveryLocation()]);
+      mockDeliveryRepo.find.mockResolvedValueOnce([makeDelivery()]);
+
+      const result = await service.getActiveDriverLocations('company-uuid-1');
+
+      expect(result).toEqual([
+        {
+          deliveryId: 'delivery-1',
+          firstName: 'Pedro',
+          lastName: 'Delivery',
+          lat: -34.61,
+          lng: -58.38,
+          accuracy: 20,
+          recordedAt: makeDeliveryLocation().recordedAt,
+          orderId: 'order-1',
+          orderNumber: 'OBY-001',
+        },
+      ]);
+    });
+
+    it('mezcla resultados de driver interno y delivery independiente en la misma empresa', async () => {
+      mockOrdersService.findActiveAssignments.mockResolvedValueOnce([
+        { orderId: 'order-1', orderNumber: 'OBY-001', assignedDriverId: 'driver-1', assignedDeliveryId: null },
+        { orderId: 'order-2', orderNumber: 'OBY-002', assignedDriverId: null, assignedDeliveryId: 'delivery-1' },
+      ]);
+      mockLocationRepo.find.mockResolvedValueOnce([makeDriverLocation()]);
+      mockUserRepo.find.mockResolvedValueOnce([makeUser()]);
+      mockDeliveryLocationRepo.find.mockResolvedValueOnce([makeDeliveryLocation()]);
+      mockDeliveryRepo.find.mockResolvedValueOnce([makeDelivery()]);
+
+      const result = await service.getActiveDriverLocations('company-uuid-1');
+
+      expect(result).toHaveLength(2);
+      expect(result).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ companyUserId: 'driver-1', orderId: 'order-1' }),
+          expect.objectContaining({ deliveryId: 'delivery-1', orderId: 'order-2' }),
+        ]),
+      );
+    });
+  });
+
+  describe('upsertDeliveryLocation()', () => {
+    it('hace upsert con deliveryId como conflict path', async () => {
+      await service.upsertDeliveryLocation('delivery-1', { lat: -34.6, lng: -58.4, accuracy: 10 });
+
+      expect(mockDeliveryLocationRepo.upsert).toHaveBeenCalledWith(
+        expect.objectContaining({ deliveryId: 'delivery-1', lat: -34.6, lng: -58.4, accuracy: 10 }),
+        ['deliveryId'],
+      );
+    });
+  });
+
+  describe('getLocationForAssignment()', () => {
+    it('con assignedDriverId: busca en driver_locations', async () => {
+      mockLocationRepo.findOne.mockResolvedValueOnce(makeDriverLocation());
+
+      const result = await service.getLocationForAssignment('driver-1', null);
+
+      expect(result).toEqual({ lat: -34.6037, lng: -58.3816, accuracy: 15, recordedAt: makeDriverLocation().recordedAt });
+      expect(mockLocationRepo.findOne).toHaveBeenCalledWith({ where: { companyUserId: 'driver-1' } });
+    });
+
+    it('con assignedDeliveryId: busca en delivery_locations', async () => {
+      mockDeliveryLocationRepo.findOne.mockResolvedValueOnce(makeDeliveryLocation());
+
+      const result = await service.getLocationForAssignment(null, 'delivery-1');
+
+      expect(result).toEqual({ lat: -34.61, lng: -58.38, accuracy: 20, recordedAt: makeDeliveryLocation().recordedAt });
+      expect(mockDeliveryLocationRepo.findOne).toHaveBeenCalledWith({ where: { deliveryId: 'delivery-1' } });
+    });
+
+    it('sin ninguno de los dos ids: devuelve null sin consultar nada', async () => {
+      const result = await service.getLocationForAssignment(null, null);
+
+      expect(result).toBeNull();
+      expect(mockLocationRepo.findOne).not.toHaveBeenCalled();
+      expect(mockDeliveryLocationRepo.findOne).not.toHaveBeenCalled();
+    });
+
+    it('con assignedDriverId pero sin posicion reportada: devuelve null', async () => {
+      mockLocationRepo.findOne.mockResolvedValueOnce(null);
+
+      const result = await service.getLocationForAssignment('driver-1', null);
+
+      expect(result).toBeNull();
     });
   });
 });

@@ -126,6 +126,24 @@ export class Order {
     notes?: string;
   };
 
+  // Ruta calculada con Google Directions API al pasar a Despachado (ver
+  // ADR-027 / fase4e). Se calcula UNA sola vez (origen Company.address,
+  // destino deliveryAddress, ambos texto libre) y se cachea aca -- no se
+  // vuelve a pedir en cada poll de posicion del repartidor. Null si Google
+  // Maps esta deshabilitado o Directions API no pudo resolver la ruta
+  // (no bloquea el despacho del pedido).
+  @Column({ name: 'route_polyline', type: 'text', nullable: true })
+  routePolyline: string | null;
+
+  @Column({ name: 'route_distance_meters', type: 'int', nullable: true })
+  routeDistanceMeters: number | null;
+
+  @Column({ name: 'route_duration_seconds', type: 'int', nullable: true })
+  routeDurationSeconds: number | null;
+
+  @Column({ name: 'route_calculated_at', type: 'timestamptz', nullable: true })
+  routeCalculatedAt: Date | null;
+
   @Column({ name: 'scheduled_delivery_date', nullable: true })
   scheduledDeliveryDate: Date;
 

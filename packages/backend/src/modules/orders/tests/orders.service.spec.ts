@@ -13,6 +13,8 @@ import { EmailService } from '../../email/email.service';
 import { BuyersService } from '../../buyers/buyers.service';
 import { AfipService } from '../../afip/afip.service';
 import { DriversService } from '../../logistics/drivers.service';
+import { GoogleMapsService } from '../../logistics/google-maps.service';
+import { LogisticsService } from '../../logistics/logistics.service';
 import { Company, FleetType } from '../../users/entities/company.entity';
 import { UserRole } from '../../users/entities/company-user.entity';
 
@@ -85,6 +87,16 @@ const mockDriversService = {
   isAvailable: jest.fn().mockResolvedValue(true),
 };
 
+// Ver ADR-027: GoogleMapsService deshabilitado por default en los tests
+// (sin API key) -- cada test de ruta sobreescribe el valor con mockResolvedValueOnce.
+const mockGoogleMapsService = {
+  calculateRoute: jest.fn().mockResolvedValue(null),
+};
+
+const mockLogisticsService = {
+  getLocationForAssignment: jest.fn().mockResolvedValue(null),
+};
+
 const mockCompanyRepo = {
   findOne: jest.fn().mockResolvedValue(null),
 };
@@ -94,7 +106,7 @@ const mockDataSource = {
   transaction: jest.fn(async (cb) => {
     const orderRepo = {
       findOne: mockOrderRepo.findOne,
-      save: jest.fn(async (entity) => entity),
+      save: mockOrderRepo.save,
     };
     const messageRepo = {
       create: jest.fn((data) => ({ ...data })),
@@ -127,6 +139,8 @@ describe('OrdersService', () => {
         { provide: BuyersService, useValue: mockBuyersService },
         { provide: AfipService, useValue: mockAfipService },
         { provide: DriversService, useValue: mockDriversService },
+        { provide: GoogleMapsService, useValue: mockGoogleMapsService },
+        { provide: LogisticsService, useValue: mockLogisticsService },
       ],
     }).compile();
 
@@ -553,10 +567,136 @@ describe('OrdersService', () => {
 
       const result = await service.findActiveAssignments('company-uuid-1');
 
-      expect(result).toEqual([{ orderId: 'o1', orderNumber: 'OBY-001', assignedDriverId: 'driver-1' }]);
+      expect(result).toEqual([
+        { orderId: 'o1', orderNumber: 'OBY-001', assignedDriverId: 'driver-1', assignedDeliveryId: undefined },
+      ]);
       expect(mockOrderRepo.find).toHaveBeenCalledWith({
         where: { companyId: 'company-uuid-1', status: OrderStatus.DESPACHADO },
       });
+    });
+  });
+
+  describe('updateStatus() — cálculo de ruta con Google Maps al Despachar (ver ADR-027)', () => {
+    it('Despachado con ruta calculada: guarda polyline/distancia/duracion en el pedido', async () => {
+      mockOrderRepo.findOne.mockResolvedValueOnce(
+        makeOrder({ status: OrderStatus.PREPARACION, deliveryAddress: { street: 'Calle 1', city: 'CABA', province: 'CABA', postalCode: '1000' } }),
+      );
+      mockCompanyRepo.findOne.mockResolvedValueOnce({ address: 'Av Siempreviva 742, CABA' });
+      mockGoogleMapsService.calculateRoute.mockResolvedValueOnce({
+        polyline: 'abc123',
+        distanceMeters: 5000,
+        durationSeconds: 600,
+      });
+      mockOrderRepo.findOne.mockResolvedValueOnce(makeOrder({ status: OrderStatus.DESPACHADO }));
+
+      await service.updateStatus(
+        'order-uuid-1', 'company-uuid-1',
+        { status: OrderStatus.DESPACHADO },
+        'user-1', 'Admin',
+      );
+
+      expect(mockGoogleMapsService.calculateRoute).toHaveBeenCalledWith('Av Siempreviva 742, CABA', 'Calle 1, CABA, CABA');
+      const savedOrder = mockOrderRepo.save.mock.calls[0][0];
+      expect(savedOrder.routePolyline).toBe('abc123');
+      expect(savedOrder.routeDistanceMeters).toBe(5000);
+      expect(savedOrder.routeDurationSeconds).toBe(600);
+    });
+
+    it('GoogleMapsService deshabilitado o sin resultado: no bloquea el despacho', async () => {
+      mockOrderRepo.findOne.mockResolvedValueOnce(
+        makeOrder({ status: OrderStatus.PREPARACION, deliveryAddress: { street: 'Calle 1', city: 'CABA', province: 'CABA', postalCode: '1000' } }),
+      );
+      mockCompanyRepo.findOne.mockResolvedValueOnce({ address: 'Av Siempreviva 742, CABA' });
+      mockGoogleMapsService.calculateRoute.mockResolvedValueOnce(null);
+      mockOrderRepo.findOne.mockResolvedValueOnce(makeOrder({ status: OrderStatus.DESPACHADO }));
+
+      const result = await service.updateStatus(
+        'order-uuid-1', 'company-uuid-1',
+        { status: OrderStatus.DESPACHADO },
+        'user-1', 'Admin',
+      );
+
+      expect(result.status).toBe(OrderStatus.DESPACHADO);
+    });
+
+    it('calculateRoute lanza error: no bloquea el despacho (best-effort)', async () => {
+      mockOrderRepo.findOne.mockResolvedValueOnce(
+        makeOrder({ status: OrderStatus.PREPARACION, deliveryAddress: { street: 'Calle 1', city: 'CABA', province: 'CABA', postalCode: '1000' } }),
+      );
+      mockCompanyRepo.findOne.mockResolvedValueOnce({ address: 'Av Siempreviva 742, CABA' });
+      mockGoogleMapsService.calculateRoute.mockRejectedValueOnce(new Error('timeout'));
+      mockOrderRepo.findOne.mockResolvedValueOnce(makeOrder({ status: OrderStatus.DESPACHADO }));
+
+      const result = await service.updateStatus(
+        'order-uuid-1', 'company-uuid-1',
+        { status: OrderStatus.DESPACHADO },
+        'user-1', 'Admin',
+      );
+
+      expect(result.status).toBe(OrderStatus.DESPACHADO);
+    });
+  });
+
+  describe('getTrackingForBuyer() — ver ADR-027/fase4e', () => {
+    it('pedido no existe o no es del comprador: NotFoundException', async () => {
+      mockOrderRepo.findOne.mockResolvedValueOnce(null);
+
+      await expect(service.getTrackingForBuyer('order-uuid-1', 'buyer-uuid-1')).rejects.toThrow(NotFoundException);
+    });
+
+    it('pedido no esta Despachado: devuelve null', async () => {
+      mockOrderRepo.findOne.mockResolvedValueOnce(makeOrder({ status: OrderStatus.PREPARACION }));
+
+      const result = await service.getTrackingForBuyer('order-uuid-1', 'buyer-uuid-1');
+
+      expect(result).toBeNull();
+    });
+
+    it('Despachado sin repartidor asignado: devuelve null', async () => {
+      mockOrderRepo.findOne.mockResolvedValueOnce(
+        makeOrder({ status: OrderStatus.DESPACHADO, assignedDriverId: null, assignedDeliveryId: null }),
+      );
+
+      const result = await service.getTrackingForBuyer('order-uuid-1', 'buyer-uuid-1');
+
+      expect(result).toBeNull();
+    });
+
+    it('repartidor asignado sin posicion reportada: devuelve null', async () => {
+      mockOrderRepo.findOne.mockResolvedValueOnce(
+        makeOrder({ status: OrderStatus.DESPACHADO, assignedDriverId: 'driver-1' }),
+      );
+      mockLogisticsService.getLocationForAssignment.mockResolvedValueOnce(null);
+
+      const result = await service.getTrackingForBuyer('order-uuid-1', 'buyer-uuid-1');
+
+      expect(result).toBeNull();
+    });
+
+    it('happy path: devuelve posicion y ruta calculada', async () => {
+      mockOrderRepo.findOne.mockResolvedValueOnce(
+        makeOrder({
+          status: OrderStatus.DESPACHADO,
+          assignedDriverId: 'driver-1',
+          routePolyline: 'abc123',
+          routeDistanceMeters: 5000,
+          routeDurationSeconds: 600,
+        }),
+      );
+      mockLogisticsService.getLocationForAssignment.mockResolvedValueOnce({
+        lat: -34.6, lng: -58.4, accuracy: 10, recordedAt: new Date('2026-10-07T12:00:00Z'),
+      });
+
+      const result = await service.getTrackingForBuyer('order-uuid-1', 'buyer-uuid-1');
+
+      expect(result).toEqual({
+        driverLat: -34.6,
+        driverLng: -58.4,
+        routePolyline: 'abc123',
+        routeDistanceMeters: 5000,
+        routeDurationSeconds: 600,
+      });
+      expect(mockLogisticsService.getLocationForAssignment).toHaveBeenCalledWith('driver-1', undefined);
     });
   });
 });
