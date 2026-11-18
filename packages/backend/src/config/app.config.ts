@@ -11,6 +11,11 @@ export const databaseConfig = registerAs('database', () => ({
   name: process.env.DATABASE_NAME || 'obraya',
   user: process.env.DATABASE_USER || 'user',
   password: process.env.DATABASE_PASSWORD || 'password',
+  // Ver ADR-020: Postgres corre como contenedor local en la misma instancia
+  // (no RDS), sin SSL configurado. No inferir de NODE_ENV=production (eso
+  // asumia el diseno original de ADR-015 con RDS). Opt-in explicito via
+  // DATABASE_SSL=true si en el futuro se migra a un Postgres managed.
+  ssl: process.env.DATABASE_SSL === 'true',
 }));
 
 export const jwtConfig = registerAs('jwt', () => ({

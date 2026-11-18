@@ -182,6 +182,70 @@ describe('OrdersService', () => {
     });
   });
 
+  describe('create() — comisión de ObraYa (4%) y neto de la empresa', () => {
+    const baseDto = {
+      companyId: 'company-uuid-1',
+      items: [{ productId: 'p1', productName: 'Cemento', quantity: 2, unitPrice: 10000 }],
+      buyerName: 'Juan',
+      buyerEmail: 'juan@test.com',
+      deliveryAddress: { street: 'Calle 1', city: 'CABA', province: 'CABA', postalCode: '1000' },
+    } as any;
+
+    it('sin company (default 4%): platformCommissionAmount se calcula sobre itemsTotal, sin envío', async () => {
+      mockCompanyRepo.findOne.mockResolvedValueOnce(null);
+
+      const order = await service.create('company-uuid-1', 'buyer-uuid-1', baseDto);
+
+      expect(order.platformCommissionAmount).toBe(800); // 4% de 20000
+    });
+
+    it('con % negociado por empresa: usa platformCommissionPercent de la company', async () => {
+      mockCompanyRepo.findOne.mockResolvedValueOnce({ platformCommissionPercent: 10 });
+
+      const order = await service.create('company-uuid-1', 'buyer-uuid-1', baseDto);
+
+      expect(order.platformCommissionAmount).toBe(2000); // 10% de 20000
+    });
+
+    it('Efectivo/Transferencia: mpFeeAmount y netAmountToCompany se calculan al crear (no hay fee de MP)', async () => {
+      mockCompanyRepo.findOne.mockResolvedValueOnce(null);
+
+      const order = await service.create('company-uuid-1', 'buyer-uuid-1', baseDto);
+
+      expect(order.mpFeeAmount).toBe(0);
+      expect(order.netAmountToCompany).toBe(order.totalAmount - order.platformCommissionAmount);
+    });
+
+    it('MercadoPago: mpFeeAmount y netAmountToCompany quedan null hasta que el webhook confirma el pago', async () => {
+      mockCompanyRepo.findOne.mockResolvedValueOnce(null);
+      mockPaymentsService.createPreference.mockResolvedValueOnce({
+        preferenceId: 'pref-1', initPoint: 'https://mp/pay',
+      });
+
+      const order = await service.create('company-uuid-1', 'buyer-uuid-1', {
+        ...baseDto, paymentMethod: 'MercadoPago',
+      });
+
+      expect(order.mpFeeAmount).toBeNull();
+      expect(order.netAmountToCompany).toBeNull();
+    });
+
+    it('envío no cuenta como venta: la comisión no se calcula sobre shippingCost', async () => {
+      mockCompanyRepo.findOne.mockResolvedValueOnce({
+        deliveryZones: [{
+          id: 'zone-1', name: 'CABA', zipCodes: ['1000'],
+          promisedHours: 24, fleetType: FleetType.PROPIA, shippingCost: 5000,
+        }],
+        platformCommissionPercent: 4,
+      });
+
+      const order = await service.create('company-uuid-1', 'buyer-uuid-1', baseDto);
+
+      expect(order.totalAmount).toBe(25000); // 20000 items + 5000 envío
+      expect(order.platformCommissionAmount).toBe(800); // 4% de 20000, no de 25000
+    });
+  });
+
   describe('updateStatus() — transiciones válidas', () => {
     it('Nuevo → Aceptado: transición válida', async () => {
       mockOrderRepo.findOne.mockResolvedValueOnce(makeOrder({ status: OrderStatus.NUEVO }));

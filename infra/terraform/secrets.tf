@@ -89,6 +89,23 @@ resource "aws_secretsmanager_secret_version" "sentry_dsn" {
   }
 }
 
+# Access token de AfipSDK (app.afipsdk.com) -- no es un secret de AFIP en si,
+# sino de la libreria @afipsdk/afip.js que actua de proxy hacia AFIP (ver
+# ADR-010 y afip.service.ts). Sin esto, la emision de facturas falla con 401
+# incluso con certificado/CUIT propios correctos.
+resource "aws_secretsmanager_secret" "afip_access_token" {
+  name = "obraya/${var.environment}/afip-access-token"
+}
+
+resource "aws_secretsmanager_secret_version" "afip_access_token" {
+  secret_id     = aws_secretsmanager_secret.afip_access_token.id
+  secret_string = "CHANGEME"
+
+  lifecycle {
+    ignore_changes = [secret_string]
+  }
+}
+
 # AFIP_CERT_PATH/AFIP_KEY_PATH son archivos (certificado + clave), no un
 # string simple -- no entran en este patron de Secrets Manager. Ver
 # README.md para como montarlos en la task de ECS.

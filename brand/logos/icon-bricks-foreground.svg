@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <!-- Versión sin fondo (transparente) del icon-bricks, escalada y centrada
+       dentro de la "safe zone" (~66%) que exige el adaptive icon de Android. -->
+  <g transform="translate(174,174) scale(0.66)">
+    <rect x="72" y="248" width="400" height="160" rx="16" fill="#ffffff"/>
+    <rect x="552" y="248" width="400" height="160" rx="16" fill="#ffffff"/>
+    <rect x="72" y="432" width="160" height="160" rx="16" fill="#ffffff"/>
+    <rect x="272" y="432" width="480" height="160" rx="16" fill="#ffffff"/>
+    <rect x="792" y="432" width="160" height="160" rx="16" fill="#ffffff"/>
+    <rect x="72" y="616" width="400" height="160" rx="16" fill="#ffffff"/>
+    <rect x="552" y="616" width="400" height="160" rx="16" fill="#ffffff"/>
+  </g>
+</svg>

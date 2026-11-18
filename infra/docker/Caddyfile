@@ -1,6 +1,6 @@
 # Caddy emite y renueva certificados TLS automaticamente via Let's Encrypt
 # (HTTP-01), sin ACM ni ALB de por medio (ver infra/terraform/acm.tf). Los
-# tres dominios deben apuntar (A/AAAA) a la IP elastica de la instancia
+# dominios deben apuntar (A/AAAA) a la IP elastica de la instancia
 # (output eip_public_ip de terraform) antes de levantar este stack, o el
 # challenge HTTP-01 falla.
 
@@ -13,5 +13,12 @@ admin.obraya.com.ar {
 }
 
 app.obraya.com.ar {
+	reverse_proxy frontend:3001
+}
+
+# Landing de marketing (apex, sin subdominio) -- mismo contenedor de
+# frontend que app./admin., el Next.js decide via Host header (ver
+# middleware.ts) si sirve la landing o la app logueada.
+obraya.com.ar {
 	reverse_proxy frontend:3001
 }

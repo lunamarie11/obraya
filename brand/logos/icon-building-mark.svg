@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <rect width="1024" height="1024" rx="220" fill="#0f172a"/>
+
+  <!-- Techo / roofline minimalista -->
+  <path d="M 212 560 L 512 290 L 812 560" fill="none" stroke="#ffffff" stroke-width="48" stroke-linecap="round" stroke-linejoin="round"/>
+
+  <!-- Base / cimiento -->
+  <rect x="212" y="560" width="600" height="48" rx="24" fill="#ffffff"/>
+
+  <!-- Columnas -->
+  <rect x="300" y="608" width="48" height="140" rx="20" fill="#ffffff"/>
+  <rect x="676" y="608" width="48" height="140" rx="20" fill="#ffffff"/>
+
+  <!-- Acento / baliza en el vertice -->
+  <circle cx="512" cy="290" r="46" fill="#f97316"/>
+</svg>

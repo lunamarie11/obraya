@@ -14,6 +14,7 @@ import {
   HttpCode,
   HttpStatus,
   ParseUUIDPipe,
+  BadRequestException,
 } from '@nestjs/common';
 import { FileInterceptor, FilesInterceptor } from '@nestjs/platform-express';
 import {
@@ -113,11 +114,17 @@ export class ProductsController {
   }
 
   @Post('import')
-  @ApiOperation({ summary: 'Import masivo de productos via CSV' })
+  @ApiOperation({ summary: 'Import masivo de productos via CSV o Excel (admite precio y stock)' })
   @ApiConsumes('multipart/form-data')
   @Roles(UserRole.ADMIN, UserRole.VENDEDOR)
   @UseInterceptors(FileInterceptor('file', imageStorage))
-  async importCsv(@UploadedFile() file: Express.Multer.File, @CurrentUser() user: any) {
-    return this.productsService.importFromCsv(user.companyId, file.buffer);
+  async importProducts(@UploadedFile() file: Express.Multer.File, @CurrentUser() user: any) {
+    if (!file) throw new BadRequestException('Debe adjuntar un archivo CSV o Excel');
+    return this.productsService.importFromFile(
+      user.companyId,
+      file.buffer,
+      file.originalname,
+      user.id,
+    );
   }
 }

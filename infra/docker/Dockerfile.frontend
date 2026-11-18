@@ -23,6 +23,9 @@ COPY . .
 ARG NEXT_PUBLIC_API_URL
 ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
 
+# Build shared package first (el frontend depende de su dist compilado)
+RUN npm run build --workspace=@obraya/shared
+
 # Build the application (requiere output: 'standalone' en next.config.js)
 RUN npm run build --workspace=@obraya/frontend
 

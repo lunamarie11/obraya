@@ -9,12 +9,14 @@ import { AdminController } from './admin.controller';
 import { AdminService } from './admin.service';
 import { UsersModule } from '../users/users.module';
 import { ProductsModule } from '../products/products.module';
+import { EmailModule } from '../email/email.module';
 
 @Module({
   imports: [
     TypeOrmModule.forFeature([Company, CompanyUser, Order, Product, SponsoredBanner]),
     UsersModule,
     ProductsModule,
+    EmailModule,
   ],
   controllers: [AdminController],
   providers: [AdminService],

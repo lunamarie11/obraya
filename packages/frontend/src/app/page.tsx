@@ -269,8 +269,8 @@ export default function Home() {
         <div className="max-w-7xl mx-auto px-6 flex flex-col md:flex-row items-center justify-between text-sm">
           <div>© {new Date().getFullYear()} ObraYa</div>
           <div className="flex gap-4 mt-4 md:mt-0 text-slate-300">
-            <span>Política de privacidad</span>
-            <span>Términos</span>
+            <a href="/privacidad" className="hover:text-white">Política de privacidad</a>
+            <a href="/terminos" className="hover:text-white">Términos</a>
           </div>
         </div>
       </footer>

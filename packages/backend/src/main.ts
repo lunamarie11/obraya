@@ -1,4 +1,5 @@
 import { NestFactory } from '@nestjs/core';
+import { NestExpressApplication } from '@nestjs/platform-express';
 import helmet from 'helmet';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { AppModule } from './app.module';
@@ -39,7 +40,17 @@ async function bootstrap() {
     process.exit(1);
   }
 
-  const app = await NestFactory.create(AppModule);
+  const app = await NestFactory.create<NestExpressApplication>(AppModule);
+
+  // En produccion, el backend solo es alcanzable a traves de Caddy (ver
+  // Caddyfile / docker-compose.prod.yml, el puerto 3000 nunca se publica al
+  // host). Sin "trust proxy", Express ignora X-Forwarded-For y req.ip queda
+  // igual para TODAS las requests (la IP interna de Caddy) -- lo que hacia
+  // que el rate limit de login (5 intentos/15min por IP, ver
+  // throttling.module.ts) fuera en realidad global para todo el sitio: un
+  // puñado de intentos de cualquier usuario bloqueaba el login de todos los
+  // demas. "1" = confiar en un solo hop de proxy (Caddy).
+  app.set('trust proxy', 1);
 
   registerProcessErrorHandlers(app.get(LoggerService), app.get(ErrorTrackingService));
 

@@ -1,16 +1,24 @@
 'use client';
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import Link from 'next/link';
 import { api } from '@/lib/api';
 import { Header } from '@/components/layout/Header';
-import { Plus, Search, Package, Pencil, EyeOff } from 'lucide-react';
+import { Plus, Search, Package, Pencil, EyeOff, Upload, Loader2, AlertTriangle, CheckCircle2, X } from 'lucide-react';
+import { clsx } from 'clsx';
 
 export default function ProductsPage() {
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(1);
   const qc = useQueryClient();
+  const importRef = useRef<HTMLInputElement>(null);
+  const [importing, setImporting] = useState(false);
+  const [importResult, setImportResult] = useState<{
+    created: number;
+    updated: number;
+    errors: Array<{ row: number; error: string }>;
+  } | null>(null);
 
   const { data, isLoading } = useQuery({
     queryKey: ['products', search, page],
@@ -24,14 +32,69 @@ export default function ProductsPage() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ['products'] }),
   });
 
+  const handleImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setImporting(true);
+    setImportResult(null);
+    const fd = new FormData();
+    fd.append('file', file);
+    try {
+      const { data } = await api.post('/products/import', fd, { headers: { 'Content-Type': 'multipart/form-data' } });
+      setImportResult(data);
+      qc.invalidateQueries({ queryKey: ['products'] });
+      qc.invalidateQueries({ queryKey: ['stock'] });
+    } finally {
+      setImporting(false);
+      e.target.value = '';
+    }
+  };
+
   return (
     <div>
       <Header title="Productos" actions={
-        <Link href="/products/new" className="btn-primary flex items-center gap-2 text-sm">
-          <Plus size={15} /> Nuevo producto
-        </Link>
+        <div className="flex items-center gap-2">
+          <label className={clsx('btn-secondary text-sm flex items-center gap-2 cursor-pointer', importing && 'opacity-60 pointer-events-none')}>
+            {importing ? <Loader2 size={14} className="animate-spin" /> : <Upload size={14} />}
+            {importing ? 'Importando...' : 'Importar CSV/Excel'}
+            <input ref={importRef} type="file" accept=".csv,.xlsx,.xls" className="hidden" onChange={handleImport} />
+          </label>
+          <Link href="/products/new" className="btn-primary flex items-center gap-2 text-sm">
+            <Plus size={15} /> Nuevo producto
+          </Link>
+        </div>
       } />
       <div className="p-6 space-y-4">
+
+        {importResult && (
+          <div className={clsx(
+            'rounded-2xl p-4 flex items-start gap-3 border',
+            importResult.errors.length > 0 ? 'bg-amber-50 border-amber-200' : 'bg-green-50 border-green-200',
+          )}>
+            {importResult.errors.length > 0
+              ? <AlertTriangle size={18} className="text-amber-500 flex-shrink-0 mt-0.5" />
+              : <CheckCircle2 size={18} className="text-green-500 flex-shrink-0 mt-0.5" />}
+            <div className="text-sm flex-1">
+              <p className={importResult.errors.length > 0 ? 'text-amber-700' : 'text-green-700'}>
+                <span className="font-semibold">{importResult.created}</span> creados,{' '}
+                <span className="font-semibold">{importResult.updated}</span> actualizados
+                {importResult.errors.length > 0 && (
+                  <>, <span className="font-semibold">{importResult.errors.length}</span> con error{importResult.errors.length > 1 ? 'es' : ''}</>
+                )}
+              </p>
+              {importResult.errors.length > 0 && (
+                <ul className="mt-1.5 text-xs text-amber-600 space-y-0.5 max-h-32 overflow-y-auto">
+                  {importResult.errors.map((err, i) => (
+                    <li key={i}>Fila {err.row}: {err.error}</li>
+                  ))}
+                </ul>
+              )}
+            </div>
+            <button onClick={() => setImportResult(null)} className="text-slate-400 hover:text-slate-700 transition-colors">
+              <X size={15} />
+            </button>
+          </div>
+        )}
 
         <div className="relative max-w-sm">
           <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
@@ -53,7 +116,7 @@ export default function ProductsPage() {
           <div className="card p-12 flex flex-col items-center text-center">
             <Package size={40} className="text-slate-300 mb-3" />
             <p className="font-semibold text-slate-700">No hay productos aún</p>
-            <p className="text-sm text-slate-500 mt-1">Creá tu primer producto o importá desde CSV</p>
+            <p className="text-sm text-slate-500 mt-1">Creá tu primer producto o importá tu catálogo desde CSV/Excel</p>
             <Link href="/products/new" className="btn-primary mt-4 text-sm">Crear producto</Link>
           </div>
         ) : (

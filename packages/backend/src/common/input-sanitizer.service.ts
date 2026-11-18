@@ -58,6 +58,15 @@ export class InputSanitizerService {
       return this.sanitizeString(obj);
     }
 
+    // Los archivos subidos (@UploadedFile) tambien pasan por este pipe global.
+    // Buffer es "object" para typeof pero NO debe reconstruirse como objeto
+    // plano: Object.entries() de un Buffer devuelve sus bytes como claves
+    // "0","1","2"... y Object.assign pierde el prototipo de Buffer, lo cual
+    // rompe cualquier parseo posterior (CSV/Excel/imagenes) del archivo.
+    if (Buffer.isBuffer(obj)) {
+      return obj;
+    }
+
     if (Array.isArray(obj)) {
       return obj.map((item) => this.sanitizeObject(item));
     }

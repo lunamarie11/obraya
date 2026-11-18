@@ -69,8 +69,8 @@ export default function StockPage() {
       <Header title="Stock" actions={
         <label className={clsx('btn-secondary text-sm flex items-center gap-2 cursor-pointer', csvUploading && 'opacity-60 pointer-events-none')}>
           {csvUploading ? <Loader2 size={14} className="animate-spin" /> : <Upload size={14} />}
-          {csvUploading ? 'Importando...' : 'Importar CSV'}
-          <input ref={csvRef} type="file" accept=".csv" className="hidden" onChange={handleCsvUpload} />
+          {csvUploading ? 'Importando...' : 'Importar CSV/Excel'}
+          <input ref={csvRef} type="file" accept=".csv,.xlsx,.xls" className="hidden" onChange={handleCsvUpload} />
         </label>
       } />
       <div className="p-6 space-y-4">

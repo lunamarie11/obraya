@@ -18,12 +18,19 @@ function isBuyerRoute(url?: string) {
   );
 }
 
+// Rutas del repartidor independiente (ver ADR-026): usan un JWT propio (Delivery).
+function isDeliveryRoute(url?: string) {
+  return !!url && (url.includes('/delivery-auth') || url.includes('/delivery-orders'));
+}
+
 // Inyectar token en cada request, eligiendo el par de tokens según la ruta
 api.interceptors.request.use((config) => {
   if (typeof window !== 'undefined') {
-    const token = isBuyerRoute(config.url)
-      ? localStorage.getItem('buyerAccessToken')
-      : localStorage.getItem('accessToken');
+    const token = isDeliveryRoute(config.url)
+      ? localStorage.getItem('deliveryAccessToken')
+      : isBuyerRoute(config.url)
+        ? localStorage.getItem('buyerAccessToken')
+        : localStorage.getItem('accessToken');
     if (token) config.headers.Authorization = `Bearer ${token}`;
   }
   return config;
@@ -35,11 +42,28 @@ api.interceptors.response.use(
   async (error) => {
     const original = error.config;
     const buyerRoute = isBuyerRoute(original?.url);
+    const deliveryRoute = isDeliveryRoute(original?.url);
     // No interceptar errores de los propios endpoints de auth
     const isAuthEndpoint = original?.url?.includes('/auth/');
     if (error.response?.status === 401 && !original._retry && !isAuthEndpoint) {
       original._retry = true;
       const baseURL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3010/api/v1';
+
+      if (deliveryRoute) {
+        const deliveryRefreshToken = localStorage.getItem('deliveryRefreshToken');
+        if (!deliveryRefreshToken) return Promise.reject(error);
+        try {
+          const { data } = await axios.post(`${baseURL}/delivery-auth/refresh`, { refreshToken: deliveryRefreshToken });
+          localStorage.setItem('deliveryAccessToken', data.accessToken);
+          original.headers.Authorization = `Bearer ${data.accessToken}`;
+          return api(original);
+        } catch {
+          localStorage.removeItem('deliveryAccessToken');
+          localStorage.removeItem('deliveryRefreshToken');
+          localStorage.removeItem('deliveryUser');
+          return Promise.reject(error);
+        }
+      }
 
       if (buyerRoute) {
         const buyerRefreshToken = localStorage.getItem('buyerRefreshToken');

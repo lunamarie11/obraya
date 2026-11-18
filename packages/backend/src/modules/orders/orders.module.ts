@@ -6,6 +6,7 @@ import { OrderMessage } from './entities/order-message.entity';
 import { OrdersService } from './orders.service';
 import { OrdersController } from './orders.controller';
 import { BuyerOrdersController } from './buyer-orders.controller';
+import { DeliveryOrdersController } from './delivery-orders.controller';
 import { StockModule } from '../stock/stock.module';
 import { BuyersModule } from '../buyers/buyers.module';
 import { PaymentsModule } from '../payments/payments.module';
@@ -14,6 +15,7 @@ import { AfipModule } from '../afip/afip.module';
 import { EmailModule } from '../email/email.module';
 import { Company } from '../users/entities/company.entity';
 import { LogisticsModule } from '../logistics/logistics.module';
+import { DeliveryModule } from '../delivery/delivery.module';
 
 @Module({
   imports: [
@@ -29,8 +31,9 @@ import { LogisticsModule } from '../logistics/logistics.module';
     // ya depende de OrdersModule (ADR-018) -> dependencia circular resuelta
     // con forwardRef en ambos lados.
     forwardRef(() => LogisticsModule),
+    DeliveryModule,
   ],
-  controllers: [OrdersController, BuyerOrdersController],
+  controllers: [OrdersController, BuyerOrdersController, DeliveryOrdersController],
   providers: [OrdersService],
   exports: [OrdersService],
 })

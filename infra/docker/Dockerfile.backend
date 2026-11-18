@@ -16,6 +16,9 @@ RUN npm ci
 # Copy source code
 COPY . .
 
+# Build shared package first (el backend depende de su dist compilado)
+RUN npm run build --workspace=@obraya/shared
+
 # Build the application
 RUN npm run build --workspace=@obraya/backend
 

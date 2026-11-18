@@ -33,9 +33,21 @@ export class AfipService implements OnModuleInit {
   private client: any;
   private enabled = false;
   private readonly ptoVta: number;
+  private readonly issuerIvaCondition: CompanyIvaCondition;
 
   constructor(private readonly config: ConfigService) {
     this.ptoVta = parseInt(this.config.get<string>('AFIP_PTO_VTA') ?? '1', 10);
+    // Condicion de IVA del CUIT que efectivamente factura (configurado en
+    // AFIP_CUIT), NO del fabricante de cada pedido -- ver correccion en
+    // ADR-010. Default MONOTRIBUTO: es la opcion segura, ya que emitir
+    // Factura B sin ser Responsable Inscripto es rechazado por AFIP
+    // (error 10000), mientras que emitir Factura C de mas no tiene ese
+    // riesgo.
+    const configured = this.config.get<string>('AFIP_ISSUER_IVA_CONDITION');
+    this.issuerIvaCondition =
+      configured && Object.values(CompanyIvaCondition).includes(configured as CompanyIvaCondition)
+        ? (configured as CompanyIvaCondition)
+        : CompanyIvaCondition.MONOTRIBUTO;
   }
 
   onModuleInit(): void {
@@ -59,7 +71,20 @@ export class AfipService implements OnModuleInit {
       return;
     }
 
-    this.client = new Afip({ CUIT: cuit, cert, key, production });
+    // @afipsdk/afip.js no habla directo con los servidores de AFIP: todas
+    // las llamadas (incluso con cert/key propios) pasan por el proxy en la
+    // nube de AfipSDK (app.afipsdk.com), que exige su propio access_token
+    // en producción (gratuito, se obtiene registrandose en esa plataforma).
+    // Sin este token, cualquier llamada falla con HTTP 401.
+    const accessToken = this.config.get<string>('AFIP_ACCESS_TOKEN');
+    if (production && !accessToken) {
+      this.logger.warn(
+        'AFIP deshabilitado: en producción es obligatorio AFIP_ACCESS_TOKEN (se obtiene gratis en https://app.afipsdk.com).',
+      );
+      return;
+    }
+
+    this.client = new Afip({ CUIT: cuit, cert, key, production, access_token: accessToken });
     this.enabled = true;
     this.logger.log(
       `AfipService inicializado (${production ? 'producción' : 'testing/homologación'}, CUIT ${cuit}).`,
@@ -97,14 +122,19 @@ export class AfipService implements OnModuleInit {
     }
   }
 
-  // Emite una Factura B (Responsable Inscripto) o C (Monotributo/Exento).
-  // Nunca Factura A: Buyer no tiene CUIT propio, siempre es consumidor
-  // final sin identificar ante AFIP (ver ADR-010).
+  // Emite una Factura B (si el CUIT emisor es Responsable Inscripto) o C
+  // (Monotributo/Exento). El tipo de factura depende de la condicion de IVA
+  // de quien efectivamente factura ante AFIP (el CUIT configurado en
+  // AFIP_CUIT/AFIP_ISSUER_IVA_CONDITION) -- NO de la condicion de IVA del
+  // fabricante dueno del pedido, que es irrelevante para esta decision
+  // (correccion sobre el diseño original de ADR-010, ver seccion
+  // "Correccion" al final del ADR). Nunca Factura A: Buyer no tiene CUIT
+  // propio, siempre es consumidor final sin identificar ante AFIP.
   async createInvoice(params: { company: Company; order: Order }): Promise<AfipInvoiceResult | null> {
     if (!this.enabled) return null;
 
-    const { company, order } = params;
-    const cbteTipo = company.ivaCondition === CompanyIvaCondition.RESPONSABLE_INSCRIPTO ? 6 : 11;
+    const { order } = params;
+    const cbteTipo = this.issuerIvaCondition === CompanyIvaCondition.RESPONSABLE_INSCRIPTO ? 6 : 11;
     const invoiceType: 'B' | 'C' = cbteTipo === 6 ? 'B' : 'C';
     // Sin desglose de IVA en el modelo de precios actual: se informa todo
     // el importe como neto (ver ADR-010, limitación conocida).

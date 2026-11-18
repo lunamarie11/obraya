@@ -94,7 +94,31 @@ throttler nombrado. Quedan 2 throttlers: `api` (120/min, global) y `auth`
 (5/15min, solo en los controllers de login). Verificado con build limpio y
 pruebas de carga manuales — ver ADR-023. No hay acción pendiente acá.
 
-## 6. Infraestructura de deploy — en progreso (ver ADR-015)
+## 6. Infraestructura de deploy — RESUELTO (2026-11-17)
+
+**Deploy real completado.** `terraform apply` corrido contra una cuenta de
+AWS real (`sa-east-1`), instancia EC2 levantada, imágenes de Docker
+construidas y subidas a ECR, contenedores desplegados vía SSM
+(`docker-compose.prod.yml`), migración inicial corrida sin errores, DNS
+apuntando y HTTPS funcionando en `api.`/`admin.`/`app.obraya.com.ar`
+(verificado con `curl`, todos devuelven `200`). Los 6 secrets
+(JWT/DB/Mercado Pago/Firebase/Sentry) están cargados en Secrets Manager.
+
+Dos bugs de código reales encontrados y corregidos durante este deploy
+(no eran de infraestructura): `packages/shared` nunca se compilaba a JS
+antes de este cambio (rompía cualquier build de producción), y
+`database.module.ts` forzaba SSL en la conexión a Postgres asumiendo el
+diseño viejo de RDS (ADR-015) en vez del Postgres local de ADR-020 —
+ahora `DATABASE_SSL` es una env var explícita, no se infiere de
+`NODE_ENV`.
+
+**Lo que sigue pendiente ya no es "llegar a producción" sino "operar en
+serio" — ver `docs/backlog-salida-produccion.md`** (AFIP real, confirmar
+que el token de Mercado Pago sea de producción, salir del sandbox de SES,
+backups de Postgres, alarma de presupuesto, automatizar el deploy en CI).
+
+<details>
+<summary>Historial — estado antes del 2026-11-17 (en progreso, ver ADR-015)</summary>
 
 **RESUELTO (2026-09-29): decisión de infraestructura + groundwork sin costo.**
 ADR-015 fija AWS ECS Fargate (`sa-east-1`) como orquestador, con
@@ -143,6 +167,8 @@ job (`.github/workflows/ci.yml`). Pendiente menor: `packages/shared` no
 tiene `tsconfig.json` propio, así que su `build` (`tsc`) no corre en CI
 todavía — solo el lint.
 
+</details>
+
 ## 7. Orden sugerido antes del primer deploy
 
 1. ~~Decidir la infraestructura de destino (sección 6)~~ — **hecho, ADR-015,
@@ -154,19 +180,20 @@ todavía — solo el lint.
    `infra/terraform/`. `JWT_SECRET`/`JWT_REFRESH_SECRET`/`DATABASE_PASSWORD`
    (sección 1) ya los genera ese Terraform en Secrets Manager — no hace
    falta generarlos a mano por separado.
-5. Aprobar costo y correr `terraform apply` (sección 6,
-   `infra/terraform/README.md` tiene el orden exacto de pasos) — requiere
-   cuenta de AWS real con método de pago. Costo ahora ~20-25 USD/mes (bajó
-   de ~110-120 tras ADR-020).
-6. Configurar credenciales reales de MercadoPago/AFIP/SES/FCM/Sentry
-   (sección 3) vía `aws secretsmanager put-secret-value` (ver README de
-   Terraform) — la app arranca sin esto, pero con funcionalidad de negocio
-   apagada.
-7. DNS apuntando a la IP elástica de la instancia (`app./admin./api.`) y a
-   CloudFront (`cdn.`) — ver README de Terraform sección 4 para el detalle
-   (son A records a una IP fija, no CNAME a un ALB).
-8. Deploy (build+push de imágenes a ECR, conectar por SSM y levantar
-   `docker-compose.prod.yml`, ver README de Terraform), correr
-   `migration:run` (sección 2), smoke test de `/api/v1/health` y de un flujo
-   de compra end-to-end contra las integraciones reales (MercadoPago/AFIP en
-   modo producción suelen comportarse distinto que en sandbox).
+5. ~~Aprobar costo y correr `terraform apply` (sección 6)~~ — **hecho,
+   2026-11-17**.
+6. ~~Configurar credenciales reales de MercadoPago/Firebase/Sentry
+   (sección 3)~~ — **hecho** (cargadas en Secrets Manager). AFIP sigue en
+   modo testing (bloqueado por falta de CUIT real) y SES sigue en sandbox
+   mode — ver `docs/backlog-salida-produccion.md`.
+7. ~~DNS apuntando a la IP elástica de la instancia~~ — **hecho**,
+   `app.`/`admin.`/`api.obraya.com.ar` resuelven y responden `200` sobre
+   HTTPS.
+8. ~~Deploy (build+push a ECR, SSM, `docker-compose up`) + `migration:run`
+   + smoke test de `/api/v1/health`~~ — **hecho, 2026-11-17**. Falta el
+   flujo de compra end-to-end contra Mercado Pago/AFIP reales — depende de
+   los puntos 1-3 de `docs/backlog-salida-produccion.md`.
+
+**El deploy a producción está completo. Lo que sigue (AFIP real, SES,
+backups, CI/CD) ya no es "llegar a producción" sino "operar en serio" —
+ver `docs/backlog-salida-produccion.md`.**

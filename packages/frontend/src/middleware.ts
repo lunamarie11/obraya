@@ -11,6 +11,11 @@ const PUBLIC_PREFIXES = [
   '/login',
   '/register',
   '/accept-invite',
+  '/terminos',
+  '/privacidad',
+  '/landing',
+  '/get-started',
+  '/delivery',
 ];
 
 // Rutas que solo puede ver SuperAdmin
@@ -18,6 +23,16 @@ const SUPERADMIN_PREFIXES = ['/superadmin/dashboard', '/superadmin/companies', '
 
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
+
+  // Dominio apex (obraya.com.ar, sin subdominio) = landing de marketing,
+  // separada de app.obraya.com.ar (la app logueada). Mismo contenedor de
+  // frontend para ambos dominios (ver Caddyfile) -- la unica diferencia es
+  // que "/" se resuelve a una pagina distinta segun el Host.
+  const host = request.headers.get('host') ?? '';
+  const isApexHost = host === 'obraya.com.ar' || host === 'www.obraya.com.ar';
+  if (isApexHost && pathname === '/') {
+    return NextResponse.rewrite(new URL('/landing', request.url));
+  }
 
   // Rutas públicas — buyer experience + auth pages
   const isPublic = PUBLIC_PREFIXES.some(
@@ -54,5 +69,10 @@ export function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ['/((?!_next/static|_next/image|favicon.ico|api).*)'],
+  // El negative lookahead excluye además cualquier ruta con extensión de
+  // archivo (ícono, SVG, manifest, etc. servidos desde /public o desde las
+  // convenciones de metadata de Next) — si no, el middleware las intercepta
+  // y las redirige a /login por no tener token (bug real: rompía favicon.ico,
+  // icon.png, apple-icon.png y /brand/obraya-lockup.svg en producción).
+  matcher: ['/((?!_next/static|_next/image|favicon.ico|api|.*\\..*).*)'],
 };

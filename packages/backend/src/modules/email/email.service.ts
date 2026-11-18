@@ -18,16 +18,18 @@ export class EmailService implements OnModuleInit {
 
   onModuleInit() {
     const region = this.config.get<string>('AWS_SES_REGION') ?? this.config.get<string>('AWS_S3_REGION');
-    const accessKeyId = this.config.get<string>('AWS_ACCESS_KEY_ID');
-    const secretAccessKey = this.config.get<string>('AWS_SECRET_ACCESS_KEY');
     const from = this.config.get<string>('EMAIL_FROM');
 
-    if (!region || !accessKeyId || !secretAccessKey || !from) {
-      this.logger.warn('AWS SES no configurado (falta region/credenciales/EMAIL_FROM) — envio de email deshabilitado');
+    if (!region || !from) {
+      this.logger.warn('AWS SES no configurado (falta region/EMAIL_FROM) — envio de email deshabilitado');
       return;
     }
 
-    this.client = new SESClient({ region, credentials: { accessKeyId, secretAccessKey } });
+    // Sin `credentials` explicitas: usa el provider chain default del SDK
+    // (variables de entorno o, en la instancia EC2, el IAM role -- mismo
+    // patron que StorageService con S3). El role ya tiene ses:SendEmail/
+    // ses:SendRawEmail (ver iam.tf).
+    this.client = new SESClient({ region });
     this.fromAddress = from;
     this.logger.log('AWS SES inicializado');
   }
@@ -48,6 +50,30 @@ export class EmailService implements OnModuleInit {
     } catch (err) {
       this.logger.warn(`Envio de email a ${to} fallo: ${(err as Error).message}`);
     }
+  }
+
+  async sendRegistrationReceivedEmail(to: string, companyName: string): Promise<void> {
+    const html = `
+      <p>Recibimos el registro de <strong>${companyName}</strong> en ObraYa.</p>
+      <p>Tu cuenta esta pendiente de aprobacion. Te avisamos por este mismo medio en cuanto este activa y puedas cargar tu catalogo de materiales.</p>
+    `;
+    await this.sendEmail(to, `Registro recibido - ${companyName}`, html);
+  }
+
+  async sendCompanyApprovedEmail(to: string, companyName: string): Promise<void> {
+    const html = `
+      <p>Tu empresa <strong>${companyName}</strong> fue aprobada en ObraYa.</p>
+      <p>Ya podes ingresar y cargar tu catalogo de materiales.</p>
+    `;
+    await this.sendEmail(to, `${companyName} fue aprobada en ObraYa`, html);
+  }
+
+  async sendNewCompanyAdminAlert(to: string, companyName: string, cuit: string): Promise<void> {
+    const html = `
+      <p>Se registro una nueva empresa pendiente de aprobacion: <strong>${companyName}</strong> (CUIT ${cuit}).</p>
+      <p>Revisa y aproba desde el panel de SuperAdmin.</p>
+    `;
+    await this.sendEmail(to, `Nueva empresa pendiente de aprobacion: ${companyName}`, html);
   }
 
   async sendInviteEmail(to: string, companyName: string, inviteLink: string): Promise<void> {

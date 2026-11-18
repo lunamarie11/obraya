@@ -18,12 +18,23 @@ function makeCompany(overrides: Partial<Company> = {}): Company {
 const mockCompanyRepo = {
   update: jest.fn(),
   findOne: jest.fn(),
+  create: jest.fn((v) => v),
+  save: jest.fn((v) => Promise.resolve(v)),
 };
 
-const mockCompanyUserRepo = {};
+const mockCompanyUserRepo = {
+  findOne: jest.fn(),
+  create: jest.fn((v) => v),
+  save: jest.fn((v) => Promise.resolve(v)),
+};
 
-const mockAfipService = {};
-const mockEmailService = {};
+const mockAfipService = {
+  getTaxpayerDetails: jest.fn().mockResolvedValue(null),
+};
+const mockEmailService = {
+  sendRegistrationReceivedEmail: jest.fn().mockResolvedValue(undefined),
+  sendNewCompanyAdminAlert: jest.fn().mockResolvedValue(undefined),
+};
 const mockConfig = { get: jest.fn() };
 
 describe('UsersService', () => {
@@ -70,6 +81,46 @@ describe('UsersService', () => {
 
       expect(mockCompanyRepo.update).toHaveBeenCalledWith('company-uuid-1', { deliveryZones: zones });
       expect(result.deliveryZones).toEqual(zones);
+    });
+  });
+
+  // Bug real en producción: un cliente se registró, el email quedó guardado
+  // con mayúsculas/espacios, y al loguearse con la versión normalizada no se
+  // encontraba la fila -> "Credenciales inválidas". Ver normalize-email.ts.
+  describe('normalización de email', () => {
+    it('findUserByEmail busca usando el email normalizado (trim + lowercase)', async () => {
+      const user = new CompanyUser();
+      mockCompanyUserRepo.findOne.mockResolvedValue(user);
+
+      await service.findUserByEmail('  Admin@Empresa.COM  ');
+
+      expect(mockCompanyUserRepo.findOne).toHaveBeenCalledWith({
+        where: { email: 'admin@empresa.com' },
+        relations: ['company'],
+      });
+    });
+
+    it('registerCompany guarda la empresa y el admin con el email normalizado', async () => {
+      mockCompanyRepo.findOne.mockResolvedValue(null);
+      mockCompanyUserRepo.findOne.mockResolvedValue(null);
+
+      const dto = {
+        cuit: '30500010912',
+        razonSocial: 'Cerámicas del Sur S.A.',
+        email: '  Empresa@Test.COM  ',
+        phone: '+54 11 1234-5678',
+        city: 'CABA',
+        province: 'Buenos Aires',
+        adminEmail: '  Admin@Empresa.COM  ',
+        adminPassword: 'Password123!',
+        adminFirstName: 'Juan',
+        adminLastName: 'Perez',
+      } as any;
+
+      const { company, adminUser } = await service.registerCompany(dto);
+
+      expect(company.email).toBe('empresa@test.com');
+      expect(adminUser.email).toBe('admin@empresa.com');
     });
   });
 });

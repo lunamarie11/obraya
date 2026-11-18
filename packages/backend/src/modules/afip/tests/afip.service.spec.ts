@@ -69,16 +69,24 @@ describe('AfipService', () => {
     expect(mockCreateNextVoucher).not.toHaveBeenCalled();
   });
 
-  it('emite Factura B (CbteTipo 6) para Responsable Inscripto', async () => {
+  it('emite Factura B (CbteTipo 6) cuando el emisor (AFIP_ISSUER_IVA_CONDITION) es Responsable Inscripto', async () => {
+    // El CbteTipo depende de la condición de IVA del CUIT que efectivamente
+    // factura (configurado en AFIP_ISSUER_IVA_CONDITION), NO de la condición
+    // de IVA de la empresa/fabricante del pedido -- corrección de ADR-010
+    // (ver sección correspondiente). Por eso company.ivaCondition no influye
+    // aquí.
     mockCreateNextVoucher.mockResolvedValue({
       CAE: '75123456789012',
       CAEFchVto: '2026-09-13',
       voucherNumber: 42,
     });
 
-    const service = await buildService({ AFIP_ENV: 'testing' });
+    const service = await buildService({
+      AFIP_ENV: 'testing',
+      AFIP_ISSUER_IVA_CONDITION: CompanyIvaCondition.RESPONSABLE_INSCRIPTO,
+    });
     const result = await service.createInvoice({
-      company: makeCompany({ ivaCondition: CompanyIvaCondition.RESPONSABLE_INSCRIPTO }),
+      company: makeCompany(),
       order: makeOrder(),
     });
 
@@ -93,7 +101,7 @@ describe('AfipService', () => {
     });
   });
 
-  it('emite Factura C (CbteTipo 11) para Monotributo', async () => {
+  it('emite Factura C (CbteTipo 11) para Monotributo (default del emisor sin configurar)', async () => {
     mockCreateNextVoucher.mockResolvedValue({
       CAE: '75123456789099',
       CAEFchVto: '2026-09-13',
@@ -102,7 +110,7 @@ describe('AfipService', () => {
 
     const service = await buildService({ AFIP_ENV: 'testing' });
     const result = await service.createInvoice({
-      company: makeCompany({ ivaCondition: CompanyIvaCondition.MONOTRIBUTO }),
+      company: makeCompany(),
       order: makeOrder(),
     });
 

@@ -212,6 +212,10 @@ export interface Order {
   // Repartidor que reclamó el pedido (ver ADR-017). Null/undefined = disponible.
   assignedDriverId?: string | null;
   assignedAt?: Date | null;
+  // Delivery independiente (sin empresa) que reclamó el pedido (ver ADR-026).
+  // Mutuamente excluyente con assignedDriverId.
+  assignedDeliveryId?: string | null;
+  assignedDeliveryAt?: Date | null;
   items: OrderItem[];
   totalAmount: number;
   shippingCost?: number;
