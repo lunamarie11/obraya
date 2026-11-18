@@ -4,6 +4,26 @@ Cada cambio importante del proyecto se documenta aqui. Las decisiones arquitecto
 
 ---
 
+## [0.33.10] - 2026-11-17
+
+### Límite de intentos de login subido de 5 a 15 (misma ventana de 15min)
+
+Tras el fix de 0.33.9 (`trust proxy`), el rate limit de login ya aisla
+correctamente por IP real — pero la clave del throttler es IP+endpoint, no
+IP+cuenta: probar el login de varias cuentas distintas (SuperAdmin +
+cliente) seguidas desde la misma red agotaba igual el cupo de 5, generando
+fricción real durante soporte/testing en vivo (síntoma reportado como
+"sigue el mismo error" tras el fix de IP). Se sube `limit` de 5 a 15 en
+ambos lugares que lo definen: `throttling.module.ts` (default del módulo)
+y los `@Throttle(...)` a nivel de clase en `auth.controller.ts` y
+`buyer-auth.controller.ts` (que tienen precedencia sobre el módulo vía
+`Reflector.getAllAndOverride`, asi que había que tocar los tres o el
+cambio no tenía efecto). Ventana sin cambios (15 min). Se reinició el
+contenedor de producción para limpiar los contadores en memoria mientras
+se desplegaba el fix.
+
+---
+
 ## [0.33.9] - 2026-11-17
 
 ### Bug crítico: rate limit de login bloqueaba a TODOS los usuarios, no por IP

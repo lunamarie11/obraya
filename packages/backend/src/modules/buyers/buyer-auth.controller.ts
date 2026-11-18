@@ -10,11 +10,14 @@ import { BuyerJwtAuthGuard } from './guards/buyer-jwt-auth.guard';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { AuthThrottlerGuard } from '../../config/scoped-throttler.guard';
 
-// Ver ADR-007 y ADR-023: throttler 'auth' (5 intentos / 15 min) contra
-// brute-force de credenciales, aplicado explicitamente solo aqui via
-// @UseGuards(AuthThrottlerGuard) (el guard global solo corre 'api').
+// Ver ADR-007, ADR-023 y CHANGELOG 0.33.10: throttler 'auth' (15 intentos /
+// 15 min, subido de 5) contra brute-force de credenciales, aplicado
+// explicitamente solo aqui via @UseGuards(AuthThrottlerGuard) (el guard
+// global solo corre 'api'). Debe coincidir con el default de
+// throttling.module.ts: este @Throttle de clase tiene precedencia sobre
+// el modulo (Reflector.getAllAndOverride), asi que si difieren gana este.
 @UseGuards(AuthThrottlerGuard)
-@Throttle({ auth: { limit: 5, ttl: 900000 } })
+@Throttle({ auth: { limit: 15, ttl: 900000 } })
 @ApiTags('buyer-auth')
 @Controller('buyer-auth')
 export class BuyerAuthController {

@@ -30,11 +30,14 @@ import { ApiThrottlerGuard, AuthThrottlerGuard } from './scoped-throttler.guard'
         name: 'api',
       },
       {
-        // Endpoints de login (login, register, demo-login): 5 intentos / 15
-        // min, contra brute-force de credenciales. Solo se aplica donde se
-        // usa @UseGuards(AuthThrottlerGuard) explicitamente.
+        // Endpoints de login (login, register, demo-login): 15 intentos / 15
+        // min, contra brute-force de credenciales. Subido de 5 a 15 (ver
+        // CHANGELOG): la clave es IP+endpoint, no IP+email, asi que probar
+        // mas de una cuenta seguida desde la misma red agotaba el cupo de 5
+        // muy rapido durante soporte/testing en vivo. Solo se aplica donde
+        // se usa @UseGuards(AuthThrottlerGuard) explicitamente.
         ttl: 900000,
-        limit: 5,
+        limit: 15,
         name: 'auth',
       },
     ]),
