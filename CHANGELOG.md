@@ -39,8 +39,11 @@ directo con ADR-019, así que se documentó como una identidad nueva que
   `lib/delivery-auth.ts` (sesión en localStorage, claves separadas de
   `buyerUser`/`user` para poder tener las tres sesiones abiertas a la vez).
 - Migraciones `CreateDeliveries` y `AddAssignedDeliveryToOrders`
-  verificadas (up + down) contra una base Postgres limpia antes de este
-  commit; **no corridas aún contra producción**.
+  verificadas (up + down) contra una base Postgres limpia, y corridas
+  luego contra la base de producción. Build + deploy de backend y
+  frontend a producción (EC2 vía ECR), verificado en vivo
+  (`/delivery-auth/*`, `/delivery-orders/*`, `/get-started`,
+  `/delivery/register`, `/delivery/login`, `/delivery/orders`).
 
 ---
 
