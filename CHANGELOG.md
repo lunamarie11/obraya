@@ -4,6 +4,47 @@ Cada cambio importante del proyecto se documenta aqui. Las decisiones arquitecto
 
 ---
 
+## [0.36.1] - 2026-11-18
+
+### Fix: bug urgente de login tras el registro ("contraseña inválida" con email bien tipeado)
+
+Reporte real de un cliente: se registró, y al intentar volver a entrar la
+app le decía credenciales inválidas, aunque la contraseña era correcta.
+
+- **Causa raíz**: ninguna de las 3 identidades (`CompanyUser`, `Buyer`,
+  `Delivery`) normalizaba el email (trim + lowercase) al registrar ni al
+  loguear. Si el email se guardaba con una capitalización y se tipeaba el
+  login con otra (muy común: autocapitalización del teclado, copy/paste),
+  el `findOne` por email no encontraba la fila. Como el mensaje de error es
+  genérico (`Credenciales inválidas`, igual para "no existe" y para
+  "contraseña incorrecta"), el síntoma se percibía como contraseña
+  inválida.
+- Nuevo helper `normalizeEmail()` (`common/utils/normalize-email.ts`),
+  aplicado en registro, login y búsquedas por email en
+  `UsersService` (empresa + invitaciones), `BuyersService` y
+  `DeliveriesService`.
+- Migración `1790770000000-NormalizeExistingEmails`: corrige los emails ya
+  guardados en `companies`, `company_users`, `buyers` y `deliveries` (el
+  fix de código solo evita casos nuevos, no arregla las filas ya mal
+  guardadas como la del cliente que reportó el problema).
+- Tests nuevos: normalización en `users.service.spec.ts`, y specs nuevos
+  `buyers.service.spec.ts` / `deliveries.service.spec.ts` (no existían).
+
+### Fix: CI roto en 3 checks (backend, frontend, mobile)
+
+- `afip.service.spec.ts` esperaba que el `CbteTipo` de la factura dependiera
+  de `company.ivaCondition` (condición de IVA del fabricante), pero la
+  corrección de ADR-010 en `bc75bbd` cambió la lógica para que dependa de
+  `AFIP_ISSUER_IVA_CONDITION` (la condición de IVA del CUIT que
+  efectivamente emite, configurado a nivel plataforma). El test quedó
+  desactualizado y nunca se corrigió. Se actualizó el test para reflejar el
+  comportamiento correcto y documentado.
+- `frontend` y `mobile` fallaban con `Cannot find module '@obraya/shared'`:
+  el workflow de CI nunca compilaba `packages/shared` antes de esos jobs
+  (su `dist/` está en `.gitignore`, no viene en el checkout). Se agregó
+  `npm run build --workspace=packages/shared` como paso previo en ambos
+  jobs, y se agregó el build real al job `shared` (antes solo corría lint).
+
 ## [0.36.0] - 2026-11-18
 
 ### Feat: separación de la comisión de ObraYa (4%) y el fee de Mercado Pago en cada pedido

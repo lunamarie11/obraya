@@ -16,6 +16,7 @@ import { InviteUserDto } from './dto/invite-user.dto';
 import { AfipService } from '../afip/afip.service';
 import { EmailService } from '../email/email.service';
 import { ConfigService } from '@nestjs/config';
+import { normalizeEmail } from '../../common/utils/normalize-email';
 
 @Injectable()
 export class UsersService {
@@ -32,6 +33,13 @@ export class UsersService {
   ) {}
 
   async registerCompany(dto: RegisterCompanyDto): Promise<{ company: Company; adminUser: CompanyUser }> {
+    // Normalizamos los emails (trim + lowercase) ANTES de chequear unicidad
+    // y guardar: ver normalize-email.ts, es la causa raíz del bug de login
+    // "me registré y después no puedo entrar" cuando el email se tipea con
+    // distinta capitalización entre el registro y el login.
+    const email = normalizeEmail(dto.email);
+    const adminEmail = normalizeEmail(dto.adminEmail);
+
     // Verificar CUIT único
     const existingCompany = await this.companyRepo.findOne({ where: { cuit: dto.cuit } });
     if (existingCompany) {
@@ -39,13 +47,13 @@ export class UsersService {
     }
 
     // Verificar email de empresa único
-    const existingEmail = await this.companyRepo.findOne({ where: { email: dto.email } });
+    const existingEmail = await this.companyRepo.findOne({ where: { email } });
     if (existingEmail) {
       throw new ConflictException('El email de empresa ya está registrado');
     }
 
     // Verificar email de admin único
-    const existingAdminEmail = await this.companyUserRepo.findOne({ where: { email: dto.adminEmail } });
+    const existingAdminEmail = await this.companyUserRepo.findOne({ where: { email: adminEmail } });
     if (existingAdminEmail) {
       throw new ConflictException('El email del administrador ya está en uso');
     }
@@ -54,7 +62,7 @@ export class UsersService {
     const company = this.companyRepo.create({
       cuit: dto.cuit,
       razonSocial: dto.razonSocial,
-      email: dto.email,
+      email,
       phone: dto.phone,
       city: dto.city,
       province: dto.province,
@@ -77,7 +85,7 @@ export class UsersService {
     const passwordHash = await bcrypt.hash(dto.adminPassword, 12);
     const adminUser = this.companyUserRepo.create({
       companyId: company.id,
-      email: dto.adminEmail,
+      email: adminEmail,
       passwordHash,
       firstName: dto.adminFirstName,
       lastName: dto.adminLastName,
@@ -105,7 +113,7 @@ export class UsersService {
 
   async findUserByEmail(email: string): Promise<CompanyUser | null> {
     return this.companyUserRepo.findOne({
-      where: { email },
+      where: { email: normalizeEmail(email) },
       relations: ['company'],
     });
   }
@@ -147,7 +155,8 @@ export class UsersService {
     const company = await this.companyRepo.findOne({ where: { id: companyId } });
     if (!company) throw new NotFoundException('Empresa no encontrada');
 
-    const existing = await this.companyUserRepo.findOne({ where: { email: dto.email } });
+    const email = normalizeEmail(dto.email);
+    const existing = await this.companyUserRepo.findOne({ where: { email } });
     if (existing) throw new ConflictException('El email ya está en uso');
 
     const inviteToken = uuidv4();
@@ -155,7 +164,7 @@ export class UsersService {
 
     const user = this.companyUserRepo.create({
       companyId,
-      email: dto.email,
+      email,
       firstName: dto.firstName,
       lastName: dto.lastName,
       role: dto.role,
@@ -171,8 +180,8 @@ export class UsersService {
     const frontendUrl = this.config.get<string>('FRONTEND_URL') ?? 'http://localhost:3002';
     const inviteLink = `${frontendUrl}/accept-invite?token=${inviteToken}`;
     this.emailService
-      .sendInviteEmail(dto.email, company.razonSocial, inviteLink)
-      .catch((err) => this.logger.warn(`No se pudo enviar el email de invitacion a ${dto.email}: ${(err as Error).message}`));
+      .sendInviteEmail(email, company.razonSocial, inviteLink)
+      .catch((err) => this.logger.warn(`No se pudo enviar el email de invitacion a ${email}: ${(err as Error).message}`));
 
     return saved;
   }

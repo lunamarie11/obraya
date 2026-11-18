@@ -4,6 +4,7 @@ import { Repository } from 'typeorm';
 import * as bcrypt from 'bcrypt';
 import { Buyer } from './entities/buyer.entity';
 import { RegisterBuyerDto } from './dto/register-buyer.dto';
+import { normalizeEmail } from '../../common/utils/normalize-email';
 
 @Injectable()
 export class BuyersService {
@@ -13,14 +14,15 @@ export class BuyersService {
   ) {}
 
   async register(dto: RegisterBuyerDto): Promise<Buyer> {
-    const existing = await this.buyerRepo.findOne({ where: { email: dto.email } });
+    const email = normalizeEmail(dto.email);
+    const existing = await this.buyerRepo.findOne({ where: { email } });
     if (existing) {
       throw new ConflictException('El email ya está registrado');
     }
 
     const passwordHash = await bcrypt.hash(dto.password, 12);
     const buyer = this.buyerRepo.create({
-      email: dto.email,
+      email,
       passwordHash,
       firstName: dto.firstName,
       lastName: dto.lastName,
@@ -31,7 +33,7 @@ export class BuyersService {
   }
 
   async validateBuyer(email: string, password: string): Promise<Buyer> {
-    const buyer = await this.buyerRepo.findOne({ where: { email } });
+    const buyer = await this.buyerRepo.findOne({ where: { email: normalizeEmail(email) } });
     if (!buyer) throw new UnauthorizedException('Credenciales inválidas');
     if (!buyer.isActive) throw new UnauthorizedException('Cuenta inactiva');
 
@@ -42,7 +44,7 @@ export class BuyersService {
   }
 
   async findByEmail(email: string): Promise<Buyer | null> {
-    return this.buyerRepo.findOne({ where: { email } });
+    return this.buyerRepo.findOne({ where: { email: normalizeEmail(email) } });
   }
 
   async findById(id: string): Promise<Buyer | null> {

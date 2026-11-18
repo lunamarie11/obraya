@@ -4,6 +4,7 @@ import { Repository } from 'typeorm';
 import * as bcrypt from 'bcrypt';
 import { Delivery } from './entities/delivery.entity';
 import { RegisterDeliveryDto } from './dto/register-delivery.dto';
+import { normalizeEmail } from '../../common/utils/normalize-email';
 
 @Injectable()
 export class DeliveriesService {
@@ -13,14 +14,15 @@ export class DeliveriesService {
   ) {}
 
   async register(dto: RegisterDeliveryDto): Promise<Delivery> {
-    const existing = await this.deliveryRepo.findOne({ where: { email: dto.email } });
+    const email = normalizeEmail(dto.email);
+    const existing = await this.deliveryRepo.findOne({ where: { email } });
     if (existing) {
       throw new ConflictException('El email ya está registrado');
     }
 
     const passwordHash = await bcrypt.hash(dto.password, 12);
     const delivery = this.deliveryRepo.create({
-      email: dto.email,
+      email,
       passwordHash,
       firstName: dto.firstName,
       lastName: dto.lastName,
@@ -33,7 +35,7 @@ export class DeliveriesService {
   }
 
   async validateDelivery(email: string, password: string): Promise<Delivery> {
-    const delivery = await this.deliveryRepo.findOne({ where: { email } });
+    const delivery = await this.deliveryRepo.findOne({ where: { email: normalizeEmail(email) } });
     if (!delivery) throw new UnauthorizedException('Credenciales inválidas');
     if (!delivery.isActive) throw new UnauthorizedException('Cuenta inactiva');
 
@@ -44,7 +46,7 @@ export class DeliveriesService {
   }
 
   async findByEmail(email: string): Promise<Delivery | null> {
-    return this.deliveryRepo.findOne({ where: { email } });
+    return this.deliveryRepo.findOne({ where: { email: normalizeEmail(email) } });
   }
 
   async findById(id: string): Promise<Delivery | null> {
