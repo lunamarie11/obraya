@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { forwardRef, Inject, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { In, Repository } from 'typeorm';
 import { DriverLocation } from './entities/driver-location.entity';
@@ -54,6 +54,10 @@ export class LogisticsService {
     private readonly userRepo: Repository<CompanyUser>,
     @InjectRepository(Delivery)
     private readonly deliveryRepo: Repository<Delivery>,
+    // Ver ADR-027: OrdersService ahora tambien inyecta LogisticsService
+    // (forwardRef en ese lado) -- el ciclo necesita forwardRef en ambos
+    // extremos o NestJS resuelve este param como undefined en runtime.
+    @Inject(forwardRef(() => OrdersService))
     private readonly ordersService: OrdersService,
   ) {}
 
