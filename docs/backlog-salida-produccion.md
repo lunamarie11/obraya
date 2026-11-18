@@ -75,9 +75,9 @@ prioridad.
 Esto no lo puedo hacer yo porque no es código, pero sin esto tampoco hay
 lanzamiento real:
 
-9. **Primer fabricante real dado de alta y aprobado** (el flujo de
-   aprobación manual ya existe y funciona: `Company.status`
-   pending → active).
+9. ~~**Primer fabricante real dado de alta y aprobado.**~~ **Resuelto
+   (2026-11-18).** Certeza ya se dio de alta y fue aprobado (flujo manual
+   `Company.status` pending → active).
 10. **Canal de soporte/atención al cliente** — hoy no hay nada definido
     sobre quién responde si un comprador o un fabricante tiene un
     problema.
@@ -103,7 +103,8 @@ Lo que queda:
 - **P1:** 6 (automatizar CI/CD) y 7 (health check honesto) — no bloquean,
   son deuda técnica operativa.
 - **P2:** 8 (Elasticsearch) — decisión a futuro, no urgente.
-- **Fuera de código:** 9 (alta del primer fabricante) y 10 (definir quién da
-  soporte) siguen pendientes y los tiene que resolver el equipo de ObraYa.
-  11 (términos/privacidad) ya está publicado (ver arriba), pendiente de
-  revisión legal profesional antes de ser definitivo.
+- **Fuera de código:** 9 (alta del primer fabricante) ya está resuelto
+  (Certeza). 10 (definir quién da soporte) sigue pendiente y lo tiene que
+  resolver el equipo de ObraYa. 11 (términos/privacidad) ya está publicado
+  (ver arriba), pendiente de revisión legal profesional antes de ser
+  definitivo.
