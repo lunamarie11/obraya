@@ -1,7 +1,7 @@
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { SESClient, SendEmailCommand } from '@aws-sdk/client-ses';
-import { OrderStatus } from '../orders/entities/order.entity';
+import { OrderEmailData, renderOrderStatusEmail } from './order-email.template';
 
 // Ver ADR-011: email transaccional via AWS SES. Best-effort, mismo patron que
 // NotificationsService (FCM) y AfipService: si faltan credenciales, el
@@ -13,6 +13,7 @@ export class EmailService implements OnModuleInit {
   private readonly logger = new Logger(EmailService.name);
   private client: SESClient | null = null;
   private fromAddress = '';
+  private replyTo: string | null = null;
 
   constructor(private readonly config: ConfigService) {}
 
@@ -30,8 +31,23 @@ export class EmailService implements OnModuleInit {
     // patron que StorageService con S3). El role ya tiene ses:SendEmail/
     // ses:SendRawEmail (ver iam.tf).
     this.client = new SESClient({ region });
-    this.fromAddress = from;
+    this.fromAddress = EmailService.withDisplayName(from);
+    this.replyTo = this.supportEmail();
     this.logger.log('AWS SES inicializado');
+  }
+
+  // Bug #10 (QA 18/11): el remitente figuraba como "no-reply". Si EMAIL_FROM
+  // es solo la dirección, se le agrega el nombre visible "ObraYa".
+  static withDisplayName(from: string): string {
+    return from.includes('<') ? from : `ObraYa <${from.trim()}>`;
+  }
+
+  // Contacto que se muestra en los mails y al que van las respuestas. Solo si
+  // SUPPORT_EMAIL está configurado explícitamente: debe ser una casilla que
+  // reciba mails de verdad (SES solo envía; obraya.com.ar no tiene casillas
+  // de entrada). Sin esto, el mail sale sin línea de contacto ni Reply-To.
+  private supportEmail(): string | null {
+    return this.config.get<string>('SUPPORT_EMAIL')?.trim() || null;
   }
 
   async sendEmail(to: string, subject: string, html: string): Promise<void> {
@@ -41,6 +57,7 @@ export class EmailService implements OnModuleInit {
         new SendEmailCommand({
           Source: this.fromAddress,
           Destination: { ToAddresses: [to] },
+          ...(this.replyTo ? { ReplyToAddresses: [this.replyTo] } : {}),
           Message: {
             Subject: { Data: subject, Charset: 'UTF-8' },
             Body: { Html: { Data: html, Charset: 'UTF-8' } },
@@ -85,33 +102,11 @@ export class EmailService implements OnModuleInit {
     await this.sendEmail(to, `Invitacion a ${companyName} en ObraYa`, html);
   }
 
-  async sendOrderStatusEmail(to: string, orderNumber: string, status: OrderStatus): Promise<void> {
-    const messages: Partial<Record<OrderStatus, { subject: string; html: string }>> = {
-      [OrderStatus.ACEPTADO]: {
-        subject: `Pedido ${orderNumber} aceptado`,
-        html: `<p>Tu pedido <strong>${orderNumber}</strong> fue aceptado y pasa a preparacion.</p>`,
-      },
-      [OrderStatus.PREPARACION]: {
-        subject: `Pedido ${orderNumber} en preparacion`,
-        html: `<p>Tu pedido <strong>${orderNumber}</strong> esta siendo preparado.</p>`,
-      },
-      [OrderStatus.DESPACHADO]: {
-        subject: `Pedido ${orderNumber} despachado`,
-        html: `<p>Tu pedido <strong>${orderNumber}</strong> fue despachado.</p>`,
-      },
-      [OrderStatus.ENTREGADO]: {
-        subject: `Pedido ${orderNumber} entregado`,
-        html: `<p>Tu pedido <strong>${orderNumber}</strong> fue entregado. Gracias por comprar en ObraYa!</p>`,
-      },
-      [OrderStatus.CANCELADO]: {
-        subject: `Pedido ${orderNumber} cancelado`,
-        html: `<p>Tu pedido <strong>${orderNumber}</strong> fue cancelado.</p>`,
-      },
-    };
-
-    const msg = messages[status];
-    if (msg) {
-      await this.sendEmail(to, msg.subject, msg.html);
-    }
+  async sendOrderStatusEmail(to: string, data: OrderEmailData): Promise<void> {
+    const msg = renderOrderStatusEmail(data, {
+      frontendUrl: this.config.get<string>('FRONTEND_URL') ?? 'http://localhost:3002',
+      supportEmail: this.supportEmail(),
+    });
+    if (msg) await this.sendEmail(to, msg.subject, msg.html);
   }
 }

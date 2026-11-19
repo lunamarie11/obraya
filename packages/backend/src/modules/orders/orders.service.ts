@@ -425,7 +425,43 @@ export class OrdersService {
       }),
     );
 
+    // Antes este flujo no avisaba al comprador ni por push ni por mail.
+    this.notifyBuyer(saved, OrderStatus.ENTREGADO);
+
     return this.hideFinancials(saved);
+  }
+
+  // Push + email al comprador en cada cambio de estado (ver ADR-011).
+  // Best-effort y sin await: nunca bloquea ni hace fallar el cambio de estado.
+  // El mail lleva el detalle del pedido (bug #10 de QA del 18/11).
+  private notifyBuyer(order: Order, status: OrderStatus): void {
+    Promise.all([
+      this.buyersService.findById(order.buyerId),
+      this.companyRepo.findOne({ where: { id: order.companyId } }).catch(() => null),
+    ])
+      .then(([buyer, company]) => {
+        this.notificationsService.notifyOrderStatus(buyer?.fcmToken, order.orderNumber, status);
+        const to = buyer?.email || order.buyerEmail;
+        if (!to) return;
+        return this.emailService.sendOrderStatusEmail(to, {
+          orderId: order.id,
+          orderNumber: order.orderNumber,
+          status,
+          buyerFirstName: buyer?.firstName ?? order.buyerName?.split(' ')[0] ?? null,
+          companyName: company?.razonSocial || null,
+          items: (order.items ?? []).map((i) => ({
+            productName: i.productName,
+            quantity: i.quantity,
+            subtotal: i.subtotal,
+          })),
+          shippingCost: order.shippingCost,
+          totalAmount: order.totalAmount,
+          deliveryAddress: order.deliveryAddress,
+          date: status === OrderStatus.ENTREGADO && order.actualDeliveryDate ? order.actualDeliveryDate : new Date(),
+          rejectionReason: order.rejectionReason,
+        });
+      })
+      .catch((err) => this.logger.warn(`No se pudo notificar al comprador ${order.buyerId}: ${(err as Error).message}`));
   }
 
   // Ver ADR-018 (extendido en ADR-027/fase4e): usado por LogisticsService
@@ -614,15 +650,7 @@ export class OrdersService {
 
       const updated = await orderRepo.findOne({ where: { id }, relations: ['items', 'messages'] }) as Order;
 
-      // Push notification + email al comprador (ver ADR-011 para el email).
-      // Best-effort: ninguno de los dos bloquea la transacción de la orden.
-      this.buyersService
-        .findById(updated.buyerId)
-        .then((buyer) => {
-          this.notificationsService.notifyOrderStatus(buyer?.fcmToken, updated.orderNumber, dto.status);
-          if (buyer?.email) this.emailService.sendOrderStatusEmail(buyer.email, updated.orderNumber, dto.status);
-        })
-        .catch((err) => this.logger.warn(`No se pudo notificar al comprador ${updated.buyerId}: ${(err as Error).message}`));
+      this.notifyBuyer(updated, dto.status);
 
       return updated;
     });

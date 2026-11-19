@@ -4,6 +4,30 @@ Cada cambio importante del proyecto se documenta aqui. Las decisiones arquitecto
 
 ---
 
+## [0.37.4] - 2026-11-19
+
+### Fix: mails de estado del pedido (bug #10 de QA del 18/11)
+
+- Nueva plantilla HTML (`email/order-email.template.ts`) para Aceptado,
+  En preparación, Despachado, Entregado y Cancelado: logo, `lang="es"` y
+  textos con acentos (Gmail dejaba de ofrecer "Traducir"), saludo con el
+  nombre del comprador, detalle de productos/cantidades/envío/total,
+  comercio que vendió, dirección de entrega o "Retiro en el local", fecha y
+  hora en horario de Argentina, botón "Ver mi pedido" y, en Entregado,
+  "Calificar al vendedor" (lleva a `/my-orders/:id#calificar`). Cancelado
+  incluye el motivo. Los datos cargados por usuarios se escapan.
+- Remitente con nombre visible "ObraYa" (antes "no-reply") y Reply-To al
+  mail de soporte. Nueva variable opcional `SUPPORT_EMAIL`: si está vacía
+  el mail sale sin línea de contacto ni Reply-To (hoy `obraya.com.ar` no
+  tiene casillas de entrada, así que no se usa ninguna dirección por
+  defecto).
+- **Bug encontrado de paso:** cuando un delivery independiente marcaba un
+  pedido como Entregado (`markDeliveredByDelivery`, ADR-026), al comprador no
+  le llegaba ni push ni mail. Ahora ambos flujos usan el mismo
+  `OrdersService.notifyBuyer()`.
+
+---
+
 ## [0.37.3] - 2026-11-19
 
 ### Fix: carga y edición de productos (bugs #2, #5, #6 y #8 de QA del 18/11)

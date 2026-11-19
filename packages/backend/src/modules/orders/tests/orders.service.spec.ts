@@ -102,6 +102,8 @@ const mockCompanyRepo = {
   findOne: jest.fn().mockResolvedValue(null),
 };
 
+const flush = () => new Promise((r) => setImmediate(r));
+
 // DataSource mock que ejecuta el callback con repos mockeados
 const mockDataSource = {
   transaction: jest.fn(async (cb) => {
@@ -352,6 +354,58 @@ describe('OrdersService', () => {
       await transition(OrderStatus.ACEPTADO, OrderStatus.PREPARACION);
       await transition(OrderStatus.DESPACHADO, OrderStatus.ENTREGADO);
       expect(mockStockService.applyOrderMovement).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('aviso al comprador (bug #10 QA 18/11)', () => {
+    it('updateStatus manda el mail con el detalle del pedido y el nombre del comercio', async () => {
+      const items = [{ productName: 'Yeso', quantity: 1, subtotal: 150000 }] as any;
+      mockOrderRepo.findOne.mockResolvedValueOnce(makeOrder({ status: OrderStatus.DESPACHADO, items }));
+      mockOrderRepo.findOne.mockResolvedValueOnce(makeOrder({ status: OrderStatus.ENTREGADO, items, actualDeliveryDate: new Date('2026-11-18T18:30:00Z') }));
+      mockBuyersService.findById.mockResolvedValueOnce({ email: 'juan@test.com', firstName: 'Juan' });
+      mockCompanyRepo.findOne.mockResolvedValueOnce({ razonSocial: 'Certezza' });
+
+      await service.updateStatus('order-uuid-1', 'company-uuid-1', { status: OrderStatus.ENTREGADO }, 'u1', 'Admin');
+      await flush();
+
+      expect(mockEmailService.sendOrderStatusEmail).toHaveBeenCalledWith(
+        'juan@test.com',
+        expect.objectContaining({
+          orderNumber: 'OBY-TEST-001',
+          status: OrderStatus.ENTREGADO,
+          buyerFirstName: 'Juan',
+          companyName: 'Certezza',
+          items: [{ productName: 'Yeso', quantity: 1, subtotal: 150000 }],
+          date: new Date('2026-11-18T18:30:00Z'),
+        }),
+      );
+    });
+
+    it('markDeliveredByDelivery ahora también avisa al comprador (antes no mandaba nada)', async () => {
+      mockOrderRepo.findOne.mockResolvedValueOnce(
+        makeOrder({ status: OrderStatus.DESPACHADO, assignedDeliveryId: 'del-1' }),
+      );
+      mockBuyersService.findById.mockResolvedValueOnce({ email: 'juan@test.com', firstName: 'Juan', fcmToken: 'tok' });
+
+      await service.markDeliveredByDelivery('order-uuid-1', 'del-1', 'Repartidor');
+      await flush();
+
+      expect(mockNotificationsService.notifyOrderStatus).toHaveBeenCalledWith('tok', 'OBY-TEST-001', OrderStatus.ENTREGADO);
+      expect(mockEmailService.sendOrderStatusEmail).toHaveBeenCalledWith(
+        'juan@test.com',
+        expect.objectContaining({ status: OrderStatus.ENTREGADO }),
+      );
+    });
+
+    it('si falla buscar al comprador no rompe el cambio de estado', async () => {
+      mockOrderRepo.findOne.mockResolvedValueOnce(makeOrder({ status: OrderStatus.NUEVO }));
+      mockOrderRepo.findOne.mockResolvedValueOnce(makeOrder({ status: OrderStatus.ACEPTADO }));
+      mockBuyersService.findById.mockRejectedValueOnce(new Error('db caída'));
+
+      const res = await service.updateStatus('order-uuid-1', 'company-uuid-1', { status: OrderStatus.ACEPTADO }, 'u1', 'Admin');
+      await flush();
+      expect(res.status).toBe(OrderStatus.ACEPTADO);
+      expect(mockEmailService.sendOrderStatusEmail).not.toHaveBeenCalled();
     });
   });
 

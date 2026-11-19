@@ -124,7 +124,7 @@ export default function OrderDetailPage({ params }: { params: { id: string } }) 
         </div>
 
         {/* Calificar pedido (solo si ya fue entregado) */}
-        {order.status === 'Entregado' && <ReviewSection orderId={order.id} />}
+        {order.status === 'Entregado' && <div id="calificar" className="scroll-mt-24"><ReviewSection orderId={order.id} /></div>}
 
         {/* Actions */}
         <div className="flex flex-col gap-3">
