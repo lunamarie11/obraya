@@ -99,8 +99,11 @@ export class ProductsService {
       order: { createdAt: 'DESC' },
     });
 
+    // Bug #2: la tarjeta del backoffice muestra el precio actual.
+    const prices = await this.pricesService.findCurrentPrices(products.map((p) => p.id));
+
     return {
-      data: products,
+      data: products.map((p) => ({ ...p, currentPrice: prices.get(p.id) ?? null })),
       total,
       page: query.page ?? 1,
       limit: query.limit ?? 20,
@@ -165,6 +168,23 @@ export class ProductsService {
     const url = await this.storageService.uploadProductImage(companyId, id, file);
     product.images = [...(product.images || []), url];
     return this.productRepo.save(product);
+  }
+
+  // Bug #8 (QA 18/11): borrar y reordenar fotos. Recibe la lista final; la
+  // primera es la principal (la que muestra la tarjeta). Solo acepta URLs que
+  // el producto ya tiene, así no se puede inyectar una imagen externa.
+  // El archivo en S3 no se borra (queda huérfano, sin impacto).
+  async setImages(id: string, companyId: string, images: string[]): Promise<Product> {
+    const product = await this.findOne(id, companyId);
+    const current = product.images ?? [];
+    const next = [...new Set(images)];
+    if (next.some((url) => !current.includes(url))) {
+      throw new BadRequestException('Solo se pueden ordenar o quitar imágenes que ya tiene el producto');
+    }
+    product.images = next;
+    const saved = await this.productRepo.save(product);
+    await this.searchService.indexProduct(this.toSearchDoc(saved));
+    return saved;
   }
 
   async uploadTechnicalSheet(

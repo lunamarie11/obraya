@@ -3,7 +3,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useState, useRef } from 'react';
 import Link from 'next/link';
-import { api } from '@/lib/api';
+import { api, formatARS } from '@/lib/api';
 import { Header } from '@/components/layout/Header';
 import { Plus, Search, Package, Pencil, EyeOff, Upload, Loader2, AlertTriangle, CheckCircle2, X, Download } from 'lucide-react';
 import { downloadCsvTemplate, PRODUCTS_TEMPLATE, apiErrorMessage } from '@/lib/csv-template';
@@ -157,6 +157,12 @@ export default function ProductsPage() {
                 <div className="flex-1">
                   <p className="font-semibold text-slate-900 truncate">{product.name}</p>
                   {product.sku && <p className="text-xs text-slate-500 font-mono mt-0.5">{product.sku}</p>}
+                  {/* Bug #2 (QA 18/11): precio actual en la tarjeta */}
+                  {product.currentPrice != null ? (
+                    <p className="text-base font-bold text-slate-900 mt-1">{formatARS(product.currentPrice)}</p>
+                  ) : (
+                    <p className="text-xs text-amber-600 mt-1">Sin precio cargado</p>
+                  )}
                   {product.category && (
                     <span className="inline-block mt-1.5 px-2 py-0.5 rounded-full bg-orange-50 text-orange-600 border border-orange-200 text-xs">
                       {product.category}

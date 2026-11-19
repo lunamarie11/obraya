@@ -1,12 +1,12 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useMutation } from '@tanstack/react-query';
 import { api } from '@/lib/api';
 import { Header } from '@/components/layout/Header';
 import Link from 'next/link';
-import { ArrowLeft, Plus, Trash2, Loader2 } from 'lucide-react';
+import { ArrowLeft, Plus, Trash2, Loader2, Upload, X } from 'lucide-react';
 
 const CATEGORIES = [
   'Cemento y Hormigón', 'Cerámica y Porcellanato', 'Pinturas', 'Hierro y Acero',
@@ -38,10 +38,52 @@ export default function NewProductPage() {
   const [variants, setVariants] = useState<Variant[]>([]);
   const [errors, setErrors] = useState<Partial<typeof form>>({});
 
+  // Bug #6 (QA 18/11): fotos y precio se cargan en el mismo paso que el
+  // producto. Se suben después de crearlo (los endpoints necesitan el id).
+  const [price, setPrice] = useState('');
+  const [files, setFiles] = useState<File[]>([]);
+  const [previews, setPreviews] = useState<string[]>([]);
+
+  useEffect(() => {
+    const urls = files.map((f) => URL.createObjectURL(f));
+    setPreviews(urls);
+    return () => urls.forEach((u) => URL.revokeObjectURL(u));
+  }, [files]);
+
   const create = useMutation({
-    mutationFn: (data: any) => api.post('/products', data),
-    onSuccess: (res) => router.push(`/products/${res.data.id}`),
+    mutationFn: async (data: any) => {
+      const { data: product } = await api.post('/products', data);
+      const pending: string[] = [];
+
+      const cents = Math.round(parseFloat(price.replace(',', '.')) * 100);
+      if (price.trim() && !isNaN(cents) && cents >= 0) {
+        try {
+          await api.post(`/products/${product.id}/prices`, { type: 'B2C', basePrice: cents });
+        } catch {
+          pending.push('precio');
+        }
+      }
+
+      if (files.length) {
+        const fd = new FormData();
+        files.forEach((f) => fd.append('files', f));
+        try {
+          await api.post(`/products/${product.id}/images`, fd, { headers: { 'Content-Type': 'multipart/form-data' } });
+        } catch {
+          pending.push('fotos');
+        }
+      }
+      return { id: product.id, pending };
+    },
+    onSuccess: ({ id, pending }) =>
+      router.push(`/products/${id}${pending.length ? `?pendiente=${pending.join(',')}` : ''}`),
   });
+
+  const addFiles = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const picked = Array.from(e.target.files ?? []);
+    setFiles((prev) => [...prev, ...picked].slice(0, 10));
+    e.target.value = '';
+  };
 
   const validate = () => {
     const e: Partial<typeof form> = {};
@@ -84,6 +126,59 @@ export default function NewProductPage() {
         </Link>
 
         <form onSubmit={handleSubmit} className="space-y-6">
+
+          {/* Fotos */}
+          <div className="card p-5 space-y-3">
+            <div className="flex items-center justify-between">
+              <h2 className="font-semibold text-slate-700">Fotos</h2>
+              <label className={`btn-secondary text-sm flex items-center gap-1.5 cursor-pointer ${files.length >= 10 ? 'opacity-60 pointer-events-none' : ''}`}>
+                <Upload size={14} /> Agregar fotos
+                <input type="file" accept="image/*" multiple className="hidden" onChange={addFiles} />
+              </label>
+            </div>
+            {previews.length > 0 ? (
+              <div className="grid grid-cols-4 gap-2">
+                {previews.map((url, i) => (
+                  <div key={url} className="relative aspect-square rounded-xl overflow-hidden bg-white border border-slate-200">
+                    <img src={url} alt="" className="w-full h-full object-contain" />
+                    {i === 0 && (
+                      <span className="absolute bottom-1 left-1 text-[10px] font-semibold bg-orange-500 text-white px-1.5 py-0.5 rounded">Principal</span>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => setFiles(files.filter((_, j) => j !== i))}
+                      className="absolute top-1 right-1 bg-white/90 rounded-full p-0.5 text-slate-600 hover:text-red-500"
+                      aria-label="Quitar foto"
+                    >
+                      <X size={14} />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="border-2 border-dashed border-slate-300 rounded-xl p-6 text-center text-sm text-slate-500">
+                Hasta 10 fotos. La primera es la que se ve en la tienda.
+              </div>
+            )}
+          </div>
+
+          {/* Precio */}
+          <div className="card p-5 space-y-2">
+            <h2 className="font-semibold text-slate-700">Precio de venta</h2>
+            <div className="relative max-w-xs">
+              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 text-sm">$</span>
+              <input
+                type="number"
+                min="0"
+                step="0.01"
+                className="input w-full pl-7"
+                placeholder="0.00"
+                value={price}
+                onChange={(e) => setPrice(e.target.value)}
+              />
+            </div>
+            <p className="text-xs text-slate-500">Con IVA incluido. Descuentos por volumen y promociones se configuran después, al editar.</p>
+          </div>
 
           {/* Información básica */}
           <div className="card p-5 space-y-4">
@@ -248,7 +343,7 @@ export default function NewProductPage() {
               className="btn-primary flex-1 flex items-center justify-center gap-2 disabled:opacity-60"
             >
               {create.isPending && <Loader2 size={15} className="animate-spin" />}
-              {create.isPending ? 'Creando...' : 'Crear producto'}
+              {create.isPending ? (files.length ? 'Creando y subiendo fotos...' : 'Creando...') : 'Crear producto'}
             </button>
           </div>
 

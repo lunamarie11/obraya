@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, DataSource } from 'typeorm';
+import { Repository, DataSource, In, IsNull } from 'typeorm';
 import { Price, PriceType } from './entities/price.entity';
 import { PriceHistory } from './entities/price-history.entity';
 import { SetPriceDto } from './dto/set-price.dto';
@@ -88,6 +88,18 @@ export class PricesService {
         }),
       );
     });
+  }
+
+  // Bug #2 (QA 18/11): precio de venta actual (B2C, a nivel producto) de
+  // varios productos en una sola query, para el listado del backoffice.
+  // Devuelve centavos; los productos sin precio no aparecen en el Map.
+  async findCurrentPrices(productIds: string[]): Promise<Map<string, number>> {
+    if (!productIds.length) return new Map();
+    const prices = await this.priceRepo.find({
+      where: { productId: In(productIds), type: PriceType.B2C, isActive: true, variantId: IsNull() },
+      select: ['productId', 'basePrice'],
+    });
+    return new Map(prices.map((p) => [p.productId, Number(p.basePrice)]));
   }
 
   async resolve(productId: string, type: PriceType, quantity = 1, variantId?: string): Promise<ResolvedPrice | null> {

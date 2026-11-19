@@ -6,7 +6,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api, formatARS } from '@/lib/api';
 import { Header } from '@/components/layout/Header';
 import Link from 'next/link';
-import { ArrowLeft, Plus, Trash2, Loader2, Upload, DollarSign, History, Tag } from 'lucide-react';
+import { ArrowLeft, Plus, Trash2, Loader2, Upload, DollarSign, History, Tag, Star, ChevronLeft, ChevronRight, AlertTriangle } from 'lucide-react';
 
 type PriceType = 'B2C' | 'B2B';
 
@@ -23,7 +23,10 @@ function PricesSection({ productId }: { productId: string }) {
     queryFn: () => api.get(`/products/${productId}/prices/history`).then((r) => r.data),
   });
 
-  const [tab, setTab] = useState<PriceType>('B2C');
+  // Bug #5 (QA 18/11): la regla comercial es que todos los precios van con IVA
+  // incluido y la tienda solo usa B2C. Se saca la pestaña B2B de la pantalla
+  // (el tipo B2B sigue existiendo en la API por si se retoma un canal mayorista).
+  const tab: PriceType = 'B2C';
   const [showHistory, setShowHistory] = useState(false);
 
   const current = prices.find((p: any) => p.type === tab);
@@ -116,8 +119,6 @@ function PricesSection({ productId }: { productId: string }) {
             history.map((h: any) => (
               <div key={h.id} className="flex items-start justify-between text-sm border-b border-slate-100 pb-2">
                 <div>
-                  <span className="font-medium text-slate-700">{h.type}</span>
-                  <span className="text-slate-400 mx-2">→</span>
                   <span className="text-slate-900">{formatARS(h.basePrice)}</span>
                   {h.reason && <p className="text-xs text-slate-500 mt-0.5 italic">{h.reason}</p>}
                 </div>
@@ -131,24 +132,9 @@ function PricesSection({ productId }: { productId: string }) {
         </div>
       ) : (
         <div className="px-5 py-4 space-y-4">
-          {/* Tabs B2C / B2B */}
-          <div className="flex gap-1 bg-slate-100 p-1 rounded-xl w-fit">
-            {(['B2C', 'B2B'] as PriceType[]).map((t) => (
-              <button
-                key={t}
-                onClick={() => setTab(t)}
-                className={`px-4 py-1.5 rounded-lg text-sm font-semibold transition-colors ${
-                  tab === t ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'
-                }`}
-              >
-                {t === 'B2C' ? 'B2C (con IVA)' : 'B2B (sin IVA)'}
-              </button>
-            ))}
-          </div>
-
           {/* Precio base */}
           <div>
-            <label className="label">Precio base (ARS)</label>
+            <label className="label">Precio de venta (ARS, IVA incluido)</label>
             <div className="relative">
               <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 text-sm">$</span>
               <input
@@ -312,6 +298,33 @@ export default function EditProductPage() {
 
   const [variants, setVariants] = useState<any[]>([]);
   const [uploading, setUploading] = useState(false);
+  // Bug #6: si al crear el producto no se pudo guardar el precio o las fotos.
+  const [pending, setPending] = useState<string | null>(null);
+  useEffect(() => {
+    const p = new URLSearchParams(window.location.search).get('pendiente');
+    if (p) setPending(p.split(',').join(' y '));
+  }, []);
+
+  // Bug #8 (QA 18/11): borrar, reordenar y elegir la foto principal.
+  const setImages = useMutation({
+    mutationFn: (images: string[]) => api.put(`/products/${id}/images`, { images }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['product', id] });
+      qc.invalidateQueries({ queryKey: ['products'] });
+    },
+  });
+  const images: string[] = product?.images ?? [];
+  const moveImage = (from: number, to: number) => {
+    if (to < 0 || to >= images.length) return;
+    const next = [...images];
+    const [img] = next.splice(from, 1);
+    next.splice(to, 0, img);
+    setImages.mutate(next);
+  };
+  const removeImage = (i: number) => {
+    if (!window.confirm('¿Borrar esta foto del producto?')) return;
+    setImages.mutate(images.filter((_, j) => j !== i));
+  };
 
   useEffect(() => {
     if (product) {
@@ -399,6 +412,15 @@ export default function EditProductPage() {
           <ArrowLeft size={15} /> Volver a productos
         </Link>
 
+        {pending && (
+          <div className="mb-5 rounded-2xl p-4 flex items-start gap-3 border bg-amber-50 border-amber-200">
+            <AlertTriangle size={18} className="text-amber-500 flex-shrink-0 mt-0.5" />
+            <p className="text-sm text-amber-700 flex-1">
+              El producto se creó, pero no se pudieron guardar {pending === 'precio' ? 'el precio' : pending === 'fotos' ? 'las fotos' : 'el precio y las fotos'}. Cargalos acá abajo.
+            </p>
+          </div>
+        )}
+
         <form onSubmit={handleSubmit} className="space-y-5">
 
           {/* Imágenes */}
@@ -418,14 +440,41 @@ export default function EditProductPage() {
               </label>
             </div>
 
-            {product?.images?.length > 0 ? (
-              <div className="grid grid-cols-4 gap-2">
-                {product.images.map((url: string, i: number) => (
-                  <div key={i} className="relative aspect-square rounded-xl overflow-hidden bg-slate-100">
-                    <img src={url} alt="" className="w-full h-full object-cover" />
-                  </div>
-                ))}
-              </div>
+            {images.length > 0 ? (
+              <>
+                <div className={`grid grid-cols-4 gap-2 ${setImages.isPending ? 'opacity-60 pointer-events-none' : ''}`}>
+                  {images.map((url: string, i: number) => (
+                    <div key={url} className="group relative aspect-square rounded-xl overflow-hidden bg-white border border-slate-200">
+                      <img src={url} alt="" className="w-full h-full object-contain" />
+                      {i === 0 && (
+                        <span className="absolute top-1 left-1 text-[10px] font-semibold bg-orange-500 text-white px-1.5 py-0.5 rounded">Principal</span>
+                      )}
+                      <div className="absolute inset-x-0 bottom-0 flex items-center justify-between bg-white/90 px-1 py-0.5">
+                        <div className="flex">
+                          <button type="button" onClick={() => moveImage(i, i - 1)} disabled={i === 0} className="p-1 text-slate-600 hover:text-orange-600 disabled:opacity-30" aria-label="Mover a la izquierda">
+                            <ChevronLeft size={14} />
+                          </button>
+                          <button type="button" onClick={() => moveImage(i, i + 1)} disabled={i === images.length - 1} className="p-1 text-slate-600 hover:text-orange-600 disabled:opacity-30" aria-label="Mover a la derecha">
+                            <ChevronRight size={14} />
+                          </button>
+                        </div>
+                        <div className="flex">
+                          {i !== 0 && (
+                            <button type="button" onClick={() => moveImage(i, 0)} className="p-1 text-slate-600 hover:text-orange-600" title="Hacer principal" aria-label="Hacer principal">
+                              <Star size={14} />
+                            </button>
+                          )}
+                          <button type="button" onClick={() => removeImage(i)} className="p-1 text-slate-600 hover:text-red-500" title="Borrar foto" aria-label="Borrar foto">
+                            <Trash2 size={14} />
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                <p className="text-xs text-slate-500">La foto principal es la que se ve en la tienda. Usá las flechas o la estrella para cambiarla.</p>
+                {setImages.isError && <p className="text-xs text-red-500">No se pudieron guardar los cambios en las fotos. Intentá de nuevo.</p>}
+              </>
             ) : (
               <div className="border-2 border-dashed border-slate-300 rounded-xl p-6 text-center text-sm text-slate-500">
                 Sin imágenes aún. Subí hasta 10 fotos del producto.

@@ -28,6 +28,7 @@ import { memoryStorage } from 'multer';
 import { ProductsService } from './products.service';
 import { CreateProductDto } from './dto/create-product.dto';
 import { UpdateProductDto } from './dto/update-product.dto';
+import { SetProductImagesDto } from './dto/set-product-images.dto';
 import { ProductQueryDto } from './dto/product-query.dto';
 import { JwtAuthGuard } from '../users/guards/jwt-auth.guard';
 import { RolesGuard } from '../users/guards/roles.guard';
@@ -98,6 +99,17 @@ export class ProductsController {
       product = await this.productsService.uploadImage(id, user.companyId, file);
     }
     return product;
+  }
+
+  @Put(':id/images')
+  @ApiOperation({ summary: 'Ordenar o quitar imágenes (la primera es la principal)' })
+  @Roles(UserRole.ADMIN, UserRole.VENDEDOR)
+  async setImages(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: SetProductImagesDto,
+    @CurrentUser() user: any,
+  ) {
+    return this.productsService.setImages(id, user.companyId, dto.images);
   }
 
   @Post(':id/technical-sheet')

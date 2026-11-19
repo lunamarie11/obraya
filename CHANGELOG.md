@@ -4,6 +4,29 @@ Cada cambio importante del proyecto se documenta aqui. Las decisiones arquitecto
 
 ---
 
+## [0.37.3] - 2026-11-19
+
+### Fix: carga y edición de productos (bugs #2, #5, #6 y #8 de QA del 18/11)
+
+- **#2 Precio en la tarjeta (backoffice):** `GET /products` devuelve
+  `currentPrice` (centavos, precio B2C activo a nivel producto, una sola
+  query vía `PricesService.findCurrentPrices`). La tarjeta lo muestra o avisa
+  "Sin precio cargado".
+- **#5 Pestaña B2B:** se saca de la pantalla de precios. Regla comercial:
+  todos los precios van con IVA incluido y la tienda solo usa B2C. El tipo
+  `B2B` sigue existiendo en la API y la base (sin migración) por si se
+  retoma un canal mayorista.
+- **#6 Fotos y precio al crear:** la pantalla "Nuevo producto" permite
+  cargar fotos (con vista previa) y el precio de venta en el mismo paso. Se
+  suben después de crear el producto; si alguno falla, el producto queda
+  creado y la pantalla de edición avisa qué falta cargar.
+- **#8 Gestión de fotos:** nuevo `PUT /products/:id/images` con la lista
+  final en orden (la primera es la principal). Solo acepta URLs que el
+  producto ya tiene. En la edición: borrar (con confirmación), mover y
+  "hacer principal". Los archivos borrados quedan en S3 sin referencia.
+
+---
+
 ## [0.37.2] - 2026-11-19
 
 ### Fix: buscador, importadores y fotos recortadas (bugs #1, #3, #4, #7 y #9 de QA del 18/11)
