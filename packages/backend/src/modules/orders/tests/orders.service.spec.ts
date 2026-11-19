@@ -57,6 +57,7 @@ const mockMessageRepo = {
 
 const mockStockService = {
   updateStock: jest.fn(),
+  applyOrderMovement: jest.fn(),
 };
 
 const mockPaymentsService = {
@@ -307,6 +308,50 @@ describe('OrdersService', () => {
         'user-1', 'Admin',
       );
       expect(result.status).toBe(OrderStatus.ENTREGADO);
+    });
+  });
+
+  describe('updateStatus() — movimientos de stock (bug #13 QA 18/11)', () => {
+    const items = [{ productId: 'prod-yeso', variantId: null, quantity: 1 }] as any;
+
+    async function transition(from: OrderStatus, to: OrderStatus, extra: any = {}) {
+      mockOrderRepo.findOne.mockResolvedValueOnce(makeOrder({ status: from, items }));
+      mockOrderRepo.findOne.mockResolvedValueOnce(makeOrder({ status: to, items }));
+      await service.updateStatus('order-uuid-1', 'company-uuid-1', { status: to, ...extra }, 'user-1', 'Admin');
+    }
+
+    it('Aceptar reserva el stock y nunca pisa la cantidad total', async () => {
+      await transition(OrderStatus.NUEVO, OrderStatus.ACEPTADO);
+      expect(mockStockService.applyOrderMovement).toHaveBeenCalledWith(
+        expect.anything(), 'reserve', items,
+        { id: 'order-uuid-1', orderNumber: 'OBY-TEST-001' }, 'user-1',
+      );
+      expect(mockStockService.updateStock).not.toHaveBeenCalled();
+    });
+
+    it('Despachar descuenta el stock', async () => {
+      await transition(OrderStatus.PREPARACION, OrderStatus.DESPACHADO);
+      expect(mockStockService.applyOrderMovement).toHaveBeenCalledWith(
+        expect.anything(), 'consume', items, expect.anything(), 'user-1',
+      );
+    });
+
+    it('Cancelar un pedido aceptado libera la reserva', async () => {
+      await transition(OrderStatus.ACEPTADO, OrderStatus.CANCELADO, { rejectionReason: 'Sin stock' });
+      expect(mockStockService.applyOrderMovement).toHaveBeenCalledWith(
+        expect.anything(), 'release', items, expect.anything(), 'user-1',
+      );
+    });
+
+    it('Cancelar un pedido Nuevo no toca el stock (nunca se reservó)', async () => {
+      await transition(OrderStatus.NUEVO, OrderStatus.CANCELADO, { rejectionReason: 'Sin stock' });
+      expect(mockStockService.applyOrderMovement).not.toHaveBeenCalled();
+    });
+
+    it('Preparacion y Entregado no mueven stock', async () => {
+      await transition(OrderStatus.ACEPTADO, OrderStatus.PREPARACION);
+      await transition(OrderStatus.DESPACHADO, OrderStatus.ENTREGADO);
+      expect(mockStockService.applyOrderMovement).not.toHaveBeenCalled();
     });
   });
 

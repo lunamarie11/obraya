@@ -4,7 +4,7 @@ import {
   Logger,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, DataSource } from 'typeorm';
+import { Repository, DataSource, EntityManager } from 'typeorm';
 import { parseSpreadsheet } from '../../common/utils/spreadsheet-parser';
 import { Stock } from './entities/stock.entity';
 import { StockMovement, MovementType } from './entities/stock-movement.entity';
@@ -193,6 +193,88 @@ export class StockService {
     }
 
     return results;
+  }
+
+  // Movimientos de stock disparados por el ciclo de vida de un pedido.
+  // Corre dentro de la transacción de OrdersService.updateStatus (recibe su
+  // EntityManager) para que el cambio de estado y el de stock sean atómicos.
+  //  - reserve (Aceptado): reservedQuantity += qty. Total no cambia,
+  //    Disponible baja.
+  //  - consume (Despachado): sale la mercadería → quantity -= qty y se libera
+  //    la reserva.
+  //  - release (Cancelado después de Aceptado): reservedQuantity -= qty.
+  // Antes de este fix, al aceptar se llamaba a updateStock({ quantity: 0 }),
+  // que pisa el stock total con 0 (bug #13 de QA del 18/11/2026).
+  // Nunca deja valores negativos: pedidos aceptados con el código viejo no
+  // tienen reserva, así que al despacharlos solo se descuenta quantity.
+  async applyOrderMovement(
+    manager: EntityManager,
+    kind: 'reserve' | 'consume' | 'release',
+    items: Array<{ productId: string; variantId?: string | null; quantity: number }>,
+    order: { id: string; orderNumber: string },
+    userId: string,
+  ): Promise<void> {
+    const stockRepo = manager.getRepository(Stock);
+    const movementRepo = manager.getRepository(StockMovement);
+
+    for (const item of items) {
+      const qty = Number(item.quantity);
+      if (!item.productId || !qty || qty <= 0) continue;
+
+      const qb = stockRepo
+        .createQueryBuilder('stock')
+        .setLock('pessimistic_write')
+        .where('stock.productId = :productId', { productId: item.productId });
+      if (item.variantId) {
+        qb.andWhere('stock.variantId = :variantId', { variantId: item.variantId });
+      } else {
+        qb.andWhere('stock.variantId IS NULL');
+      }
+      // Prioriza el depósito principal si hay más de uno.
+      const rows = await qb.getMany();
+      const stock = rows.find((s) => s.warehouseId === 'principal') ?? rows[0];
+
+      if (!stock) {
+        this.logger.warn(
+          `Pedido ${order.orderNumber}: producto ${item.productId} sin stock registrado, no se aplica ${kind}`,
+        );
+        continue;
+      }
+
+      let type: MovementType;
+      if (kind === 'reserve') {
+        stock.reservedQuantity = (stock.reservedQuantity || 0) + qty;
+        type = MovementType.RESERVA;
+      } else if (kind === 'release') {
+        stock.reservedQuantity = Math.max(0, (stock.reservedQuantity || 0) - qty);
+        type = MovementType.LIBERACION;
+      } else {
+        stock.quantity = Math.max(0, (stock.quantity || 0) - qty);
+        stock.reservedQuantity = Math.max(0, (stock.reservedQuantity || 0) - qty);
+        type = MovementType.SALIDA;
+      }
+
+      await stockRepo.save(stock);
+      await movementRepo.save(
+        movementRepo.create({
+          stockId: stock.id,
+          type,
+          quantity: qty,
+          quantityAfter: stock.quantity,
+          notes: `${
+            kind === 'reserve' ? 'Reserva' : kind === 'release' ? 'Liberación' : 'Venta'
+          } pedido ${order.orderNumber}`,
+          orderId: order.id,
+          userId,
+        }),
+      );
+
+      if (stock.isLowStock) {
+        this.logger.warn(
+          `BAJO STOCK: productId=${stock.productId} warehouse=${stock.warehouseId} disponible=${stock.availableQuantity} mínimo=${stock.minimumAlert}`,
+        );
+      }
+    }
   }
 
   async getMovements(

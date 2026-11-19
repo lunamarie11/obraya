@@ -4,6 +4,39 @@ Cada cambio importante del proyecto se documenta aqui. Las decisiones arquitecto
 
 ---
 
+## [0.37.1] - 2026-11-19
+
+### Fix: stock en 0 al vender y pantalla de Pedidos vacía (bugs #13 y #14 de QA del 18/11)
+
+- **#13 — al aceptar un pedido el stock quedaba en 0.** `OrdersService.updateStatus()`
+  llamaba a `StockService.updateStock({ quantity: 0 })` al pasar a Aceptado,
+  que pisa el stock total con 0 en vez de descontar. Nuevo
+  `StockService.applyOrderMovement()` que usa el campo `reserved_quantity` (ya
+  existía, nunca se usaba) y corre dentro de la misma transacción del cambio
+  de estado:
+  - Aceptado → reserva (`reserved_quantity += qty`, movimiento `reserva`).
+    Total no cambia, Disponible baja.
+  - Despachado → descuenta (`quantity -= qty`, libera la reserva, movimiento
+    `salida`).
+  - Cancelado después de Aceptado → libera la reserva (movimiento
+    `liberacion`). Antes estaba sin implementar.
+  - Cada movimiento queda en el historial con `order_id`. Nunca deja valores
+    negativos (pedidos aceptados con el código viejo no tienen reserva).
+  - Tests nuevos en `stock/tests/stock.service.spec.ts` y en
+    `orders.service.spec.ts`.
+  - **Dato a corregir a mano:** YES1 y PB1 de Certezza quedaron en 0 por el
+    bug; hay que cargarles el stock real desde Stock.
+- **#14 — Pedidos y Dashboard sin aviso de error.** Si la API falla, ahora se
+  muestra un aviso con botón Reintentar en vez de una tabla vacía o $0. La
+  tabla de pedidos también muestra un estado vacío explícito. Causa probable
+  del 500 en `/orders`: el código del tracking con Google Maps (columnas
+  `route_*`, 0.37.0) quedó corriendo antes de que se ejecutara la migración
+  `AddRouteToOrders` tras la caída del mediodía del 18/11 (la que corrigió
+  `forwardRef` en 60e5888). El deploy automático de las 19:14 ya corrió las
+  migraciones; queda por confirmar en producción.
+
+---
+
 ## [0.37.0] - 2026-11-18
 
 ### Feature: tracking con Google Maps embebido in-app (backend, ver ADR-027)

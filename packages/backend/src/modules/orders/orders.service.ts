@@ -509,24 +509,25 @@ export class OrdersService {
         throw new BadRequestException('El motivo de cancelación es obligatorio');
       }
 
-      // Al aceptar: reservar stock
-      if (dto.status === OrderStatus.ACEPTADO) {
-        for (const item of order.items) {
-          await this.stockService.updateStock(
-            item.productId,
-            companyId,
-            {
-              quantity: 0, // lo maneja internamente como reserva
-              notes: `Reserva pedido ${order.orderNumber}`,
-            },
-            userId,
-          );
-        }
-      }
-
-      // Al cancelar: liberar stock si estaba reservado
-      if (dto.status === OrderStatus.CANCELADO && order.status !== OrderStatus.NUEVO) {
-        // En v2 implementar liberación de reserva con MovementType.LIBERACION
+      // Stock (ver StockService.applyOrderMovement): Aceptado reserva,
+      // Despachado descuenta, Cancelado después de Aceptado libera la reserva.
+      // Misma transacción que el cambio de estado.
+      const stockKind =
+        dto.status === OrderStatus.ACEPTADO
+          ? 'reserve'
+          : dto.status === OrderStatus.DESPACHADO
+            ? 'consume'
+            : dto.status === OrderStatus.CANCELADO && order.status !== OrderStatus.NUEVO
+              ? 'release'
+              : null;
+      if (stockKind) {
+        await this.stockService.applyOrderMovement(
+          manager,
+          stockKind,
+          order.items ?? [],
+          { id: order.id, orderNumber: order.orderNumber },
+          userId,
+        );
       }
 
       // Al entregar: registrar fecha real

@@ -17,7 +17,7 @@ export default function OrdersPage() {
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(1);
 
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, isError, refetch } = useQuery({
     queryKey: ['orders', status, search, page],
     queryFn: () =>
       api.get('/orders', { params: { status: status || undefined, search: search || undefined, page, limit: 20 } })
@@ -57,6 +57,14 @@ export default function OrdersPage() {
             ))}
           </div>
         </div>
+
+        {/* Bug #14 (QA 18/11): si la API falla, avisar en vez de mostrar la tabla vacía */}
+        {isError && (
+          <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 flex items-center justify-between gap-3">
+            <span>No pudimos cargar los pedidos. Probá de nuevo en unos segundos; si sigue fallando, avisanos.</span>
+            <button onClick={() => refetch()} className="btn-secondary text-sm py-1 px-3">Reintentar</button>
+          </div>
+        )}
 
         {/* Tabla */}
         <div className="card overflow-hidden">
@@ -100,6 +108,13 @@ export default function OrdersPage() {
                       </td>
                     </tr>
                   ))}
+              {!isLoading && !isError && data?.data?.length === 0 && (
+                <tr>
+                  <td colSpan={6} className="px-4 py-10 text-center text-slate-500">
+                    No hay pedidos{status || search ? ' con estos filtros' : ' todavía'}.
+                  </td>
+                </tr>
+              )}
             </tbody>
           </table>
 

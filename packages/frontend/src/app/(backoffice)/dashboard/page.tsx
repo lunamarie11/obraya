@@ -23,7 +23,7 @@ const STATUS_COLORS: Record<string, string> = {
 export default function DashboardPage() {
   const [period, setPeriod] = useState<Period>('month');
 
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, isError, refetch } = useQuery({
     queryKey: ['dashboard', period],
     queryFn: () => api.get(`/dashboard/summary?period=${period}`).then((r) => r.data),
   });
@@ -48,6 +48,14 @@ export default function DashboardPage() {
             </button>
           ))}
         </div>
+
+        {/* Bug #14 (QA 18/11): no mostrar $0 / 0 pedidos como si fuera real cuando la API falla */}
+        {isError && (
+          <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 flex items-center justify-between gap-3">
+            <span>No pudimos cargar los datos del dashboard. Los números de abajo no están actualizados.</span>
+            <button onClick={() => refetch()} className="btn-secondary text-sm py-1 px-3">Reintentar</button>
+          </div>
+        )}
 
         {/* KPIs */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
