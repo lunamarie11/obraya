@@ -177,3 +177,38 @@ describe('PricesService', () => {
     });
   });
 });
+
+// SEGURIDAD (19/11/2026): sin precio previo se creaba el precio sin validar
+// que el producto fuera de la empresa.
+describe('PricesService.setPrice() — producto de otra empresa', () => {
+  function setup(ownedProduct: unknown) {
+    const qb: any = {
+      innerJoin: jest.fn().mockReturnThis(),
+      where: jest.fn().mockReturnThis(),
+      andWhere: jest.fn().mockReturnThis(),
+      getOne: jest.fn().mockResolvedValue(null),
+    };
+    const priceRepo = { createQueryBuilder: () => qb, create: jest.fn((d) => d), save: jest.fn(async (d) => d) };
+    const productRepo = { findOne: jest.fn().mockResolvedValue(ownedProduct) };
+    const manager = {
+      getRepository: (e: any) => (e === Price ? priceRepo : e === PriceHistory ? {} : productRepo),
+    };
+    const ds = { transaction: (cb: any) => cb(manager) } as any;
+    const service = new PricesService({} as any, {} as any, ds);
+    return { service, priceRepo };
+  }
+
+  it('producto ajeno sin precio previo: NotFound y no crea el precio', async () => {
+    const { service, priceRepo } = setup(null);
+    await expect(
+      service.setPrice('ajeno', 'c1', { type: PriceType.B2C, basePrice: 1 } as any, 'u1'),
+    ).rejects.toThrow('Producto no encontrado');
+    expect(priceRepo.save).not.toHaveBeenCalled();
+  });
+
+  it('producto propio sin precio previo: lo crea', async () => {
+    const { service, priceRepo } = setup({ id: 'p1' });
+    await service.setPrice('p1', 'c1', { type: PriceType.B2C, basePrice: 1000 } as any, 'u1');
+    expect(priceRepo.save).toHaveBeenCalledWith(expect.objectContaining({ productId: 'p1', basePrice: 1000 }));
+  });
+});

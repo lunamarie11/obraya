@@ -8,6 +8,7 @@ import {
   UseGuards,
   HttpCode,
   HttpStatus,
+  ForbiddenException,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth, ApiResponse } from '@nestjs/swagger';
 import { UsersService } from './users.service';
@@ -27,9 +28,21 @@ import { UserRole } from './entities/company-user.entity';
 export class UsersController {
   constructor(private readonly usersService: UsersService) {}
 
+  // SEGURIDAD (19/11/2026): ninguna ruta /companies/:id verificaba que la
+  // empresa fuera la del usuario logueado. Un Admin de otra empresa podía ver
+  // sus datos bancarios, cambiarle el CBU o invitarse como Admin. Solo
+  // SuperAdmin (ObraYa) puede operar sobre cualquier empresa.
+  private assertOwnCompany(user: any, id: string) {
+    if (user?.role === UserRole.SUPER_ADMIN) return;
+    if (!user?.companyId || user.companyId !== id) {
+      throw new ForbiddenException('No tenés acceso a esta empresa');
+    }
+  }
+
   @Get(':id')
   @ApiOperation({ summary: 'Detalle de empresa' })
   async getCompany(@Param('id') id: string, @CurrentUser() user: any) {
+    this.assertOwnCompany(user, id);
     return this.usersService.findCompanyById(id);
   }
 
@@ -39,7 +52,9 @@ export class UsersController {
   async updateCompany(
     @Param('id') id: string,
     @Body() dto: UpdateCompanyDto,
+    @CurrentUser() user: any,
   ) {
+    this.assertOwnCompany(user, id);
     return this.usersService.updateCompanyProfile(id, dto);
   }
 
@@ -49,7 +64,9 @@ export class UsersController {
   async updateDeliveryZones(
     @Param('id') id: string,
     @Body() dto: UpdateDeliveryZonesDto,
+    @CurrentUser() user: any,
   ) {
+    this.assertOwnCompany(user, id);
     return this.usersService.updateDeliveryZones(id, dto.deliveryZones);
   }
 
@@ -57,6 +74,7 @@ export class UsersController {
   @ApiOperation({ summary: 'Listar usuarios de la empresa' })
   @Roles(UserRole.ADMIN)
   async getCompanyUsers(@Param('id') id: string, @CurrentUser() currentUser: any) {
+    this.assertOwnCompany(currentUser, id);
     return this.usersService.getCompanyUsers(id);
   }
 
@@ -64,7 +82,8 @@ export class UsersController {
   @ApiOperation({ summary: 'Invitar usuario a la empresa' })
   @Roles(UserRole.ADMIN)
   @ApiResponse({ status: 201, description: 'Invitación enviada' })
-  async inviteUser(@Param('id') id: string, @Body() dto: InviteUserDto) {
+  async inviteUser(@Param('id') id: string, @Body() dto: InviteUserDto, @CurrentUser() currentUser: any) {
+    this.assertOwnCompany(currentUser, id);
     const user = await this.usersService.inviteUser(id, dto);
     return {
       message: `Invitación enviada a ${dto.email}`,

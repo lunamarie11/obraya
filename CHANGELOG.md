@@ -4,6 +4,24 @@ Cada cambio importante del proyecto se documenta aqui. Las decisiones arquitecto
 
 ---
 
+## [0.37.6] - 2026-11-19
+
+### Seguridad: acceso entre empresas en /companies/:id, invitaciones SuperAdmin y precios
+
+- **Ninguna ruta `/companies/:id` verificaba que la empresa fuera la del
+  usuario logueado.** Un Admin de cualquier comercio podía ver los datos de
+  otro (incluidos los bancarios), **cambiarle el CBU**, modificar sus zonas,
+  ver sus usuarios o **invitarse como Admin**. Ahora todas exigen que `:id`
+  sea la empresa del usuario (SuperAdmin queda exceptuado).
+- **Una empresa podía invitar usuarios con rol SuperAdmin** (acceso total a
+  la plataforma). `InviteUserDto` ya no acepta ese rol.
+- `PricesService.setPrice`: si el producto no tenía precio, se creaba sin
+  validar la empresa (se podía poner precio a productos de otro comercio).
+- Pendiente: revisar en producción si hubo cambios de CBU, usuarios
+  SuperAdmin o invitaciones sospechosas.
+
+---
+
 ## [0.37.5] - 2026-11-19
 
 ### Seguridad: el precio de los pedidos del comprador se calcula en el servidor

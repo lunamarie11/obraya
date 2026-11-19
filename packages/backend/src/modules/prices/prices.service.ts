@@ -4,6 +4,7 @@ import { Repository, DataSource, In, IsNull } from 'typeorm';
 import { Price, PriceType } from './entities/price.entity';
 import { PriceHistory } from './entities/price-history.entity';
 import { SetPriceDto } from './dto/set-price.dto';
+import { Product } from '../products/entities/product.entity';
 
 export interface ResolvedPrice {
   basePrice: number;           // precio base en centavos
@@ -74,6 +75,13 @@ export class PricesService {
         });
         return priceRepo.save(existing);
       }
+
+      // SEGURIDAD (19/11/2026): sin precio previo no hay join que valide la
+      // empresa; verificar que el producto sea de esta empresa.
+      const owned = await manager
+        .getRepository(Product)
+        .findOne({ where: { id: productId, companyId }, select: ['id'] });
+      if (!owned) throw new NotFoundException('Producto no encontrado');
 
       // Crear precio nuevo
       return priceRepo.save(
