@@ -20,7 +20,21 @@ import * as ExcelJS from 'exceljs';
 // headers, para que ambos importers lo hereden gratis.
 const SPANISH_HEADER_ALIASES: Record<string, string> = {
   nombre: 'name',
+  // Bug #3 (QA 18/11): planillas reales usan "Producto" y "Precio Lista".
+  producto: 'name',
+  'nombre del producto': 'name',
+  'nombre producto': 'name',
+  articulo: 'name',
   codigo: 'sku',
+  cod: 'sku',
+  'codigo sku': 'sku',
+  'precio lista': 'price',
+  'precio de lista': 'price',
+  'precio final': 'price',
+  'precio unitario': 'price',
+  'precio con iva': 'price',
+  existencia: 'quantity',
+  unidades: 'quantity',
   'codigo de producto': 'sku',
   descripcion: 'description',
   categoria: 'category',
@@ -55,6 +69,15 @@ function resolveHeaderKey(normalizedKey: string): string {
   return SPANISH_HEADER_ALIASES[canonical] ?? normalizedKey;
 }
 
+// Excel en español (es-AR) exporta CSV con ";" como separador, y ahí la coma
+// es el separador decimal ("1500,50"). No se pueden aceptar ambos a la vez:
+// se decide mirando el encabezado (primera línea).
+function detectCsvDelimiter(buffer: Buffer): string {
+  const firstLine = buffer.toString('utf-8').split(/\r?\n/, 1)[0] ?? '';
+  const count = (ch: string) => firstLine.split(ch).length - 1;
+  return count(';') > count(',') ? ';' : ',';
+}
+
 export async function parseSpreadsheet(
   buffer: Buffer,
   originalName?: string,
@@ -65,7 +88,13 @@ export async function parseSpreadsheet(
 
   if (isCsv) {
     try {
-      rawRows = csvParse(buffer, { columns: true, skip_empty_lines: true, trim: true });
+      rawRows = csvParse(buffer, {
+        columns: true,
+        skip_empty_lines: true,
+        trim: true,
+        bom: true,
+        delimiter: detectCsvDelimiter(buffer),
+      });
     } catch {
       throw new BadRequestException('El archivo CSV tiene formato inválido');
     }

@@ -57,4 +57,16 @@ describe('parseSpreadsheet', () => {
     const rows = await parseSpreadsheet(toCsvBuffer(csv), 'productos.csv');
     expect(rows).toEqual([{ name: 'Cemento', stock: '10' }]);
   });
+
+  it('bug #3: acepta "Producto" y "Precio Lista" como encabezados', async () => {
+    const csv = 'Producto,Precio Lista\nYeso x 1 KG,1500\n';
+    const rows = await parseSpreadsheet(toCsvBuffer(csv), 'productos.csv');
+    expect(rows).toEqual([{ name: 'Yeso x 1 KG', price: '1500' }]);
+  });
+
+  it('acepta CSV separado por ";" (Excel en español) y con BOM', async () => {
+    const csv = '\uFEFFNombre;SKU;Precio\nYeso;YES1;1500,50\n';
+    const rows = await parseSpreadsheet(toCsvBuffer(csv), 'plantilla.csv');
+    expect(rows).toEqual([{ name: 'Yeso', sku: 'YES1', price: '1500,50' }]);
+  });
 });

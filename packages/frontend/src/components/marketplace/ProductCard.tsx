@@ -45,12 +45,14 @@ export function ProductCard({ product, added, onQuickAdd, showStore = true }: Pr
   return (
     <Link href={`/marketplace/products/${product.id}`} className="group block">
       <div className="card-ios overflow-hidden hover:shadow-md transition-all duration-200 hover:-translate-y-0.5">
-        <div className={`relative h-44 bg-gradient-to-br ${gradient} overflow-hidden`}>
+        {/* Bug #7 (QA 18/11): object-contain para no recortar fotos verticales;
+            con foto el fondo es blanco para que el "letterbox" no se note. */}
+        <div className={`relative h-44 overflow-hidden ${product.images?.[0] ? 'bg-white' : `bg-gradient-to-br ${gradient}`}`}>
           {product.images?.[0] ? (
             <img
               src={product.images[0]}
               alt={product.name}
-              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+              className="w-full h-full object-contain p-2 group-hover:scale-105 transition-transform duration-300"
             />
           ) : (
             <div className="flex items-center justify-center h-full">

@@ -4,7 +4,8 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useState, useRef } from 'react';
 import { api } from '@/lib/api';
 import { Header } from '@/components/layout/Header';
-import { AlertTriangle, Package, Pencil, Check, X, History, Upload, Loader2 } from 'lucide-react';
+import { AlertTriangle, Package, Pencil, Check, X, History, Upload, Loader2, Download, CheckCircle2 } from 'lucide-react';
+import { downloadCsvTemplate, STOCK_TEMPLATE, apiErrorMessage } from '@/lib/csv-template';
 import { clsx } from 'clsx';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -19,6 +20,9 @@ export default function StockPage() {
   const [editWh, setEditWh] = useState('');
   const [historyId, setHistoryId] = useState<string | null>(null);
   const [csvUploading, setCsvUploading] = useState(false);
+  // Bug #9 (QA 18/11): mostrar el resultado del import (antes no mostraba nada).
+  const [csvResult, setCsvResult] = useState<{ updated: number; errors: Array<{ row: number; error: string }> } | null>(null);
+  const [csvError, setCsvError] = useState<string | null>(null);
 
   const { data: stocks = [], isLoading } = useQuery({
     queryKey: ['stock'],
@@ -51,11 +55,16 @@ export default function StockPage() {
     const file = e.target.files?.[0];
     if (!file) return;
     setCsvUploading(true);
+    setCsvResult(null);
+    setCsvError(null);
     const fd = new FormData();
     fd.append('file', file);
     try {
-      await api.post('/stock/bulk-update/csv', fd, { headers: { 'Content-Type': 'multipart/form-data' } });
+      const { data } = await api.post('/stock/bulk-update/csv', fd, { headers: { 'Content-Type': 'multipart/form-data' } });
+      setCsvResult(data);
       qc.invalidateQueries({ queryKey: ['stock'] });
+    } catch (err) {
+      setCsvError(apiErrorMessage(err, 'No se pudo importar el archivo. Revisá que tenga el formato de la plantilla.'));
     } finally {
       setCsvUploading(false);
       e.target.value = '';
@@ -67,13 +76,58 @@ export default function StockPage() {
   return (
     <div>
       <Header title="Stock" actions={
-        <label className={clsx('btn-secondary text-sm flex items-center gap-2 cursor-pointer', csvUploading && 'opacity-60 pointer-events-none')}>
-          {csvUploading ? <Loader2 size={14} className="animate-spin" /> : <Upload size={14} />}
-          {csvUploading ? 'Importando...' : 'Importar CSV/Excel'}
-          <input ref={csvRef} type="file" accept=".csv,.xlsx,.xls" className="hidden" onChange={handleCsvUpload} />
-        </label>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => downloadCsvTemplate(STOCK_TEMPLATE.filename, STOCK_TEMPLATE.headers, STOCK_TEMPLATE.rows)}
+            className="text-sm text-slate-600 hover:text-orange-600 flex items-center gap-1.5 px-2"
+            title="Columnas: SKU y Cantidad (stock total, reemplaza el actual)"
+          >
+            <Download size={14} /> Plantilla
+          </button>
+          <label className={clsx('btn-secondary text-sm flex items-center gap-2 cursor-pointer', csvUploading && 'opacity-60 pointer-events-none')}>
+            {csvUploading ? <Loader2 size={14} className="animate-spin" /> : <Upload size={14} />}
+            {csvUploading ? 'Importando...' : 'Importar CSV/Excel'}
+            <input ref={csvRef} type="file" accept=".csv,.xlsx,.xls" className="hidden" onChange={handleCsvUpload} />
+          </label>
+        </div>
       } />
       <div className="p-6 space-y-4">
+
+        {csvError && (
+          <div className="rounded-2xl p-4 flex items-start gap-3 border bg-red-50 border-red-200">
+            <AlertTriangle size={18} className="text-red-500 flex-shrink-0 mt-0.5" />
+            <p className="text-sm text-red-700 flex-1">{csvError}</p>
+            <button onClick={() => setCsvError(null)} className="text-slate-400 hover:text-slate-700 transition-colors"><X size={15} /></button>
+          </div>
+        )}
+
+        {csvResult && (
+          <div className={clsx(
+            'rounded-2xl p-4 flex items-start gap-3 border',
+            csvResult.errors.length > 0 ? 'bg-amber-50 border-amber-200' : 'bg-green-50 border-green-200',
+          )}>
+            {csvResult.errors.length > 0
+              ? <AlertTriangle size={18} className="text-amber-500 flex-shrink-0 mt-0.5" />
+              : <CheckCircle2 size={18} className="text-green-500 flex-shrink-0 mt-0.5" />}
+            <div className="text-sm flex-1">
+              <p className={csvResult.errors.length > 0 ? 'text-amber-700' : 'text-green-700'}>
+                <span className="font-semibold">{csvResult.updated}</span> producto{csvResult.updated === 1 ? '' : 's'} actualizado{csvResult.updated === 1 ? '' : 's'}
+                {csvResult.errors.length > 0 && (
+                  <>, <span className="font-semibold">{csvResult.errors.length}</span> fila{csvResult.errors.length > 1 ? 's' : ''} con error</>
+                )}
+              </p>
+              {csvResult.errors.length > 0 && (
+                <ul className="mt-1.5 text-xs text-amber-600 space-y-0.5 max-h-32 overflow-y-auto">
+                  {csvResult.errors.map((err, i) => (
+                    <li key={i}>Fila {err.row}: {err.error}</li>
+                  ))}
+                </ul>
+              )}
+            </div>
+            <button onClick={() => setCsvResult(null)} className="text-slate-400 hover:text-slate-700 transition-colors"><X size={15} /></button>
+          </div>
+        )}
 
         {lowStock.length > 0 && (
           <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 flex items-start gap-3">

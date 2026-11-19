@@ -5,7 +5,7 @@ import {
   ForbiddenException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, Like, FindOptionsWhere } from 'typeorm';
+import { Repository, ILike, FindOptionsWhere } from 'typeorm';
 import { Product } from './entities/product.entity';
 import { ProductVariant } from './entities/product-variant.entity';
 import { StorageService } from './storage.service';
@@ -83,11 +83,14 @@ export class ProductsService {
     if (query.category) where.category = query.category;
     if (query.brand) where.brand = query.brand;
 
+    // Bug #1 (QA 18/11): Like distingue mayúsculas, "yeso" no encontraba
+    // "Yeso" ni "yes1" a "YES1". ILike + trim.
+    const search = query.search?.trim();
     const [products, total] = await this.productRepo.findAndCount({
-      where: query.search
+      where: search
         ? [
-            { ...where, name: Like(`%${query.search}%`) },
-            { ...where, sku: Like(`%${query.search}%`) },
+            { ...where, name: ILike(`%${search}%`) },
+            { ...where, sku: ILike(`%${search}%`) },
           ]
         : where,
       relations: ['variants'],

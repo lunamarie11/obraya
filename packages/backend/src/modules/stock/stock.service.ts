@@ -7,6 +7,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, DataSource, EntityManager } from 'typeorm';
 import { parseSpreadsheet } from '../../common/utils/spreadsheet-parser';
 import { Stock } from './entities/stock.entity';
+import { Product } from '../products/entities/product.entity';
 import { StockMovement, MovementType } from './entities/stock-movement.entity';
 import { UpdateStockDto, BulkUpdateStockItemDto } from './dto/update-stock.dto';
 
@@ -90,6 +91,13 @@ export class StockService {
         });
         stock = await stockRepo.save(existing);
       } else {
+        // Sin fila de stock previa no hay join que valide la empresa: chequear
+        // que el producto sea de esta empresa antes de crearla.
+        const owned = await manager
+          .getRepository(Product)
+          .findOne({ where: { id: productId, companyId }, select: ['id'] });
+        if (!owned) throw new NotFoundException('Producto no encontrado');
+
         const newStock = stockRepo.create({
           productId,
           warehouseId: dto.warehouseId || 'principal',
@@ -169,9 +177,34 @@ export class StockService {
       const row = rows[i];
       const rowNum = i + 2;
 
-      if (!row.product_id || !row.quantity) {
-        results.errors.push({ row: rowNum, error: 'Se requieren columnas: product_id, quantity' });
+      // Bug #9 (QA 18/11): el comercio conoce el SKU, no el ID interno.
+      // Se acepta cualquiera de los dos (SKU tiene prioridad si vienen ambos).
+      if ((!row.sku && !row.product_id) || row.quantity === undefined || row.quantity === '') {
+        results.errors.push({ row: rowNum, error: 'Se requieren las columnas SKU y Cantidad' });
         continue;
+      }
+
+      let productId = row.product_id;
+      if (row.sku) {
+        const product = await this.dataSource
+          .getRepository(Product)
+          .findOne({ where: { sku: row.sku.trim(), companyId }, select: ['id'] });
+        if (!product) {
+          results.errors.push({ row: rowNum, error: `No existe un producto con SKU "${row.sku}"` });
+          continue;
+        }
+        productId = product.id;
+      } else {
+        // Sin SKU: validar que el product_id sea de esta empresa. updateStock
+        // crea la fila de stock si no existe y no chequea la empresa en ese caso.
+        const owned = await this.dataSource
+          .getRepository(Product)
+          .findOne({ where: { id: productId, companyId }, select: ['id'] })
+          .catch(() => null);
+        if (!owned) {
+          results.errors.push({ row: rowNum, error: `No existe un producto con ID "${productId}"` });
+          continue;
+        }
       }
 
       const qty = parseInt(row.quantity, 10);
@@ -181,7 +214,7 @@ export class StockService {
       }
 
       try {
-        await this.updateStock(row.product_id, companyId, {
+        await this.updateStock(productId, companyId, {
           quantity: qty,
           warehouseId: row.warehouse_id,
           notes: row.notes,

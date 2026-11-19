@@ -4,6 +4,33 @@ Cada cambio importante del proyecto se documenta aqui. Las decisiones arquitecto
 
 ---
 
+## [0.37.2] - 2026-11-19
+
+### Fix: buscador, importadores y fotos recortadas (bugs #1, #3, #4, #7 y #9 de QA del 18/11)
+
+- **#1 Buscador de productos (backoffice):** usaba `Like`, que distingue
+  mayúsculas ("yeso" no encontraba "Yeso", "yes1" no encontraba "YES1").
+  Ahora `ILike` + trim, sobre nombre y SKU.
+- **#3 Importar productos:** nuevos alias de encabezado en español
+  (`Producto`, `Precio Lista`, `Precio de lista`, `Precio final`, `Cod`,
+  `Artículo`, etc.). El parser ahora detecta CSV separados por `;` (lo que
+  exporta Excel en español, donde la coma es decimal) y tolera BOM. Botón
+  "Plantilla" con un CSV de ejemplo, y aviso de error si el archivo no se
+  puede leer (antes fallaba en silencio).
+- **#4 / #9 Importar stock:** acepta la columna **SKU** (antes exigía el ID
+  interno `product_id`, que se sigue aceptando). Muestra el resultado en
+  pantalla (actualizados + errores por fila) y tiene su propia plantilla
+  (`SKU;Cantidad`). Cantidad `0` ya no se toma como "falta la columna".
+- **Seguridad (encontrado de paso):** `StockService.updateStock` creaba la
+  fila de stock sin validar que el producto fuera de la empresa cuando no
+  existía stock previo. Ahora valida en ese caso; el import por
+  `product_id` también.
+- **#7 Fotos recortadas:** las tarjetas de producto (tienda pública y
+  backoffice) usan `object-contain` en vez de `object-cover`, así las fotos
+  verticales se ven completas.
+
+---
+
 ## [0.37.1] - 2026-11-19
 
 ### Fix: stock en 0 al vender y pantalla de Pedidos vacía (bugs #13 y #14 de QA del 18/11)

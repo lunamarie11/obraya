@@ -5,7 +5,8 @@ import { useState, useRef } from 'react';
 import Link from 'next/link';
 import { api } from '@/lib/api';
 import { Header } from '@/components/layout/Header';
-import { Plus, Search, Package, Pencil, EyeOff, Upload, Loader2, AlertTriangle, CheckCircle2, X } from 'lucide-react';
+import { Plus, Search, Package, Pencil, EyeOff, Upload, Loader2, AlertTriangle, CheckCircle2, X, Download } from 'lucide-react';
+import { downloadCsvTemplate, PRODUCTS_TEMPLATE, apiErrorMessage } from '@/lib/csv-template';
 import { clsx } from 'clsx';
 
 export default function ProductsPage() {
@@ -19,6 +20,7 @@ export default function ProductsPage() {
     updated: number;
     errors: Array<{ row: number; error: string }>;
   } | null>(null);
+  const [importError, setImportError] = useState<string | null>(null);
 
   const { data, isLoading } = useQuery({
     queryKey: ['products', search, page],
@@ -37,6 +39,7 @@ export default function ProductsPage() {
     if (!file) return;
     setImporting(true);
     setImportResult(null);
+    setImportError(null);
     const fd = new FormData();
     fd.append('file', file);
     try {
@@ -44,6 +47,8 @@ export default function ProductsPage() {
       setImportResult(data);
       qc.invalidateQueries({ queryKey: ['products'] });
       qc.invalidateQueries({ queryKey: ['stock'] });
+    } catch (err) {
+      setImportError(apiErrorMessage(err, 'No se pudo importar el archivo. Revisá que tenga el formato de la plantilla.'));
     } finally {
       setImporting(false);
       e.target.value = '';
@@ -54,6 +59,14 @@ export default function ProductsPage() {
     <div>
       <Header title="Productos" actions={
         <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => downloadCsvTemplate(PRODUCTS_TEMPLATE.filename, PRODUCTS_TEMPLATE.headers, PRODUCTS_TEMPLATE.rows)}
+            className="text-sm text-slate-600 hover:text-orange-600 flex items-center gap-1.5 px-2"
+            title="Columnas: Nombre (obligatoria), SKU, Descripción, Categoría, Marca, Unidad de medida, Precio (con IVA), Stock"
+          >
+            <Download size={14} /> Plantilla
+          </button>
           <label className={clsx('btn-secondary text-sm flex items-center gap-2 cursor-pointer', importing && 'opacity-60 pointer-events-none')}>
             {importing ? <Loader2 size={14} className="animate-spin" /> : <Upload size={14} />}
             {importing ? 'Importando...' : 'Importar CSV/Excel'}
@@ -65,6 +78,16 @@ export default function ProductsPage() {
         </div>
       } />
       <div className="p-6 space-y-4">
+
+        {importError && (
+          <div className="rounded-2xl p-4 flex items-start gap-3 border bg-red-50 border-red-200">
+            <AlertTriangle size={18} className="text-red-500 flex-shrink-0 mt-0.5" />
+            <p className="text-sm text-red-700 flex-1">{importError}</p>
+            <button onClick={() => setImportError(null)} className="text-slate-400 hover:text-slate-700 transition-colors">
+              <X size={15} />
+            </button>
+          </div>
+        )}
 
         {importResult && (
           <div className={clsx(
@@ -125,7 +148,7 @@ export default function ProductsPage() {
               <div key={product.id} className="card p-4 flex flex-col gap-3">
                 <div className="w-full h-36 bg-slate-100 rounded-xl flex items-center justify-center overflow-hidden">
                   {product.images?.[0] ? (
-                    <img src={product.images[0]} alt={product.name} className="w-full h-full object-cover" />
+                    <img src={product.images[0]} alt={product.name} className="w-full h-full object-contain bg-white" />
                   ) : (
                     <Package size={32} className="text-slate-300" />
                   )}
