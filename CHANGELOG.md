@@ -4,6 +4,23 @@ Cada cambio importante del proyecto se documenta aqui. Las decisiones arquitecto
 
 ---
 
+## [0.37.5] - 2026-11-19
+
+### Seguridad: el precio de los pedidos del comprador se calcula en el servidor
+
+- `OrdersService.createForBuyer` usaba el `unitPrice` que mandaba el
+  navegador: cualquier comprador podía crear (y pagar por Mercado Pago) un
+  pedido al precio que quisiera, o con productos de otra empresa. Ahora
+  precio, descuento, nombre y SKU salen de la base (producto activo de esa
+  empresa + `PricesService.resolve` B2C con descuentos por volumen y
+  promociones vigentes). Producto ajeno/inactivo, variante inválida o sin
+  precio → 400 y no se crea el pedido. El alta manual de pedidos desde el
+  backoffice (`POST /orders`, del propio comercio) no cambia.
+- Pendiente: revisar en producción si hubo pedidos con precios distintos a
+  los de lista.
+
+---
+
 ## [0.37.4] - 2026-11-19
 
 ### Fix: mails de estado del pedido (bug #10 de QA del 18/11)

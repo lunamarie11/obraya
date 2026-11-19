@@ -14,12 +14,15 @@ import { NotificationsModule } from '../notifications/notifications.module';
 import { AfipModule } from '../afip/afip.module';
 import { EmailModule } from '../email/email.module';
 import { Company } from '../users/entities/company.entity';
+import { Product } from '../products/entities/product.entity';
+import { PricesModule } from '../prices/prices.module';
 import { LogisticsModule } from '../logistics/logistics.module';
 import { DeliveryModule } from '../delivery/delivery.module';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([Order, OrderItem, OrderMessage, Company]),
+    TypeOrmModule.forFeature([Order, OrderItem, OrderMessage, Company, Product]),
+    PricesModule,
     StockModule,
     BuyersModule,
     PaymentsModule,

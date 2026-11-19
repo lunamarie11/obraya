@@ -9,7 +9,7 @@ import {
   ForbiddenException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, DataSource, Between, ILike } from 'typeorm';
+import { Repository, DataSource, Between, ILike, In } from 'typeorm';
 import { Order, OrderStatus, PaymentMethod, VALID_TRANSITIONS } from './entities/order.entity';
 import { OrderItem } from './entities/order-item.entity';
 import { OrderMessage, MessageSender } from './entities/order-message.entity';
@@ -18,6 +18,9 @@ import { UpdateOrderStatusDto } from './dto/update-order-status.dto';
 import { SendMessageDto } from './dto/send-message.dto';
 import { OrderQueryDto } from './dto/order-query.dto';
 import { StockService } from '../stock/stock.service';
+import { PricesService } from '../prices/prices.service';
+import { PriceType } from '../prices/entities/price.entity';
+import { Product } from '../products/entities/product.entity';
 import { PaymentsService } from '../payments/payments.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { EmailService } from '../email/email.service';
@@ -42,6 +45,9 @@ export class OrdersService {
     private readonly messageRepo: Repository<OrderMessage>,
     @InjectRepository(Company)
     private readonly companyRepo: Repository<Company>,
+    @InjectRepository(Product)
+    private readonly productRepo: Repository<Product>,
+    private readonly pricesService: PricesService,
     private readonly dataSource: DataSource,
     private readonly stockService: StockService,
     private readonly paymentsService: PaymentsService,
@@ -230,8 +236,52 @@ export class OrdersService {
   // Ver ADR-006: el comprador crea el pedido para el fabricante indicado en
   // dto.companyId (el carrito ya viene agrupado por companyId desde el frontend).
   async createForBuyer(buyerId: string, dto: CreateOrderDto): Promise<Order> {
-    const order = await this.create(dto.companyId, buyerId, dto);
+    const items = await this.priceItemsServerSide(dto.companyId, dto.items ?? []);
+    const order = await this.create(dto.companyId, buyerId, { ...dto, items });
     return this.hideFinancials(order);
+  }
+
+  // SEGURIDAD (19/11/2026): antes se usaba el unitPrice que mandaba el
+  // navegador, así que un comprador podía pagar el precio que quisiera (y
+  // pedir productos de otra empresa). Ahora precio, descuento, nombre y SKU
+  // salen de la base: producto activo de esa empresa + PricesService.resolve
+  // (B2C, con descuentos por volumen/promos vigentes). Lo que mande el cliente
+  // en esos campos se ignora.
+  private async priceItemsServerSide(
+    companyId: string,
+    items: CreateOrderDto['items'],
+  ): Promise<CreateOrderDto['items']> {
+    if (!items.length) return items;
+    const ids = [...new Set(items.map((i) => i.productId))];
+    const products = await this.productRepo.find({
+      where: { id: In(ids), companyId, isActive: true },
+      relations: ['variants'],
+    });
+    const byId = new Map(products.map((p) => [p.id, p]));
+
+    const priced: CreateOrderDto['items'] = [];
+    for (const item of items) {
+      const product = byId.get(item.productId);
+      if (!product) {
+        throw new BadRequestException(`El producto "${item.productName ?? item.productId}" ya no está disponible`);
+      }
+      const variant = item.variantId ? product.variants?.find((v) => v.id === item.variantId) : undefined;
+      if (item.variantId && !variant) {
+        throw new BadRequestException(`La variante elegida de "${product.name}" ya no está disponible`);
+      }
+      const resolved = await this.pricesService.resolve(product.id, PriceType.B2C, item.quantity, item.variantId);
+      if (!resolved) {
+        throw new BadRequestException(`"${product.name}" no tiene precio cargado`);
+      }
+      priced.push({
+        ...item,
+        productName: variant ? `${product.name} - ${variant.name}` : product.name,
+        productSku: variant?.skuVariant || product.sku || undefined,
+        unitPrice: resolved.finalPrice,
+        discountPercent: resolved.discountPercent,
+      });
+    }
+    return priced;
   }
 
   async findAllForBuyer(buyerId: string): Promise<Order[]> {

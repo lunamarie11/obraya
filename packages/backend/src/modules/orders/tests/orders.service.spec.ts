@@ -16,6 +16,8 @@ import { DriversService } from '../../logistics/drivers.service';
 import { GoogleMapsService } from '../../logistics/google-maps.service';
 import { LogisticsService } from '../../logistics/logistics.service';
 import { Company, FleetType } from '../../users/entities/company.entity';
+import { Product } from '../../products/entities/product.entity';
+import { PricesService } from '../../prices/prices.service';
 import { UserRole } from '../../users/entities/company-user.entity';
 
 function makeOrder(overrides: Partial<Order> = {}): Order {
@@ -104,6 +106,14 @@ const mockCompanyRepo = {
 
 const flush = () => new Promise((r) => setImmediate(r));
 
+const mockProductRepo = {
+  find: jest.fn().mockResolvedValue([]),
+};
+
+const mockPricesService = {
+  resolve: jest.fn(),
+};
+
 // DataSource mock que ejecuta el callback con repos mockeados
 const mockDataSource = {
   transaction: jest.fn(async (cb) => {
@@ -134,6 +144,8 @@ describe('OrdersService', () => {
         { provide: getRepositoryToken(OrderItem), useValue: mockItemRepo },
         { provide: getRepositoryToken(OrderMessage), useValue: mockMessageRepo },
         { provide: getRepositoryToken(Company), useValue: mockCompanyRepo },
+        { provide: getRepositoryToken(Product), useValue: mockProductRepo },
+        { provide: PricesService, useValue: mockPricesService },
         { provide: DataSource, useValue: mockDataSource },
         { provide: StockService, useValue: mockStockService },
         { provide: PaymentsService, useValue: mockPaymentsService },
@@ -406,6 +418,82 @@ describe('OrdersService', () => {
       await flush();
       expect(res.status).toBe(OrderStatus.ACEPTADO);
       expect(mockEmailService.sendOrderStatusEmail).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('createForBuyer() — precios calculados en el servidor (seguridad 19/11)', () => {
+    const product = { id: 'prod-1', name: 'Cemento x 50 KG', sku: 'CEM50', companyId: 'company-uuid-1', variants: [{ id: 'var-1', name: 'Pallet', skuVariant: 'CEM50-P' }] };
+    const baseDto: any = {
+      companyId: 'company-uuid-1',
+      buyerName: 'Juan',
+      buyerEmail: 'juan@test.com',
+      deliveryAddress: { street: 'X 1', city: 'CABA', province: 'BA', postalCode: '1043' },
+      paymentMethod: 'Efectivo',
+    };
+
+    beforeEach(() => {
+      mockOrderRepo.create.mockImplementation((data) => data);
+      mockOrderRepo.save.mockImplementation(async (e) => ({ id: 'order-new', ...e }));
+    });
+
+    it('ignora el unitPrice manipulado por el cliente y usa el precio de la base', async () => {
+      mockProductRepo.find.mockResolvedValueOnce([product]);
+      mockPricesService.resolve.mockResolvedValueOnce({ finalPrice: 1500000, discountPercent: 0 });
+
+      const order: any = await service.createForBuyer('buyer-1', {
+        ...baseDto,
+        items: [{ productId: 'prod-1', productName: 'lo que sea', quantity: 2, unitPrice: 100 }],
+      });
+
+      expect(order.items[0]).toEqual(expect.objectContaining({
+        unitPrice: 1500000,
+        subtotal: 3000000,
+        productName: 'Cemento x 50 KG',
+        productSku: 'CEM50',
+      }));
+      expect(order.totalAmount).toBe(3000000);
+      expect(mockPricesService.resolve).toHaveBeenCalledWith('prod-1', 'B2C', 2, undefined);
+    });
+
+    it('aplica el descuento por volumen que resuelve el servidor', async () => {
+      mockProductRepo.find.mockResolvedValueOnce([product]);
+      mockPricesService.resolve.mockResolvedValueOnce({ finalPrice: 900, discountPercent: 10 });
+      const order: any = await service.createForBuyer('buyer-1', { ...baseDto, items: [{ productId: 'prod-1', productName: 'x', quantity: 20, unitPrice: 1, discountPercent: 90 }] });
+      expect(order.items[0].discountPercent).toBe(10);
+      expect(order.items[0].unitPrice).toBe(900);
+    });
+
+    it('producto de otra empresa o inactivo: BadRequest y no crea el pedido', async () => {
+      mockProductRepo.find.mockResolvedValueOnce([]);
+      await expect(
+        service.createForBuyer('buyer-1', { ...baseDto, items: [{ productId: 'ajeno', productName: 'Ajeno', quantity: 1, unitPrice: 1 }] }),
+      ).rejects.toThrow(BadRequestException);
+      expect(mockOrderRepo.save).not.toHaveBeenCalled();
+      expect(mockProductRepo.find).toHaveBeenCalledWith(expect.objectContaining({
+        where: expect.objectContaining({ companyId: 'company-uuid-1', isActive: true }),
+      }));
+    });
+
+    it('producto sin precio cargado: BadRequest', async () => {
+      mockProductRepo.find.mockResolvedValueOnce([product]);
+      mockPricesService.resolve.mockResolvedValueOnce(null);
+      await expect(
+        service.createForBuyer('buyer-1', { ...baseDto, items: [{ productId: 'prod-1', productName: 'x', quantity: 1, unitPrice: 1 }] }),
+      ).rejects.toThrow('no tiene precio');
+    });
+
+    it('variante que no es del producto: BadRequest', async () => {
+      mockProductRepo.find.mockResolvedValueOnce([product]);
+      await expect(
+        service.createForBuyer('buyer-1', { ...baseDto, items: [{ productId: 'prod-1', variantId: 'otra', productName: 'x', quantity: 1, unitPrice: 1 }] }),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('con variante: usa nombre y SKU de la variante', async () => {
+      mockProductRepo.find.mockResolvedValueOnce([product]);
+      mockPricesService.resolve.mockResolvedValueOnce({ finalPrice: 5000, discountPercent: 0 });
+      const order: any = await service.createForBuyer('buyer-1', { ...baseDto, items: [{ productId: 'prod-1', variantId: 'var-1', productName: 'x', quantity: 1, unitPrice: 1 }] });
+      expect(order.items[0]).toEqual(expect.objectContaining({ productName: 'Cemento x 50 KG - Pallet', productSku: 'CEM50-P' }));
     });
   });
 
