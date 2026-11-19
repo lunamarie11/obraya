@@ -109,3 +109,20 @@ resource "aws_secretsmanager_secret_version" "afip_access_token" {
 # AFIP_CERT_PATH/AFIP_KEY_PATH son archivos (certificado + clave), no un
 # string simple -- no entran en este patron de Secrets Manager. Ver
 # README.md para como montarlos en la task de ECS.
+
+# ADR-027 / ADR-028 (rev. 19/11): clave de servidor de Google Maps Platform
+# (Places API (New) + Directions), restringida por IP al Elastic IP de la
+# instancia. El valor real se pega a mano en la consola de Secrets Manager
+# (nunca en el repo); el deploy la copia a /opt/obraya/.env.backend.
+resource "aws_secretsmanager_secret" "google_maps_server_key" {
+  name = "obraya/${var.environment}/google-maps-server-key"
+}
+
+resource "aws_secretsmanager_secret_version" "google_maps_server_key" {
+  secret_id     = aws_secretsmanager_secret.google_maps_server_key.id
+  secret_string = "CHANGEME"
+
+  lifecycle {
+    ignore_changes = [secret_string]
+  }
+}

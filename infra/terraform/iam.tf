@@ -66,6 +66,7 @@ data "aws_iam_policy_document" "app_permissions" {
       aws_secretsmanager_secret.firebase_service_account.arn,
       aws_secretsmanager_secret.sentry_dsn.arn,
       aws_secretsmanager_secret.afip_access_token.arn,
+      aws_secretsmanager_secret.google_maps_server_key.arn,
     ]
   }
 

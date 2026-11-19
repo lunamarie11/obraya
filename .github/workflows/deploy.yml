@@ -103,6 +103,19 @@ jobs:
               --query "StandardOutputContent" --output text
           }
 
+          # ADR-028 (rev. 19/11): copia la clave de Google de Secrets Manager
+          # a .env.backend (la instancia la lee con su IAM role). Si el secreto
+          # no existe o sigue en CHANGEME no toca nada; nunca imprime la clave.
+          run_remote "cd /opt/obraya && \
+            KEY=\$(aws secretsmanager get-secret-value --secret-id obraya/production/google-maps-server-key --query SecretString --output text --region ${AWS_REGION} 2>/dev/null || true) && \
+            if [ -n \"\$KEY\" ] && [ \"\$KEY\" != CHANGEME ]; then \
+              touch .env.backend && \
+              grep -v '^GOOGLE_MAPS_SERVER_API_KEY=' .env.backend > .env.backend.tmp || true; \
+              echo \"GOOGLE_MAPS_SERVER_API_KEY=\$KEY\" >> .env.backend.tmp && \
+              chmod 600 .env.backend.tmp && mv .env.backend.tmp .env.backend && \
+              echo 'clave de Google sincronizada'; \
+            else echo 'clave de Google sin cargar en Secrets Manager, se omite'; fi"
+
           run_remote "cd /opt/obraya && \
             export ECR_BACKEND_IMAGE=${ECR_REGISTRY}/obraya-backend:${{ steps.vars.outputs.sha }} && \
             export ECR_FRONTEND_IMAGE=${ECR_REGISTRY}/obraya-frontend:${{ steps.vars.outputs.sha }} && \
